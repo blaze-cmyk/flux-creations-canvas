@@ -1,6 +1,7 @@
 import { useGeneratorStore, MODELS, QUALITIES, ASPECT_RATIOS } from '@/store/generatorStore';
 import { ImagePlus, Minus, Plus, X, ChevronDown, Check, Search, AtSign, PenLine } from 'lucide-react';
 import { useRef, useState, useEffect, useCallback } from 'react';
+import { Dialog, DialogContent } from '@/components/ui/dialog';
 
 export function PromptBar() {
   const {
@@ -18,6 +19,7 @@ export function PromptBar() {
   const [modelSearch, setModelSearch] = useState('');
   const [dragging, setDragging] = useState(false);
   const [freeGens, setFreeGens] = useState(false);
+  const [previewImg, setPreviewImg] = useState<string | null>(null);
 
   const selectedModel = MODELS.find((m) => m.id === model);
 
@@ -80,7 +82,7 @@ export function PromptBar() {
             <div className="flex items-center gap-2 mb-2">
               {referenceImages.map((img, i) => (
                 <div key={i} className="relative group">
-                  <img src={img} alt="" className="w-10 h-10 rounded-lg object-cover border border-border" />
+                  <img src={img} alt="" className="w-10 h-10 rounded-lg object-cover border border-border cursor-pointer" onClick={() => setPreviewImg(img)} />
                   <button
                     onClick={() => removeReferenceImage(i)}
                     className="absolute -top-1 -right-1 w-4 h-4 bg-destructive rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
@@ -210,6 +212,13 @@ export function PromptBar() {
           </div>
         </div>
       </div>
+
+      {/* Image preview dialog */}
+      <Dialog open={!!previewImg} onOpenChange={() => setPreviewImg(null)}>
+        <DialogContent className="max-w-2xl p-2 bg-popover border-border">
+          {previewImg && <img src={previewImg} alt="Preview" className="w-full h-auto rounded-lg object-contain max-h-[80vh]" />}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
