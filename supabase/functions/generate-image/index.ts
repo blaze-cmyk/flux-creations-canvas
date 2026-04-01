@@ -281,7 +281,7 @@ serve(async (req) => {
         });
       }
 
-      const size = arToSize(ar, quality);
+      const size = arToSize(ar, quality, modelConfig.runwareModel);
       const taskUUID = crypto.randomUUID();
 
       const task: Record<string, unknown> = {
