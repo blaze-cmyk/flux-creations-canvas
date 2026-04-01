@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { persist } from 'zustand/middleware';
 import { supabase } from '@/integrations/supabase/client';
 
 export type GeneratedImage = {
@@ -85,7 +86,9 @@ async function callGenerateAPI(params: {
   return { imageUrl: data?.imageUrl, imageBase64: data?.imageBase64 };
 }
 
-export const useGeneratorStore = create<GeneratorState>((set, get) => ({
+export const useGeneratorStore = create<GeneratorState>()(
+  persist(
+    (set, get) => ({
   prompt: '',
   referenceImages: [],
   model: 'gemini-3.1-flash-image',
@@ -219,4 +222,10 @@ export const useGeneratorStore = create<GeneratorState>((set, get) => ({
       set({ referenceImages: [...refs, imageUrl], selectedImageId: null });
     }
   },
-}));
+}),
+    {
+      name: 'generator-storage',
+      partialize: (state) => ({ images: state.images }),
+    }
+  )
+);
