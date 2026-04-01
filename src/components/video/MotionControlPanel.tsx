@@ -11,7 +11,7 @@ interface MotionControlPanelProps {
 }
 
 export function MotionControlPanel({
-  referenceImages, addReferenceImage, removeReferenceImage, fileInputRef,
+  referenceImages, addReferenceImage, setReferenceImageAt, removeReferenceImage, fileInputRef,
 }: MotionControlPanelProps) {
   const [sceneControl, setSceneControl] = useState(true);
   const [sceneSource, setSceneSource] = useState<'video' | 'image'>('image');
