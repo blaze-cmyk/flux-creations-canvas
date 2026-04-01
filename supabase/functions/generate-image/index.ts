@@ -289,11 +289,6 @@ serve(async (req) => {
       // Add seed image if reference images provided and model supports it
       if (modelConfig.supportsImageInput && referenceImages.length > 0) {
         task.inputs = { seedImage: referenceImages[0] };
-        // Some architectures (e.g. flux_2_pro) don't support strength
-        const noStrength = ["bfl:5@1", "bfl:6@1", "bfl:2@1", "bfl:2@2"];
-        if (!noStrength.includes(modelConfig.runwareModel!)) {
-          task.strength = 0.75;
-        }
       }
 
       console.log(`Calling Runware: model=${modelConfig.runwareModel}, size=${size.width}x${size.height}, refs=${referenceImages.length}`);
