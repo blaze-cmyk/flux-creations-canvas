@@ -108,7 +108,7 @@ async function callGenerate(payload: Record<string, unknown>, videoId: string, g
   }
 
   try {
-    const { data, error } = await supabase.functions.invoke('generate-video', { body: payload });
+    const { data, error } = await supabase.functions.invoke('generate-video', { body: { ...payload, action: 'submit' } });
 
     if (error) {
       let errMsg = error.message;
@@ -118,9 +118,7 @@ async function callGenerate(payload: Record<string, unknown>, videoId: string, g
           const body = await ctx.json();
           if (body?.error) errMsg = body.error;
         }
-      } catch {
-        // ignore secondary parsing errors
-      }
+      } catch {}
       set({ videos: get().videos.map(v => v.id === videoId ? { ...v, status: 'failed', error: errMsg } : v) });
       return;
     }
@@ -128,6 +126,45 @@ async function callGenerate(payload: Record<string, unknown>, videoId: string, g
     if (data?.error) {
       const isNsfw = data.filtered;
       set({ videos: get().videos.map(v => v.id === videoId ? { ...v, status: isNsfw ? 'nsfw' : 'failed', error: data.error } : v) });
+      return;
+    }
+
+    // Immediate result
+    if (data?.videoUrl || data?.status === 'complete') {
+      set({ videos: get().videos.map(v => v.id === videoId ? { ...v, status: 'complete', videoUrl: data.videoUrl } : v) });
+      return;
+    }
+
+    // Async: poll for result
+    if (data?.submitted && data?.provider && data?.taskId) {
+      const pollBody: Record<string, unknown> = {
+        action: 'poll',
+        provider: data.provider,
+        taskId: data.taskId,
+      };
+      if (data.responseUrl) pollBody.responseUrl = data.responseUrl;
+      if (data.statusUrl) pollBody.statusUrl = data.statusUrl;
+
+      const maxAttempts = 120; // 10 min max
+      for (let i = 0; i < maxAttempts; i++) {
+        await new Promise(r => setTimeout(r, 5000));
+        try {
+          const { data: pollData, error: pollError } = await supabase.functions.invoke('generate-video', { body: pollBody });
+          if (pollError) continue;
+          if (pollData?.status === 'complete' && pollData?.videoUrl) {
+            set({ videos: get().videos.map(v => v.id === videoId ? { ...v, status: 'complete', videoUrl: pollData.videoUrl } : v) });
+            return;
+          }
+          if (pollData?.status === 'failed') {
+            set({ videos: get().videos.map(v => v.id === videoId ? { ...v, status: 'failed', error: pollData.error || 'Generation failed' } : v) });
+            return;
+          }
+          // Still processing, continue polling
+        } catch {
+          // Network error, retry
+        }
+      }
+      set({ videos: get().videos.map(v => v.id === videoId ? { ...v, status: 'failed', error: 'Video generation timed out' } : v) });
       return;
     }
 
