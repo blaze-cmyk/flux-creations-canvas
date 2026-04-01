@@ -78,6 +78,7 @@ export function ReferenceImageStrip({
               key={image.id}
               id={image.id}
               src={image.src}
+              index={image.index}
               onPreview={() => onPreview(image.src)}
               onRemove={() => onRemove(image.index)}
             />
@@ -99,14 +100,16 @@ export function ReferenceImageStrip({
   );
 }
 
+
 type SortableThumbnailProps = {
   id: string;
   src: string;
+  index: number;
   onPreview: () => void;
   onRemove: () => void;
 };
 
-function SortableThumbnail({ id, src, onPreview, onRemove }: SortableThumbnailProps) {
+function SortableThumbnail({ id, src, index, onPreview, onRemove }: SortableThumbnailProps) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id });
 
   return (
@@ -123,6 +126,9 @@ function SortableThumbnail({ id, src, onPreview, onRemove }: SortableThumbnailPr
         {...listeners}
       >
         <img src={src} alt="" className="h-full w-full select-none object-cover" draggable={false} />
+        <span className="absolute bottom-1 left-1 flex h-5 w-5 items-center justify-center rounded-md bg-black/60 text-[10px] font-bold text-white backdrop-blur-sm">
+          {index + 1}
+        </span>
       </button>
 
       <button
