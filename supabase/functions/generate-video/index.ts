@@ -218,9 +218,9 @@ serve(async (req) => {
       const reqBody: Record<string, unknown> = {};
 
       if (isMotionControl) {
-        // Motion control: image_url (character), video_url (motion reference), optional prompt
-        if (referenceImages.length > 0) reqBody.image_url = referenceImages[0];
-        if (referenceImages.length > 1) reqBody.video_url = referenceImages[1];
+        // Motion control: slot 0 = motion video (video_url), slot 1 = character image (image_url)
+        if (referenceImages.length > 0) reqBody.video_url = referenceImages[0];
+        if (referenceImages.length > 1) reqBody.image_url = referenceImages[1];
         if (prompt) reqBody.prompt = prompt;
         reqBody.duration = duration;
         reqBody.aspect_ratio = aspectRatio;
