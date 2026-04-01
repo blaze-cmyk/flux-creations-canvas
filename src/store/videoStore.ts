@@ -22,6 +22,7 @@ export type GeneratedVideo = {
   thumbnailUrl?: string;
   createdAt: number;
   error?: string;
+  progress?: number;
   characterOrientation?: 'video' | 'image';
 };
 
