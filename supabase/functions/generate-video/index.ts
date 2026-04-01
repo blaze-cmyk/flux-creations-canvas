@@ -1,5 +1,4 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.4";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -9,132 +8,42 @@ const corsHeaders = {
 
 const FAL_QUEUE = "https://queue.fal.run";
 const RUNWARE_BASE = "https://api.runware.ai/v1";
-
-// Upload base64 data URI to storage and return public URL
-async function resolveFileUrl(dataOrUrl: string): Promise<string> {
-  if (!dataOrUrl.startsWith("data:")) return dataOrUrl;
-
-  const match = dataOrUrl.match(/^data:(.*?);base64,(.*)$/);
-  if (!match) return dataOrUrl;
-
-  const contentType = match[1];
-  const base64Data = match[2];
-  const bytes = Uint8Array.from(atob(base64Data), c => c.charCodeAt(0));
-  const ext = contentType.includes("png") ? "png" : contentType.includes("webp") ? "webp" : contentType.includes("mp4") ? "mp4" : "jpg";
-  const path = `${crypto.randomUUID()}.${ext}`;
-
-  const supabase = createClient(
-    Deno.env.get("SUPABASE_URL")!,
-    Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
-  );
-
-  const { error } = await supabase.storage.from("video-inputs").upload(path, bytes, {
-    contentType,
-    upsert: false,
-  });
-  if (error) throw new Error(`Storage upload failed: ${error.message}`);
-
-  const { data } = supabase.storage.from("video-inputs").getPublicUrl(path);
-  console.log(`Uploaded base64 to storage: ${path} -> ${data.publicUrl}`);
-  return data.publicUrl;
-}
+const EVOLINK_BASE = "https://api.evolink.ai";
 
 type VideoModelConfig = {
-  type: "fal" | "runware";
+  type: "fal" | "runware" | "evolink";
   textToVideo?: string;
   imageToVideo?: string;
   motionControl?: string;
   runwareModel?: string;
+  evolinkModel?: string;
 };
 
 const VIDEO_MODEL_MAP: Record<string, VideoModelConfig> = {
-  "kling-v3-pro": {
-    type: "fal",
-    textToVideo: "fal-ai/kling-video/v3/pro/text-to-video",
-    imageToVideo: "fal-ai/kling-video/v3/pro/image-to-video",
-  },
-  "kling-v3-motion": {
-    type: "fal",
-    motionControl: "fal-ai/kling-video/v3/pro/motion-control",
-  },
-  "kling-o3-pro": {
-    type: "fal",
-    imageToVideo: "fal-ai/kling-video/o3/standard/image-to-video",
-  },
-  "kling-v2.5-turbo-pro": {
-    type: "fal",
-    textToVideo: "fal-ai/kling-video/v2.5-turbo/pro/text-to-video",
-    imageToVideo: "fal-ai/kling-video/v2.5-turbo/pro/image-to-video",
-  },
-  "kling-v2.6-pro": {
-    type: "fal",
-    imageToVideo: "fal-ai/kling-video/v2.6/pro/image-to-video",
-  },
-  "kling-v2.6-motion-std": {
-    type: "fal",
-    motionControl: "fal-ai/kling-video/v2.6/standard/motion-control",
-  },
-  "kling-v2.6-motion-pro": {
-    type: "fal",
-    motionControl: "fal-ai/kling-video/v2.6/pro/motion-control",
-  },
-  "veo-3.1": {
-    type: "fal",
-    textToVideo: "fal-ai/veo3.1",
-    imageToVideo: "fal-ai/veo3.1/image-to-video",
-  },
-  "veo-3.1-fast": {
-    type: "fal",
-    textToVideo: "fal-ai/veo3.1/fast",
-    imageToVideo: "fal-ai/veo3.1/fast/image-to-video",
-  },
-  "veo-3.1-lite": {
-    type: "fal",
-    textToVideo: "fal-ai/veo3.1/lite",
-    imageToVideo: "fal-ai/veo3.1/lite/image-to-video",
-  },
-  "minimax-video": {
-    type: "fal",
-    textToVideo: "fal-ai/minimax/video-01-live",
-    imageToVideo: "fal-ai/minimax/video-01-live/image-to-video",
-  },
-  "pixverse-v6": {
-    type: "fal",
-    textToVideo: "fal-ai/pixverse/v6/text-to-video",
-    imageToVideo: "fal-ai/pixverse/v6/image-to-video",
-  },
-  "ltx-2-19b": {
-    type: "fal",
-    textToVideo: "fal-ai/ltx-2-19b",
-    imageToVideo: "fal-ai/ltx-2-19b/image-to-video",
-  },
-  "rw-seedance-1.5-pro": {
-    type: "runware",
-    runwareModel: "bytedance:seedance@1.5-pro",
-  },
-  "rw-runway-gen4.5": {
-    type: "runware",
-    runwareModel: "runwayml:gen@4.5",
-  },
-  "rw-sora-2": {
-    type: "runware",
-    runwareModel: "openai:3@1",
-  },
-  "rw-kling-2.5": {
-    type: "runware",
-    runwareModel: "klingai:6@1",
-  },
-  "rw-veo-3.1": {
-    type: "runware",
-    runwareModel: "google:3@2",
-  },
-  "rw-veo-3.1-fast": {
-    type: "runware",
-    runwareModel: "google:3@3",
-  },
+  "kling-v3-pro": { type: "fal", textToVideo: "fal-ai/kling-video/v3/pro/text-to-video", imageToVideo: "fal-ai/kling-video/v3/pro/image-to-video" },
+  "kling-v3-motion": { type: "fal", motionControl: "fal-ai/kling-video/v3/pro/motion-control" },
+  "ev-kling-v3-motion": { type: "evolink", evolinkModel: "kling-v3-motion-control" },
+  "kling-o3-pro": { type: "fal", imageToVideo: "fal-ai/kling-video/o3/standard/image-to-video" },
+  "kling-v2.5-turbo-pro": { type: "fal", textToVideo: "fal-ai/kling-video/v2.5-turbo/pro/text-to-video", imageToVideo: "fal-ai/kling-video/v2.5-turbo/pro/image-to-video" },
+  "kling-v2.6-pro": { type: "fal", imageToVideo: "fal-ai/kling-video/v2.6/pro/image-to-video" },
+  "kling-v2.6-motion-std": { type: "fal", motionControl: "fal-ai/kling-video/v2.6/standard/motion-control" },
+  "kling-v2.6-motion-pro": { type: "fal", motionControl: "fal-ai/kling-video/v2.6/pro/motion-control" },
+  "veo-3.1": { type: "fal", textToVideo: "fal-ai/veo3.1", imageToVideo: "fal-ai/veo3.1/image-to-video" },
+  "veo-3.1-fast": { type: "fal", textToVideo: "fal-ai/veo3.1/fast", imageToVideo: "fal-ai/veo3.1/fast/image-to-video" },
+  "veo-3.1-lite": { type: "fal", textToVideo: "fal-ai/veo3.1/lite", imageToVideo: "fal-ai/veo3.1/lite/image-to-video" },
+  "minimax-video": { type: "fal", textToVideo: "fal-ai/minimax/video-01-live", imageToVideo: "fal-ai/minimax/video-01-live/image-to-video" },
+  "pixverse-v6": { type: "fal", textToVideo: "fal-ai/pixverse/v6/text-to-video", imageToVideo: "fal-ai/pixverse/v6/image-to-video" },
+  "ltx-2-19b": { type: "fal", textToVideo: "fal-ai/ltx-2-19b", imageToVideo: "fal-ai/ltx-2-19b/image-to-video" },
+  "rw-seedance-1.5-pro": { type: "runware", runwareModel: "bytedance:seedance@1.5-pro" },
+  "rw-runway-gen4.5": { type: "runware", runwareModel: "runwayml:gen@4.5" },
+  "rw-sora-2": { type: "runware", runwareModel: "openai:3@1" },
+  "rw-kling-2.5": { type: "runware", runwareModel: "klingai:6@1" },
+  "rw-veo-3.1": { type: "runware", runwareModel: "google:3@2" },
+  "rw-veo-3.1-fast": { type: "runware", runwareModel: "google:3@3" },
 };
 
-// Poll fal.ai queue using status_url then fetch result from response_url
+// ---- Polling helpers ----
+
 async function pollFalResult(responseUrl: string, statusUrl: string | null, falKey: string, maxWaitMs = 300000): Promise<any> {
   const headers = { Authorization: `Key ${falKey}`, Accept: "application/json" };
   const start = Date.now();
@@ -144,12 +53,11 @@ async function pollFalResult(responseUrl: string, statusUrl: string | null, falK
     const resp = await fetch(pollUrl, { method: "GET", headers });
 
     if (resp.status === 202 || resp.status === 400) {
-      // Still in progress (fal returns 400 with "still in progress" for some models)
       const body = await resp.text();
       if (resp.status === 400 && !body.includes("in progress")) {
         throw new Error(`Poll error: ${resp.status} ${body}`);
       }
-      console.log(`Still processing, waiting 5s...`);
+      console.log("Still processing, waiting 5s...");
       await new Promise(r => setTimeout(r, 5000));
       continue;
     }
@@ -161,7 +69,6 @@ async function pollFalResult(responseUrl: string, statusUrl: string | null, falK
 
     const data = await resp.json();
 
-    // If polling status_url, check for COMPLETED/FAILED
     if (pollUrl !== responseUrl) {
       if (data.status === "COMPLETED") {
         const resultResp = await fetch(responseUrl, { method: "GET", headers });
@@ -174,16 +81,35 @@ async function pollFalResult(responseUrl: string, statusUrl: string | null, falK
       if (data.status === "FAILED") {
         throw new Error(data.error || "Video generation failed");
       }
-      // IN_QUEUE or IN_PROGRESS
       await new Promise(r => setTimeout(r, 5000));
       continue;
     }
 
-    // If polling response_url directly, the response IS the result
     return data;
   }
   throw new Error("Video generation timed out");
 }
+
+async function pollEvolinkTask(taskId: string, apiKey: string, maxWaitMs = 300000): Promise<any> {
+  const start = Date.now();
+  while (Date.now() - start < maxWaitMs) {
+    const resp = await fetch(`${EVOLINK_BASE}/v1/tasks/${taskId}`, {
+      headers: { Authorization: `Bearer ${apiKey}` },
+    });
+    if (!resp.ok) {
+      const body = await resp.text();
+      throw new Error(`Evolink task check failed: ${resp.status} ${body}`);
+    }
+    const data = await resp.json();
+    if (data.status === "completed") return data;
+    if (data.status === "failed") throw new Error(data.error?.message || "Evolink task failed");
+    console.log(`Evolink task ${taskId}: ${data.status} (${data.progress || 0}%)`);
+    await new Promise(r => setTimeout(r, 5000));
+  }
+  throw new Error("Evolink task timed out");
+}
+
+// ---- Main handler ----
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -193,11 +119,10 @@ serve(async (req) => {
   try {
     const body = await req.json();
     const prompt = typeof body?.prompt === "string" ? body.prompt : "";
-    const rawRefs = Array.isArray(body?.referenceImages)
+    // Client should have already uploaded base64 → URLs
+    const referenceImages = Array.isArray(body?.referenceImages)
       ? body.referenceImages.filter((img: unknown): img is string => typeof img === "string" && img.length > 0)
       : [];
-    // Resolve any base64 data URIs to hosted URLs
-    const referenceImages = await Promise.all(rawRefs.map((ref: string) => resolveFileUrl(ref)));
     const model = typeof body?.model === "string" ? body.model : "kling-v2.5-turbo-pro";
     const mode = typeof body?.mode === "string" ? body.mode : "text-to-video";
     const aspectRatio = typeof body?.aspectRatio === "string" ? body.aspectRatio : "16:9";
@@ -211,6 +136,81 @@ serve(async (req) => {
     }
 
     let videoUrl: string | undefined;
+
+    // ========== EVOLINK ==========
+    if (config.type === "evolink") {
+      const EVOLINK_API_KEY = Deno.env.get("EVOLINK_API_KEY");
+      if (!EVOLINK_API_KEY) {
+        return new Response(JSON.stringify({ error: "EVOLINK_API_KEY not configured" }), {
+          status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      // Motion control: slot 0 = motion video, slot 1 = character image
+      const motionVideo = referenceImages[0];
+      const characterImage = referenceImages[1];
+
+      if (!motionVideo || !characterImage) {
+        return new Response(JSON.stringify({ error: "Motion control requires a motion video (slot 0) and a character image (slot 1)" }), {
+          status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      const evolinkBody: Record<string, unknown> = {
+        model: config.evolinkModel,
+        image_urls: [characterImage],
+        video_urls: [motionVideo],
+        quality: "1080p",
+        model_params: {
+          character_orientation: body?.characterOrientation === "image" ? "image" : "video",
+        },
+      };
+      if (prompt) evolinkBody.prompt = prompt;
+
+      console.log(`Submitting Evolink task: model=${config.evolinkModel}`);
+
+      const submitResp = await fetch(`${EVOLINK_BASE}/v1/videos/generations`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${EVOLINK_API_KEY}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(evolinkBody),
+      });
+
+      if (!submitResp.ok) {
+        const errText = await submitResp.text();
+        console.error("Evolink submit error:", submitResp.status, errText);
+        return new Response(JSON.stringify({ error: `Evolink API error: ${submitResp.status}`, details: errText }), {
+          status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      const submitData = await submitResp.json();
+      const taskId = submitData.id;
+
+      if (!taskId) {
+        return new Response(JSON.stringify({ error: "No task ID in Evolink response" }), {
+          status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      console.log(`Polling Evolink task: ${taskId}`);
+      const result = await pollEvolinkTask(taskId, EVOLINK_API_KEY);
+
+      // Extract video URL from results
+      const results = result?.results;
+      if (Array.isArray(results) && results.length > 0) {
+        videoUrl = typeof results[0] === "string" ? results[0] : results[0]?.url;
+      }
+
+      if (!videoUrl) {
+        console.error("Evolink result:", JSON.stringify(result).substring(0, 500));
+        return new Response(JSON.stringify({ error: "No video in Evolink response" }), {
+          status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+    }
 
     // ========== FAL.AI ==========
     if (config.type === "fal") {
@@ -227,42 +227,25 @@ serve(async (req) => {
       let endpoint: string | undefined;
       if (isMotionControl) {
         endpoint = config.motionControl;
-        if (!endpoint) {
-          return new Response(JSON.stringify({ error: `Model ${model} does not support motion control` }), {
-            status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
-          });
-        }
+        if (!endpoint) return new Response(JSON.stringify({ error: `Model ${model} does not support motion control` }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
       } else if (isImageMode) {
         endpoint = config.imageToVideo;
-        if (!endpoint) {
-          return new Response(JSON.stringify({ error: `Model ${model} does not support image to video` }), {
-            status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
-          });
-        }
+        if (!endpoint) return new Response(JSON.stringify({ error: `Model ${model} does not support image to video` }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
       } else {
         endpoint = config.textToVideo;
-        if (!endpoint) {
-          return new Response(JSON.stringify({ error: `Model ${model} does not support text to video` }), {
-            status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
-          });
-        }
+        if (!endpoint) return new Response(JSON.stringify({ error: `Model ${model} does not support text to video` }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
       }
 
-      // Build the input payload
       const input: Record<string, unknown> = {};
 
       if (isMotionControl) {
-        // Motion control: slot 0 = motion video, slot 1 = character image
         const motionVideo = referenceImages[0];
         const characterImage = referenceImages[1];
-
         if (!motionVideo || !characterImage) {
-          return new Response(JSON.stringify({ error: "Motion control requires both a motion reference video (slot 0) and a character image (slot 1)" }), {
+          return new Response(JSON.stringify({ error: "Motion control requires a motion video (slot 0) and a character image (slot 1)" }), {
             status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
           });
         }
-
-        // Per fal.ai docs: image_url (character), video_url (motion ref), character_orientation (required)
         input.image_url = characterImage;
         input.video_url = motionVideo;
         input.character_orientation = body?.characterOrientation === "image" ? "image" : "video";
@@ -273,25 +256,17 @@ serve(async (req) => {
         input.duration = duration;
         input.aspect_ratio = aspectRatio;
         input.negative_prompt = "blur, distort, and low quality";
-
         if (isImageMode) {
           input.image_url = referenceImages[0];
-          if (referenceImages.length > 1) {
-            input.tail_image_url = referenceImages[1];
-          }
+          if (referenceImages.length > 1) input.tail_image_url = referenceImages[1];
         }
       }
 
-      console.log(`Submitting to fal.ai queue: ${endpoint}, mode=${mode}, input_keys=${Object.keys(input).join(",")}`);
+      console.log(`Submitting to fal.ai queue: ${endpoint}, mode=${mode}`);
 
-      // Submit to queue with { input: ... } wrapper per fal.ai docs
       const submitResp = await fetch(`${FAL_QUEUE}/${endpoint}`, {
         method: "POST",
-        headers: {
-          Authorization: `Key ${FAL_KEY}`,
-          "Content-Type": "application/json",
-          Accept: "application/json",
-        },
+        headers: { Authorization: `Key ${FAL_KEY}`, "Content-Type": "application/json", Accept: "application/json" },
         body: JSON.stringify(input),
       });
 
@@ -304,30 +279,21 @@ serve(async (req) => {
       }
 
       const submitData = await submitResp.json();
-      console.log(`Fal submit response keys: ${Object.keys(submitData).join(",")}`);
-
       const responseUrl = submitData.response_url;
 
       if (!responseUrl) {
-        // Synchronous response — extract video directly
         const payload = submitData?.data ?? submitData;
         const vid = payload?.video?.url || payload?.video;
-        if (vid) {
-          videoUrl = typeof vid === "string" ? vid : vid.url;
-        }
+        if (vid) videoUrl = typeof vid === "string" ? vid : vid.url;
       } else {
-        // Async queue — poll response_url
-        console.log(`Polling fal.ai: request_id=${submitData.request_id}, response_url=${responseUrl}`);
+        console.log(`Polling fal.ai: request_id=${submitData.request_id}`);
         const result = await pollFalResult(responseUrl, submitData.status_url || null, FAL_KEY);
         const payload = result?.data ?? result;
         const vid = payload?.video?.url || payload?.video;
-        if (vid) {
-          videoUrl = typeof vid === "string" ? vid : vid.url;
-        }
+        if (vid) videoUrl = typeof vid === "string" ? vid : vid.url;
       }
 
       if (!videoUrl) {
-        console.error("No video URL found in fal response");
         return new Response(JSON.stringify({ error: "No video in fal.ai response" }), {
           status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
@@ -357,14 +323,11 @@ serve(async (req) => {
         task.seedImage = referenceImages[0];
       }
 
-      console.log(`Calling Runware video: model=${config.runwareModel}, dur=${duration}s`);
+      console.log(`Calling Runware video: model=${config.runwareModel}`);
 
       const response = await fetch(RUNWARE_BASE, {
         method: "POST",
-        headers: {
-          Authorization: `Bearer ${RUNWARE_API_KEY}`,
-          "Content-Type": "application/json",
-        },
+        headers: { Authorization: `Bearer ${RUNWARE_API_KEY}`, "Content-Type": "application/json" },
         body: JSON.stringify([task]),
       });
 
