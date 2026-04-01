@@ -69,43 +69,7 @@ function toBase64DataUri(bytes: Uint8Array, mimeType: string): string {
   return `data:${mimeType};base64,${bytesToBase64(bytes)}`;
 }
 
-// Poll fal.ai queue until complete
-async function pollFalResult(requestId: string, falModel: string, falKey: string): Promise<any> {
-  const statusUrl = `https://queue.fal.run/${falModel}/requests/${requestId}/status`;
-  const resultUrl = `https://queue.fal.run/${falModel}/requests/${requestId}`;
-
-  for (let i = 0; i < 120; i++) {
-    await new Promise((r) => setTimeout(r, 2000));
-
-    const statusResp = await fetch(statusUrl, {
-      headers: { Authorization: `Key ${falKey}` },
-    });
-
-    if (!statusResp.ok) {
-      console.error("Fal status check error:", statusResp.status);
-      continue;
-    }
-
-    const statusData = await statusResp.json();
-    console.log(`Fal status (${i}):`, statusData.status);
-
-    if (statusData.status === "COMPLETED") {
-      const resultResp = await fetch(resultUrl, {
-        headers: { Authorization: `Key ${falKey}` },
-      });
-      if (!resultResp.ok) {
-        throw new Error(`Failed to fetch fal result: ${resultResp.status}`);
-      }
-      return await resultResp.json();
-    }
-
-    if (statusData.status === "FAILED") {
-      throw new Error(statusData.error || "Fal generation failed");
-    }
-  }
-
-  throw new Error("Fal generation timed out");
-}
+// fal.run is synchronous — no polling needed
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {
