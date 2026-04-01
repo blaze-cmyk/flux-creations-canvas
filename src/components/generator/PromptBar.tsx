@@ -212,6 +212,13 @@ export function PromptBar() {
           </div>
         </div>
       </div>
+
+      {/* Image preview dialog */}
+      <Dialog open={!!previewImg} onOpenChange={() => setPreviewImg(null)}>
+        <DialogContent className="max-w-2xl p-2 bg-popover border-border">
+          {previewImg && <img src={previewImg} alt="Preview" className="w-full h-auto rounded-lg object-contain max-h-[80vh]" />}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
