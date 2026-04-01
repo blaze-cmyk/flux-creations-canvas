@@ -1,6 +1,13 @@
 import { create } from 'zustand';
 import { supabase } from '@/integrations/supabase/client';
 import { resolveAllToUrls } from '@/lib/uploadToStorage';
+import { toast } from 'sonner';
+
+function formatBytes(bytes: number) {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1048576) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / 1048576).toFixed(1)} MB`;
+}
 
 export type GeneratedVideo = {
   id: string;
