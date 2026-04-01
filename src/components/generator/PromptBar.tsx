@@ -1,6 +1,7 @@
 import { useGeneratorStore, MODELS, QUALITIES, ASPECT_RATIOS } from '@/store/generatorStore';
 import { ImagePlus, Minus, Plus, X, ChevronDown, Check, Search, AtSign, PenLine } from 'lucide-react';
 import { useRef, useState, useEffect, useCallback } from 'react';
+import { Dialog, DialogContent } from '@/components/ui/dialog';
 
 export function PromptBar() {
   const {
