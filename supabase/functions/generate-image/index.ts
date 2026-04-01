@@ -19,6 +19,7 @@ type ModelConfig = {
   isMultiRef?: boolean;
   requiresImage?: boolean;
   textFallback?: string;
+  lora?: string;
 };
 
 const MODEL_MAP: Record<string, ModelConfig> = {
@@ -40,6 +41,7 @@ const MODEL_MAP: Record<string, ModelConfig> = {
 
   // Flux 1 (via fal.ai) — text-to-image
   "flux-schnell": { falModel: "fal-ai/flux/schnell", type: "fal", supportsImageInput: false },
+  "flux-uncensored-v2": { falModel: "fal-ai/flux/dev", type: "fal", supportsImageInput: false, lora: "enhanceaiteam/Flux-Uncensored-V2" },
   "flux-dev": { falModel: "fal-ai/flux/dev", type: "fal", supportsImageInput: false },
   "flux-pro-v1.1": { falModel: "fal-ai/flux-pro/v1.1", type: "fal", supportsImageInput: false },
 
@@ -221,6 +223,11 @@ serve(async (req) => {
       const reqBody: Record<string, unknown> = {
         prompt, num_images: 1, output_format: "png", safety_tolerance: "6",
       };
+
+      // Add LoRA if configured
+      if (modelConfig.lora) {
+        reqBody.loras = [{ path: `https://huggingface.co/${modelConfig.lora}`, scale: 1.0 }];
+      }
       if (ar !== "Auto") reqBody.aspect_ratio = ar;
 
       if (modelConfig.supportsImageInput && referenceImages.length > 0) {
