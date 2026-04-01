@@ -29,10 +29,6 @@ export default function Generator() {
               <Clock className="w-3.5 h-3.5" />
               History
             </button>
-            <button className="flex items-center gap-1.5 text-sm text-muted-foreground px-3 py-1 rounded-full hover:bg-muted transition-colors">
-              <Users className="w-3.5 h-3.5" />
-              Community
-            </button>
           </div>
         </div>
         <div className="flex items-center gap-2">
