@@ -9,14 +9,35 @@ const corsHeaders = {
 const APIYI_BASE = "https://api.apiyi.com";
 const FAL_BASE = "https://queue.fal.run";
 
-const MODEL_MAP: Record<string, { falModel?: string; apiModel?: string; type: "gemini" | "flux" }> = {
-  "gemini-3.1-flash-image": { apiModel: "gemini-3.1-flash-image-preview", type: "gemini" },
-  "gemini-3-pro-image": { apiModel: "gemini-3-pro-image-preview", type: "gemini" },
-  "gemini-2.5-flash-image": { apiModel: "gemini-2.5-flash-image", type: "gemini" },
-  "flux-kontext-pro": { falModel: "fal-ai/flux-pro/kontext", type: "flux" },
-  "flux-kontext-max": { falModel: "fal-ai/flux-pro/kontext/max", type: "flux" },
-  "flux-dev": { falModel: "fal-ai/flux/dev", type: "flux" },
-  "flux-pro": { falModel: "fal-ai/flux-pro/v1.1", type: "flux" },
+type ModelConfig = {
+  type: "gemini" | "fal";
+  falModel?: string;
+  apiModel?: string;
+  supportsImageInput?: boolean; // can accept reference images
+  isMultiRef?: boolean; // supports multiple reference images natively
+};
+
+const MODEL_MAP: Record<string, ModelConfig> = {
+  // Gemini models (via apiyi)
+  "gemini-3.1-flash-image": { apiModel: "gemini-3.1-flash-image-preview", type: "gemini", supportsImageInput: true, isMultiRef: true },
+  "gemini-3-pro-image": { apiModel: "gemini-3-pro-image-preview", type: "gemini", supportsImageInput: true, isMultiRef: true },
+  "gemini-2.5-flash-image": { apiModel: "gemini-2.5-flash-image", type: "gemini", supportsImageInput: true, isMultiRef: true },
+  // Flux Kontext (via fal.ai)
+  "flux-kontext-pro": { falModel: "fal-ai/flux-pro/kontext", type: "fal", supportsImageInput: true },
+  "flux-kontext-max": { falModel: "fal-ai/flux-pro/kontext/max", type: "fal", supportsImageInput: true },
+  "flux-kontext-multi": { falModel: "fal-ai/flux-pro/kontext/multi", type: "fal", supportsImageInput: true, isMultiRef: true },
+  // Flux 2 (via fal.ai)
+  "flux-2-pro": { falModel: "fal-ai/flux-2-pro/edit", type: "fal", supportsImageInput: true },
+  "flux-2-max": { falModel: "fal-ai/flux-2-max/edit", type: "fal", supportsImageInput: true },
+  "flux-2-flex": { falModel: "fal-ai/flux-2-flex/edit", type: "fal", supportsImageInput: true, isMultiRef: true },
+  "flux-2-dev": { falModel: "fal-ai/flux-2/edit", type: "fal", supportsImageInput: true },
+  // Flux 1 (via fal.ai)
+  "flux-schnell": { falModel: "fal-ai/flux/schnell", type: "fal", supportsImageInput: false },
+  "flux-dev": { falModel: "fal-ai/flux/dev", type: "fal", supportsImageInput: false },
+  "flux-pro-v1.1": { falModel: "fal-ai/flux-pro/v1.1", type: "fal", supportsImageInput: false },
+  // Other fal.ai models
+  "recraft-v3": { falModel: "fal-ai/recraft-v3", type: "fal", supportsImageInput: false },
+  "ideogram-v3": { falModel: "fal-ai/ideogram/v3", type: "fal", supportsImageInput: false },
 };
 
 const QUALITY_MAP: Record<string, string> = { "1K": "1K", "2K": "2K", "4K": "4K" };
@@ -132,18 +153,15 @@ serve(async (req) => {
 
       const parts: any[] = [];
 
-      // Add reference images as inline data
       for (const refImg of referenceImages) {
         const dataUri = await fetchImageAsDataUri(refImg);
         if (!dataUri) continue;
         const match = dataUri.match(/^data:(image\/\w+);base64,(.+)$/);
         if (!match) continue;
-        parts.push({
-          inlineData: { mimeType: match[1], data: match[2] },
-        });
+        parts.push({ inlineData: { mimeType: match[1], data: match[2] } });
       }
 
-      // Add prompt text — passed exactly as user typed
+      // Prompt passed exactly as user typed
       parts.push({ text: prompt });
 
       const imageSize = QUALITY_MAP[quality] || "2K";
@@ -192,8 +210,8 @@ serve(async (req) => {
       }
     }
 
-    // ========== FLUX MODELS (via fal.ai) ==========
-    if (modelConfig.type === "flux") {
+    // ========== FAL.AI MODELS ==========
+    if (modelConfig.type === "fal") {
       const FAL_KEY = Deno.env.get("FAL_KEY");
       if (!FAL_KEY) {
         return new Response(JSON.stringify({ error: "FAL_KEY not configured" }), {
@@ -203,11 +221,10 @@ serve(async (req) => {
       }
 
       const falModel = modelConfig.falModel!;
-      const isKontext = falModel.includes("kontext");
 
-      // Build fal.ai request body
+      // Build request body — prompt is ALWAYS raw, never modified
       const reqBody: Record<string, unknown> = {
-        prompt, // raw user prompt, NEVER modified
+        prompt,
         num_images: 1,
         output_format: "png",
         safety_tolerance: "6",
@@ -218,24 +235,21 @@ serve(async (req) => {
         reqBody.aspect_ratio = ar;
       }
 
-      // For Kontext models: pass reference image(s) via image_url
-      // Kontext accepts URLs or base64 data URIs natively
-      if (isKontext && referenceImages.length > 0) {
-        // Kontext takes a single image_url — for multiple refs, use the first one
-        // (Kontext pro/max is designed for single-image editing with prompt)
-        const refUrl = referenceImages[0];
-        reqBody.image_url = refUrl;
-        console.log(`Flux Kontext: using 1 reference image`);
+      // Add reference images if model supports them
+      if (modelConfig.supportsImageInput && referenceImages.length > 0) {
+        if (modelConfig.isMultiRef && referenceImages.length > 1) {
+          // Multi-ref models: pass array of URLs
+          reqBody.image_url = referenceImages;
+          console.log(`Fal multi-ref: passing ${referenceImages.length} images`);
+        } else {
+          // Single-ref: pass first image only
+          reqBody.image_url = referenceImages[0];
+          console.log(`Fal single-ref: passing 1 image`);
+        }
       }
 
-      // For non-kontext flux models (dev, pro): no image_url support
-      // They are text-to-image only
-
       const endpoint = `${FAL_BASE}/${falModel}`;
-
-      console.log(
-        `Calling fal.ai: ${endpoint}, ar=${ar}, refs=${referenceImages.length}, prompt="${prompt.substring(0, 80)}..."`,
-      );
+      console.log(`Calling fal.ai: ${endpoint}, ar=${ar}, refs=${referenceImages.length}, prompt="${prompt.substring(0, 80)}..."`);
 
       // Submit to fal.ai queue
       const submitResp = await fetch(endpoint, {
@@ -261,12 +275,10 @@ serve(async (req) => {
 
       let resultData: any;
 
-      // Check if we got an immediate result (sync) or need to poll (queue)
+      // Check if we got an immediate result or need to poll
       if (submitData.images && submitData.images.length > 0) {
-        // Synchronous result
         resultData = submitData;
       } else if (submitData.request_id) {
-        // Queue-based — poll for result
         console.log(`Fal queued, request_id: ${submitData.request_id}`);
         resultData = await pollFalResult(submitData.request_id, falModel, FAL_KEY);
       } else {
@@ -277,12 +289,18 @@ serve(async (req) => {
         });
       }
 
-      console.log("Fal result keys:", Object.keys(resultData || {}));
+      // Check for NSFW
+      if (resultData?.has_nsfw_concepts?.[0]) {
+        return new Response(JSON.stringify({ error: "Image was filtered due to content policy." }), {
+          status: 422,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
 
       // Extract image from result
       const outputImage = resultData?.images?.[0];
       if (outputImage?.url) {
-        // Proxy the image to avoid CORS issues
+        // Proxy the image to base64 to avoid CORS
         const imgResp = await fetch(outputImage.url);
         if (imgResp.ok) {
           const buf = await imgResp.arrayBuffer();
@@ -293,15 +311,6 @@ serve(async (req) => {
         }
       } else {
         console.error("No image in fal result:", JSON.stringify(resultData).substring(0, 500));
-        
-        // Check for NSFW
-        if (resultData?.has_nsfw_concepts?.[0]) {
-          return new Response(JSON.stringify({ error: "Image was filtered due to content policy." }), {
-            status: 422,
-            headers: { ...corsHeaders, "Content-Type": "application/json" },
-          });
-        }
-        
         return new Response(JSON.stringify({ error: "No image in fal.ai response" }), {
           status: 502,
           headers: { ...corsHeaders, "Content-Type": "application/json" },

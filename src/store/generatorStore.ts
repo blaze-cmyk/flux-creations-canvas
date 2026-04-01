@@ -43,13 +43,26 @@ type GeneratorState = {
 };
 
 export const MODELS = [
+  // Gemini (via apiyi)
   { id: 'gemini-3.1-flash-image', name: 'Gemini 3.1 Flash Image', desc: 'Fast image gen & editing, pro-level quality', featured: true, badge: 'NEW' as const },
   { id: 'gemini-3-pro-image', name: 'Gemini 3 Pro Image', desc: 'Next-gen image generation, highest quality', featured: true },
   { id: 'gemini-2.5-flash-image', name: 'Gemini 2.5 Flash Image', desc: 'Fast & stable, great value', featured: true },
-  { id: 'flux-kontext-pro', name: 'Flux Kontext Pro', desc: 'High quality, flexible aspect ratios, uncensored', featured: true },
-  { id: 'flux-kontext-max', name: 'Flux Kontext Max', desc: 'Maximum quality, professional grade, uncensored', featured: true },
-  { id: 'flux-dev', name: 'Flux Dev', desc: 'Development model, fast iterations', featured: false },
-  { id: 'flux-pro', name: 'Flux Pro', desc: 'Production quality flux model', featured: false },
+  // Flux Kontext (via fal.ai) — image editing with references
+  { id: 'flux-kontext-pro', name: 'Flux Kontext Pro', desc: 'Frontier image editing, single reference', featured: true },
+  { id: 'flux-kontext-max', name: 'Flux Kontext Max', desc: 'Best prompt adherence & typography', featured: true },
+  { id: 'flux-kontext-multi', name: 'Flux Kontext Multi', desc: 'Multi-image references for face swaps & merging', featured: true, badge: 'NEW' as const },
+  // Flux 2 (via fal.ai)
+  { id: 'flux-2-pro', name: 'Flux 2 Pro', desc: 'Maximum quality, exceptional photorealism', featured: true },
+  { id: 'flux-2-max', name: 'Flux 2 Max', desc: 'State-of-the-art generation & editing', featured: true },
+  { id: 'flux-2-flex', name: 'Flux 2 Flex', desc: 'Multi-reference editing, enhanced text rendering', featured: false },
+  { id: 'flux-2-dev', name: 'Flux 2 Dev', desc: 'Fast Flux 2 editing, dev-friendly', featured: false },
+  // Flux 1 (via fal.ai)
+  { id: 'flux-schnell', name: 'Flux Schnell', desc: 'Ultra-fast generation, open source', featured: false },
+  { id: 'flux-dev', name: 'Flux 1 Dev', desc: 'High quality open source, 12B params', featured: false },
+  { id: 'flux-pro-v1.1', name: 'Flux Pro 1.1', desc: 'Production quality, top Elo score', featured: false },
+  // Other fal.ai models
+  { id: 'recraft-v3', name: 'Recraft V3', desc: 'Best text rendering & vector art', featured: false },
+  { id: 'ideogram-v3', name: 'Ideogram V3', desc: 'Marketing materials, logos with text', featured: false },
 ];
 
 export const ASPECT_RATIOS = [
