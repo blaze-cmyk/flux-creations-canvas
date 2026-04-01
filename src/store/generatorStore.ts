@@ -180,9 +180,9 @@ export const useGeneratorStore = create<GeneratorState>()((set, get) => ({
     imgs.splice(toIndex, 0, moved);
     set({ referenceImages: imgs });
   },
-  setModel: (model) => set({ model }),
-  setQuality: (quality) => set({ quality }),
-  setAspectRatio: (aspectRatio) => set({ aspectRatio }),
+  setModel: (model) => { set({ model }); localStorage.setItem('gen-last-model', model); },
+  setQuality: (quality) => { set({ quality }); localStorage.setItem('gen-last-quality', quality); },
+  setAspectRatio: (aspectRatio) => { set({ aspectRatio }); localStorage.setItem('gen-last-ar', aspectRatio); },
   setQuantity: (qty) => set({ quantity: Math.max(1, Math.min(4, qty)) }),
   setSelectedImageId: (id) => set({ selectedImageId: id }),
 
