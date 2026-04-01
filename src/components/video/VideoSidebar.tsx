@@ -125,20 +125,22 @@ export function VideoSidebar() {
 
         {/* Duration / Aspect / Quality row */}
         <div className="flex gap-2">
-          <div className="flex-1 bg-card border border-border rounded-xl px-3 py-2">
-            <span className="text-[10px] text-muted-foreground block mb-1">Duration</span>
-            <div className="flex gap-1">
-              {VIDEO_DURATIONS.map(d => (
-                <button
-                  key={d}
-                  onClick={() => setDuration(d)}
-                  className={`flex-1 text-xs py-1 rounded-lg transition-colors ${duration === d ? 'bg-muted text-foreground' : 'text-muted-foreground hover:text-foreground'}`}
-                >
-                  {d}s
-                </button>
-              ))}
+          {mode !== 'motion-control' && (
+            <div className="flex-1 bg-card border border-border rounded-xl px-3 py-2">
+              <span className="text-[10px] text-muted-foreground block mb-1">Duration</span>
+              <div className="flex gap-1">
+                {VIDEO_DURATIONS.map(d => (
+                  <button
+                    key={d}
+                    onClick={() => setDuration(d)}
+                    className={`flex-1 text-xs py-1 rounded-lg transition-colors ${duration === d ? 'bg-muted text-foreground' : 'text-muted-foreground hover:text-foreground'}`}
+                  >
+                    {d}s
+                  </button>
+                ))}
+              </div>
             </div>
-          </div>
+          )}
           <div className="flex-1 bg-card border border-border rounded-xl px-3 py-2">
             <span className="text-[10px] text-muted-foreground block mb-1">Ratio</span>
             <div className="flex gap-1">
