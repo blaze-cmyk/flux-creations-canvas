@@ -14,6 +14,7 @@ export function VideoSidebar() {
   } = useVideoStore();
 
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const modelBtnRef = useRef<HTMLButtonElement>(null);
   const [modelOpen, setModelOpen] = useState(false);
   const [modelSearch, setModelSearch] = useState('');
   const [enhance, setEnhance] = useState(true);
