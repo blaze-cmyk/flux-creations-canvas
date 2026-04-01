@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { Image, decode } from "https://deno.land/x/imagescript@1.3.0/mod.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -20,7 +21,6 @@ const MODEL_MAP: Record<string, { apiModel: string; type: "gemini" | "flux" }> =
 
 const QUALITY_MAP: Record<string, string> = { "1K": "1K", "2K": "2K", "4K": "4K" };
 
-// Helper: fetch image as bytes
 async function fetchImageBytes(src: string): Promise<{ bytes: Uint8Array; mimeType: string } | null> {
   try {
     if (src.startsWith("data:")) {
@@ -41,11 +41,71 @@ async function fetchImageBytes(src: string): Promise<{ bytes: Uint8Array; mimeTy
   } catch { return null; }
 }
 
-// Helper: convert bytes to base64 data URI
 function toBase64DataUri(bytes: Uint8Array, mimeType: string): string {
   let binary = "";
   for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
   return `data:${mimeType};base64,${btoa(binary)}`;
+}
+
+// Merge multiple images side-by-side into a single image
+async function mergeImagesSideBySide(imageDataList: { bytes: Uint8Array; mimeType: string }[]): Promise<{ bytes: Uint8Array; mimeType: string }> {
+  const decoded: Image[] = [];
+  for (const img of imageDataList) {
+    const d = await decode(img.bytes);
+    decoded.push(d as Image);
+  }
+
+  // Normalize heights to the tallest image
+  const maxH = Math.max(...decoded.map(d => d.height));
+  const resized: Image[] = [];
+  for (const d of decoded) {
+    if (d.height < maxH) {
+      const scale = maxH / d.height;
+      const newW = Math.round(d.width * scale);
+      resized.push(d.resize(newW, maxH));
+    } else {
+      resized.push(d);
+    }
+  }
+
+  const totalW = resized.reduce((s, d) => s + d.width, 0);
+  const canvas = new Image(totalW, maxH);
+
+  let x = 0;
+  for (const img of resized) {
+    canvas.composite(img, x, 0);
+    x += img.width;
+  }
+
+  const pngBytes = await canvas.encode(1); // PNG format
+  return { bytes: new Uint8Array(pngBytes), mimeType: "image/png" };
+}
+
+// Rewrite prompt: replace "image 1", "image 2" etc with positional terms
+function rewritePromptForMerged(prompt: string, count: number): string {
+  const positions = ["the left", "the right", "the center", "the far left", "the far right"];
+  let result = prompt;
+  for (let i = 1; i <= count; i++) {
+    const pos = count === 2
+      ? (i === 1 ? "the left" : "the right")
+      : (i === 1 ? "the left" : i === count ? "the right" : "the center");
+    const patterns = [
+      new RegExp(`image\\s*${i}`, "gi"),
+      new RegExp(`img\\s*${i}`, "gi"),
+      new RegExp(`photo\\s*${i}`, "gi"),
+      new RegExp(`picture\\s*${i}`, "gi"),
+      new RegExp(`person\\s*${i}`, "gi"),
+      new RegExp(`model\\s*${i}`, "gi"),
+    ];
+    for (const p of patterns) {
+      result = result.replace(p, `the person on ${pos} side`);
+    }
+  }
+  // Add context about the merged image
+  if (!result.toLowerCase().includes("side by side") && !result.toLowerCase().includes("left") && !result.toLowerCase().includes("right")) {
+    result = `This image shows ${count} people side by side (left to right). ${result}`;
+  }
+  return result;
 }
 
 serve(async (req) => {
@@ -85,7 +145,6 @@ serve(async (req) => {
       // Gemini: inline images in parts
       const parts: any[] = [];
       
-      // Add reference images first so the model sees them before the text instruction
       for (const refImg of referenceImages) {
         const img = await fetchImageBytes(refImg);
         if (img) {
@@ -138,66 +197,46 @@ serve(async (req) => {
       const hasRefs = referenceImages.length > 0;
 
       if (hasRefs) {
-        // Flux with reference images → use /v1/images/edits (multipart/form-data)
-        // For multiple images, we use the first image as the main edit target
-        // The prompt should describe what to do with the image
-        const firstImg = await fetchImageBytes(referenceImages[0]);
-        if (!firstImg) {
-          return new Response(JSON.stringify({ error: "Could not load reference image" }), {
+        // Fetch all reference images
+        const allImages: { bytes: Uint8Array; mimeType: string }[] = [];
+        for (const ref of referenceImages) {
+          const img = await fetchImageBytes(ref);
+          if (img) allImages.push(img);
+        }
+
+        if (allImages.length === 0) {
+          return new Response(JSON.stringify({ error: "Could not load reference images" }), {
             status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
           });
         }
 
-        // Build enhanced prompt referencing all images
+        let imageToSend: { bytes: Uint8Array; mimeType: string };
         let enhancedPrompt = prompt;
-        
-        // If multiple reference images, we need to merge them side-by-side
-        // and adjust the prompt to reference left/right
-        let imageToSend = firstImg;
-        
-        if (referenceImages.length >= 2) {
-          // For multi-image: merge side by side using canvas-like approach
-          // Since we can't use Canvas in Deno easily, we'll send as the first image
-          // and describe the second image in the prompt
-          // Better approach: use Kontext Max which supports the edit API
-          
-          // Fetch all images
-          const allImages: { bytes: Uint8Array; mimeType: string }[] = [];
-          for (const ref of referenceImages) {
-            const img = await fetchImageBytes(ref);
-            if (img) allImages.push(img);
-          }
-          
-          if (allImages.length >= 2) {
-            // Create a simple side-by-side merge using PPM format (no external deps needed)
-            // We'll use a simpler approach: send first image to edit API with prompt referencing all
-            imageToSend = allImages[0];
-            
-            // For 2+ images with Flux, we enhance the prompt
-            // The user's prompt like "swap face from image 1 to image 2" becomes
-            // instructions on the primary image
-            console.log(`Flux edit with ${allImages.length} reference images`);
-          }
+
+        if (allImages.length >= 2) {
+          // Merge images side-by-side so the model can see ALL reference images
+          console.log(`Merging ${allImages.length} images side-by-side for Flux edit`);
+          imageToSend = await mergeImagesSideBySide(allImages);
+          enhancedPrompt = rewritePromptForMerged(prompt, allImages.length);
+          console.log(`Rewritten prompt: ${enhancedPrompt}`);
+        } else {
+          imageToSend = allImages[0];
         }
 
-        // Use flux-kontext-max for editing (it's the edit-capable model)
         const editModel = modelConfig.apiModel.includes("kontext") ? modelConfig.apiModel : "flux-kontext-max";
         const endpoint = `${APIYI_BASE}/v1/images/edits`;
 
-        // Build multipart form data
         const formData = new FormData();
         const blob = new Blob([imageToSend.bytes], { type: imageToSend.mimeType });
         const ext = imageToSend.mimeType.includes("png") ? "png" : "jpg";
         formData.append("image", blob, `image.${ext}`);
         formData.append("model", editModel);
         formData.append("prompt", enhancedPrompt);
-        
-        // Add extra params as individual form fields
         formData.append("aspect_ratio", ar);
         formData.append("safety_tolerance", "6");
         formData.append("output_format", "png");
 
-        console.log(`Calling Flux Edit: ${endpoint}, model=${editModel}, ar=${ar}, refs=${referenceImages.length}`);
+        console.log(`Calling Flux Edit: ${endpoint}, model=${editModel}, ar=${ar}, refs=${allImages.length}`);
 
         const response = await fetch(endpoint, {
           method: "POST",
@@ -217,14 +256,13 @@ serve(async (req) => {
         const rawUrl = data?.data?.[0]?.url;
 
         if (rawUrl) {
-          // Download the image to avoid CORS issues on client
           const imgResp = await fetch(rawUrl);
           if (imgResp.ok) {
             const buf = await imgResp.arrayBuffer();
             const bytes = new Uint8Array(buf);
             imageBase64 = toBase64DataUri(bytes, imgResp.headers.get("content-type") || "image/png");
           } else {
-            imageUrl = rawUrl; // fallback
+            imageUrl = rawUrl;
           }
         } else {
           const b64 = data?.data?.[0]?.b64_json;
