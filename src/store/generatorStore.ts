@@ -174,7 +174,15 @@ async function saveToDb(img: GeneratedImage, storageUrl: string) {
 export const useGeneratorStore = create<GeneratorState>()((set, get) => ({
   prompt: localStorage.getItem('gen-last-prompt') || '',
   referenceImages: loadPersistedReferenceImages(),
+  model: (localStorage.getItem('gen-last-model') as string) || 'gemini-3.1-flash-image',
+  quality: (localStorage.getItem('gen-last-quality') as string) || '2K',
+  aspectRatio: (localStorage.getItem('gen-last-ar') as string) || '1:1',
+  quantity: 4,
+  images: [],
+  selectedImageId: null,
+  historyLoaded: false,
 
+  setPrompt: (prompt) => { set({ prompt }); localStorage.setItem('gen-last-prompt', prompt); },
   addReferenceImage: (img) => {
     const refs = get().referenceImages;
     if (refs.length < 5) {
