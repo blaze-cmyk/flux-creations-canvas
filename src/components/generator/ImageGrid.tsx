@@ -18,7 +18,7 @@ export function ImageGrid() {
 
   return (
     <div className="h-full overflow-y-auto p-3">
-      <div className="columns-2 sm:columns-3 md:columns-4 lg:columns-5 xl:columns-6 gap-2 [column-fill:_balance]">
+      <div className="grid grid-cols-[repeat(auto-fill,minmax(220px,1fr))] gap-2">
         {images.map((img) => (
           <div key={img.id} className="break-inside-avoid mb-2">
             <ImageCard image={img} />
