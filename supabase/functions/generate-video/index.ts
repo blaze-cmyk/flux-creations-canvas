@@ -209,6 +209,7 @@ serve(async (req) => {
         console.log("Could not check image size, proceeding:", e);
       }
 
+      const evolinkQuality = body?.quality === "1080p" ? "1080p" : "720p";
       const evolinkBody: Record<string, unknown> = {
         model: config.evolinkModel,
         image_urls: [characterImage],
