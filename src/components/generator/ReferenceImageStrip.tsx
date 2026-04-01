@@ -89,9 +89,9 @@ export function ReferenceImageStrip({
               type="button"
               onClick={onAdd}
               title="Upload image"
-              className="flex h-20 w-20 shrink-0 items-center justify-center rounded-[1.35rem] border border-dashed border-border bg-muted/15 text-muted-foreground transition-all hover:border-foreground/20 hover:bg-muted/30 hover:text-foreground/70"
+              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-dashed border-border bg-muted/15 text-muted-foreground transition-all hover:border-foreground/20 hover:bg-muted/30 hover:text-foreground/70"
             >
-              <ImagePlus className="h-5 w-5" />
+              <ImagePlus className="h-4 w-4" />
             </button>
           )}
         </div>
