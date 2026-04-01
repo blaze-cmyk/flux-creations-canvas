@@ -196,7 +196,19 @@ serve(async (req) => {
         });
       }
 
-      const evolinkQuality = body?.quality === "1080p" ? "1080p" : "720p";
+      // Validate image size — Evolink limit is 10MB
+      try {
+        const headResp = await fetch(characterImage, { method: "HEAD" });
+        const contentLength = parseInt(headResp.headers.get("content-length") || "0");
+        if (contentLength > 10 * 1024 * 1024) {
+          return new Response(JSON.stringify({ error: `Character image is ${(contentLength / 1048576).toFixed(1)}MB — Evolink limit is 10MB. Please upload a smaller image.` }), {
+            status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+      } catch (e) {
+        console.log("Could not check image size, proceeding:", e);
+      }
+
       const evolinkBody: Record<string, unknown> = {
         model: config.evolinkModel,
         image_urls: [characterImage],
