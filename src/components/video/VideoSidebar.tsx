@@ -1,6 +1,7 @@
 import { useVideoStore, VIDEO_MODELS, VIDEO_ASPECT_RATIOS, VIDEO_DURATIONS } from '@/store/videoStore';
 import { ImagePlus, ChevronRight, Check, Search, Play, Video, Film, Wand2, Volume2, Sparkles, Plus, Image as ImageIcon } from 'lucide-react';
 import { MotionControlPanel } from './MotionControlPanel';
+import { EditVideoPanel } from './EditVideoPanel';
 import { useRef, useState, useEffect, useCallback } from 'react';
 
 export function VideoSidebar() {
@@ -122,47 +123,14 @@ export function VideoSidebar() {
 
         {/* === EDIT VIDEO === */}
         {mode === 'image-to-video' && (
-          <>
-            <div className="relative rounded-xl overflow-hidden bg-gradient-to-br from-muted to-card h-28 flex items-end p-3">
-              <div>
-                <p className="text-xs font-bold text-foreground uppercase tracking-wider">EDIT VIDEO</p>
-                <p className="text-[10px] text-muted-foreground">Modify, restyle, change angles</p>
-              </div>
-            </div>
-
-            {/* Video/image upload */}
-            {referenceImages.length > 0 ? (
-              <div className="flex justify-center">
-                <div className="relative w-20 h-20 rounded-xl overflow-hidden border border-border">
-                  <img src={referenceImages[0]} alt="" className="w-full h-full object-cover" />
-                  <button onClick={() => removeReferenceImage(0)} className="absolute top-0.5 right-0.5 w-4 h-4 rounded-full bg-black/60 text-white text-[10px] flex items-center justify-center">×</button>
-                  <span className="absolute bottom-1 left-1/2 -translate-x-1/2 text-[9px] text-white bg-black/50 px-1 rounded">Image</span>
-                </div>
-              </div>
-            ) : null}
-
-            {/* Upload area */}
-            <button
-              onClick={() => fileInputRef.current?.click()}
-              className="w-full border border-dashed border-border rounded-xl p-4 flex flex-col items-center gap-1.5 text-muted-foreground hover:border-foreground/30 hover:text-foreground transition-colors"
-            >
-              <Plus className="w-5 h-5" />
-              <span className="text-xs">Upload images & elements</span>
-              <span className="text-[10px] text-muted-foreground/60">Up to 4 images or elements</span>
-            </button>
-
-            {/* Prompt */}
-            <div className="space-y-1">
-              <span className="text-[11px] text-muted-foreground">Prompt</span>
-              <textarea
-                value={prompt}
-                onChange={e => setPrompt(e.target.value)}
-                placeholder='Describe the change you want, like "Make it snow". Add elements using @'
-                rows={3}
-                className="w-full bg-card rounded-xl p-3 text-sm text-foreground placeholder:text-muted-foreground/40 resize-none border border-border focus:outline-none focus:ring-1 focus:ring-primary/50 leading-5"
-              />
-            </div>
-          </>
+          <EditVideoPanel
+            prompt={prompt}
+            setPrompt={setPrompt}
+            referenceImages={referenceImages}
+            addReferenceImage={addReferenceImage}
+            removeReferenceImage={removeReferenceImage}
+            fileInputRef={fileInputRef}
+          />
         )}
 
         {/* === MOTION CONTROL === */}
