@@ -129,9 +129,28 @@ async function pollFalResult(responseUrl: string, statusUrl: string | null, falK
       throw new Error(`Result fetch failed: ${resp.status} ${body}`);
     }
 
-    return await resp.json();
-  }
-  throw new Error("Video generation timed out");
+    const data = await resp.json();
+
+    // If polling status_url, check for COMPLETED/FAILED
+    if (pollUrl !== responseUrl) {
+      if (data.status === "COMPLETED") {
+        const resultResp = await fetch(responseUrl, { method: "GET", headers });
+        if (!resultResp.ok) {
+          const rb = await resultResp.text();
+          throw new Error(`Result fetch failed: ${resultResp.status} ${rb}`);
+        }
+        return await resultResp.json();
+      }
+      if (data.status === "FAILED") {
+        throw new Error(data.error || "Video generation failed");
+      }
+      // IN_QUEUE or IN_PROGRESS
+      await new Promise(r => setTimeout(r, 5000));
+      continue;
+    }
+
+    // If polling response_url directly, the response IS the result
+    return data;
 }
 
 serve(async (req) => {
