@@ -224,9 +224,10 @@ serve(async (req) => {
         prompt, num_images: 1, output_format: "png", safety_tolerance: "6",
       };
 
-      // Add LoRA if configured
+      // Add LoRA if configured + disable safety checker for LoRA models
       if (modelConfig.lora) {
         reqBody.loras = [{ path: modelConfig.lora, scale: 1.0 }];
+        reqBody.enable_safety_checker = false;
       }
       if (ar !== "Auto") reqBody.aspect_ratio = ar;
 
