@@ -78,7 +78,36 @@ type VideoState = {
   generate: () => void;
   retryVideo: (id: string) => void;
   deleteVideo: (id: string) => void;
+  loadHistory: () => Promise<void>;
+  _historyLoaded: boolean;
 };
+
+async function saveVideoToDb(video: GeneratedVideo) {
+  try {
+    await supabase.from('video_generations').upsert({
+      id: video.id,
+      prompt: video.prompt,
+      model: video.model,
+      mode: video.mode,
+      aspect_ratio: video.aspectRatio,
+      duration: video.duration,
+      status: video.status === 'generating' ? 'processing' : video.status,
+      video_url: video.videoUrl || null,
+      thumbnail_url: video.thumbnailUrl || null,
+      reference_images: video.referenceImages.filter(Boolean),
+      error: video.error || null,
+    }, { onConflict: 'id' });
+  } catch (e) {
+    console.error('Failed to save video to DB:', e);
+  }
+}
+
+function updateVideoAndSave(videoId: string, updates: Partial<GeneratedVideo>, get: () => VideoState, set: (s: Partial<VideoState>) => void) {
+  const videos = get().videos.map(v => v.id === videoId ? { ...v, ...updates } : v);
+  set({ videos });
+  const updated = videos.find(v => v.id === videoId);
+  if (updated) saveVideoToDb(updated);
+}
 
 async function callGenerate(payload: Record<string, unknown>, videoId: string, get: () => VideoState, set: (s: Partial<VideoState>) => void) {
   const refs = payload.referenceImages as string[] | undefined;
@@ -98,11 +127,7 @@ async function callGenerate(payload: Record<string, unknown>, videoId: string, g
       });
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unknown upload error';
-      set({
-        videos: get().videos.map((video) =>
-          video.id === videoId ? { ...video, status: 'failed', error: `Upload failed: ${message}` } : video,
-        ),
-      });
+      updateVideoAndSave(videoId, { status: 'failed', error: `Upload failed: ${message}` }, get, set);
       return;
     }
   }
@@ -119,24 +144,25 @@ async function callGenerate(payload: Record<string, unknown>, videoId: string, g
           if (body?.error) errMsg = body.error;
         }
       } catch {}
-      set({ videos: get().videos.map(v => v.id === videoId ? { ...v, status: 'failed', error: errMsg } : v) });
+      updateVideoAndSave(videoId, { status: 'failed', error: errMsg }, get, set);
       return;
     }
 
     if (data?.error) {
       const isNsfw = data.filtered;
-      set({ videos: get().videos.map(v => v.id === videoId ? { ...v, status: isNsfw ? 'nsfw' : 'failed', error: data.error } : v) });
+      updateVideoAndSave(videoId, { status: isNsfw ? 'nsfw' : 'failed', error: data.error }, get, set);
       return;
     }
 
-    // Immediate result
     if (data?.videoUrl || data?.status === 'complete') {
-      set({ videos: get().videos.map(v => v.id === videoId ? { ...v, status: 'complete', videoUrl: data.videoUrl } : v) });
+      updateVideoAndSave(videoId, { status: 'complete', videoUrl: data.videoUrl }, get, set);
       return;
     }
 
-    // Async: poll for result
     if (data?.submitted && data?.provider && data?.taskId) {
+      // Save provider/task info to DB for potential recovery
+      saveVideoToDb({ ...get().videos.find(v => v.id === videoId)! });
+
       const pollBody: Record<string, unknown> = {
         action: 'poll',
         provider: data.provider,
@@ -145,33 +171,30 @@ async function callGenerate(payload: Record<string, unknown>, videoId: string, g
       if (data.responseUrl) pollBody.responseUrl = data.responseUrl;
       if (data.statusUrl) pollBody.statusUrl = data.statusUrl;
 
-      const maxAttempts = 120; // 10 min max
+      const maxAttempts = 120;
       for (let i = 0; i < maxAttempts; i++) {
         await new Promise(r => setTimeout(r, 5000));
         try {
           const { data: pollData, error: pollError } = await supabase.functions.invoke('generate-video', { body: pollBody });
           if (pollError) continue;
           if (pollData?.status === 'complete' && pollData?.videoUrl) {
-            set({ videos: get().videos.map(v => v.id === videoId ? { ...v, status: 'complete', videoUrl: pollData.videoUrl } : v) });
+            updateVideoAndSave(videoId, { status: 'complete', videoUrl: pollData.videoUrl }, get, set);
             return;
           }
           if (pollData?.status === 'failed') {
-            set({ videos: get().videos.map(v => v.id === videoId ? { ...v, status: 'failed', error: pollData.error || 'Generation failed' } : v) });
+            updateVideoAndSave(videoId, { status: 'failed', error: pollData.error || 'Generation failed' }, get, set);
             return;
           }
-          // Still processing, continue polling
-        } catch {
-          // Network error, retry
-        }
+        } catch {}
       }
-      set({ videos: get().videos.map(v => v.id === videoId ? { ...v, status: 'failed', error: 'Video generation timed out' } : v) });
+      updateVideoAndSave(videoId, { status: 'failed', error: 'Video generation timed out' }, get, set);
       return;
     }
 
-    set({ videos: get().videos.map(v => v.id === videoId ? { ...v, status: 'complete', videoUrl: data?.videoUrl } : v) });
+    updateVideoAndSave(videoId, { status: 'complete', videoUrl: data?.videoUrl }, get, set);
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown generation error';
-    set({ videos: get().videos.map(v => v.id === videoId ? { ...v, status: 'failed', error: message } : v) });
+    updateVideoAndSave(videoId, { status: 'failed', error: message }, get, set);
   }
 }
 
@@ -187,6 +210,7 @@ export const useVideoStore = create<VideoState>()((set, get) => ({
   characterOrientation: 'video',
   videos: [],
   selectedVideoId: null,
+  _historyLoaded: false,
 
   setPrompt: (prompt) => set({ prompt }),
   setMotionPrompt: (motionPrompt) => set({ motionPrompt }),
@@ -246,6 +270,7 @@ export const useVideoStore = create<VideoState>()((set, get) => ({
     };
 
     set({ videos: [newVideo, ...get().videos] });
+    saveVideoToDb(newVideo);
     callGenerate({
       prompt: effectivePrompt,
       referenceImages: [...referenceImages],
@@ -278,5 +303,42 @@ export const useVideoStore = create<VideoState>()((set, get) => ({
       videos: get().videos.filter(v => v.id !== id),
       selectedVideoId: get().selectedVideoId === id ? null : get().selectedVideoId,
     });
+    supabase.from('video_generations').delete().eq('id', id).then(() => {});
+  },
+
+  loadHistory: async () => {
+    if (get()._historyLoaded) return;
+    try {
+      const { data } = await supabase
+        .from('video_generations')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(100);
+      if (data && data.length > 0) {
+        const loaded: GeneratedVideo[] = data.map((row: any) => ({
+          id: row.id,
+          prompt: row.prompt || '',
+          referenceImages: row.reference_images || [],
+          model: row.model,
+          mode: row.mode as GeneratedVideo['mode'],
+          aspectRatio: row.aspect_ratio,
+          duration: row.duration,
+          status: row.status === 'processing' ? 'generating' : row.status as GeneratedVideo['status'],
+          videoUrl: row.video_url || undefined,
+          thumbnailUrl: row.thumbnail_url || undefined,
+          createdAt: new Date(row.created_at).getTime(),
+          error: row.error || undefined,
+        }));
+        // Merge with any in-memory videos (active generations)
+        const existingIds = new Set(get().videos.map(v => v.id));
+        const newOnes = loaded.filter(v => !existingIds.has(v.id));
+        set({ videos: [...get().videos, ...newOnes], _historyLoaded: true });
+      } else {
+        set({ _historyLoaded: true });
+      }
+    } catch (e) {
+      console.error('Failed to load video history:', e);
+      set({ _historyLoaded: true });
+    }
   },
 }));

@@ -50,6 +50,63 @@ export type Database = {
         }
         Relationships: []
       }
+      video_generations: {
+        Row: {
+          aspect_ratio: string
+          created_at: string
+          duration: string
+          error: string | null
+          id: string
+          mode: string
+          model: string
+          prompt: string
+          provider: string | null
+          reference_images: string[] | null
+          response_url: string | null
+          status: string
+          status_url: string | null
+          task_id: string | null
+          thumbnail_url: string | null
+          video_url: string | null
+        }
+        Insert: {
+          aspect_ratio?: string
+          created_at?: string
+          duration?: string
+          error?: string | null
+          id?: string
+          mode?: string
+          model: string
+          prompt?: string
+          provider?: string | null
+          reference_images?: string[] | null
+          response_url?: string | null
+          status?: string
+          status_url?: string | null
+          task_id?: string | null
+          thumbnail_url?: string | null
+          video_url?: string | null
+        }
+        Update: {
+          aspect_ratio?: string
+          created_at?: string
+          duration?: string
+          error?: string | null
+          id?: string
+          mode?: string
+          model?: string
+          prompt?: string
+          provider?: string | null
+          reference_images?: string[] | null
+          response_url?: string | null
+          status?: string
+          status_url?: string | null
+          task_id?: string | null
+          thumbnail_url?: string | null
+          video_url?: string | null
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
