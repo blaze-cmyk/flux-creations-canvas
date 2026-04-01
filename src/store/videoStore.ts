@@ -91,7 +91,11 @@ async function callGenerate(payload: Record<string, unknown>, videoId: string, g
 
   if (refs && refs.length > 0) {
     try {
-      const resolvedRefs = await resolveAllToUrls(refs);
+      const resolvedRefs = await resolveAllToUrls(refs, (index, originalSize, finalSize) => {
+        toast.info(`Image ${index + 1} auto-compressed`, {
+          description: `${formatBytes(originalSize)} → ${formatBytes(finalSize)} to meet provider limits`,
+        });
+      });
       payload.referenceImages = resolvedRefs;
       set({
         videos: get().videos.map((video) =>
