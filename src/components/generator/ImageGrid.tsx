@@ -142,13 +142,19 @@ function ImageCard({ image }: {
       style={style}
       onClick={() => setSelectedImageId(image.id)}
     >
+      {/* Loading skeleton */}
+      {!loaded && (
+        <div className="absolute inset-0 bg-muted animate-pulse" />
+      )}
       <img
         src={image.imageUrl}
         alt=""
-        className="absolute inset-0 w-full h-full object-cover"
+        className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-300 ${loaded ? 'opacity-100' : 'opacity-0'}`}
         loading="lazy"
+        decoding="async"
         draggable={false}
         onLoad={(e) => {
+          setLoaded(true);
           const img = e.currentTarget;
           if (img.naturalWidth && img.naturalHeight) {
             setNaturalAspect(img.naturalWidth / img.naturalHeight);
