@@ -87,7 +87,7 @@ async function callGenerateAPI(params: {
 export const useGeneratorStore = create<GeneratorState>((set, get) => ({
   prompt: '',
   referenceImages: [],
-  model: 'nano-banana-pro',
+  model: 'gemini-3.1-flash-image',
   quality: '2K',
   aspectRatio: '1:1',
   quantity: 4,
