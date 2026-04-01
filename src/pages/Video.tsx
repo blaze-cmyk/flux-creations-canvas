@@ -1,12 +1,15 @@
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ChevronLeft } from 'lucide-react';
+import { ChevronLeft, PanelBottomOpen, PanelLeftOpen } from 'lucide-react';
 import { VideoPromptBar } from '@/components/video/VideoPromptBar';
+import { VideoSidebar } from '@/components/video/VideoSidebar';
 import { VideoGrid } from '@/components/video/VideoGrid';
 import { VideoDetailModal } from '@/components/video/VideoDetailModal';
 import { useVideoStore } from '@/store/videoStore';
 
 export default function Video() {
   const selectedVideoId = useVideoStore(s => s.selectedVideoId);
+  const [layout, setLayout] = useState<'sidebar' | 'bottom'>('sidebar');
 
   return (
     <div className="h-screen w-screen bg-background flex flex-col overflow-hidden">
@@ -24,17 +27,38 @@ export default function Video() {
           <span className="text-sm text-foreground font-medium">Videos</span>
         </div>
         <div className="flex items-center gap-2">
+          {/* Layout toggle */}
+          <button
+            onClick={() => setLayout(layout === 'sidebar' ? 'bottom' : 'sidebar')}
+            className="flex items-center justify-center w-8 h-8 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+            title={layout === 'sidebar' ? 'Switch to bottom bar' : 'Switch to sidebar'}
+          >
+            {layout === 'sidebar' ? (
+              <PanelBottomOpen className="w-4 h-4" />
+            ) : (
+              <PanelLeftOpen className="w-4 h-4" />
+            )}
+          </button>
           <div className="w-7 h-7 rounded-full bg-primary/20 border border-primary/30" />
         </div>
       </header>
 
-      {/* Video grid area */}
-      <div className="flex-1 overflow-y-auto">
-        <VideoGrid />
-      </div>
-
-      {/* Bottom prompt bar */}
-      <VideoPromptBar />
+      {/* Main content */}
+      {layout === 'sidebar' ? (
+        <div className="flex-1 flex overflow-hidden">
+          <VideoSidebar />
+          <div className="flex-1 overflow-y-auto">
+            <VideoGrid />
+          </div>
+        </div>
+      ) : (
+        <>
+          <div className="flex-1 overflow-y-auto">
+            <VideoGrid />
+          </div>
+          <VideoPromptBar />
+        </>
+      )}
 
       {/* Detail modal */}
       {selectedVideoId && <VideoDetailModal />}
