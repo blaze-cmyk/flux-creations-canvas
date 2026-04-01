@@ -94,7 +94,6 @@ async function uploadToStorage(imageData: string, id: string): Promise<string | 
     let ext = 'png';
 
     if (imageData.startsWith('data:')) {
-      // Base64 data URI → blob
       const match = imageData.match(/^data:(image\/(\w+));base64,(.+)$/);
       if (!match) return null;
       ext = match[2] === 'jpeg' ? 'jpg' : match[2];
@@ -103,7 +102,6 @@ async function uploadToStorage(imageData: string, id: string): Promise<string | 
       for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
       blob = new Blob([bytes], { type: match[1] });
     } else if (imageData.startsWith('http')) {
-      // URL → fetch and upload
       const resp = await fetch(imageData);
       if (!resp.ok) return null;
       blob = await resp.blob();
@@ -134,6 +132,30 @@ async function uploadToStorage(imageData: string, id: string): Promise<string | 
   }
 }
 
+// Upload a reference image (base64) to storage and return a persistent URL
+async function uploadReferenceImage(dataUri: string): Promise<string> {
+  if (!dataUri.startsWith('data:')) return dataUri; // already a URL
+  const id = `ref-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  const url = await uploadToStorage(dataUri, id);
+  return url || dataUri; // fallback to dataUri if upload fails
+}
+
+function persistReferenceImages(imgs: string[]) {
+  try {
+    // Only persist URLs (not base64) to avoid quota issues
+    const urls = imgs.filter(i => i.startsWith('http'));
+    localStorage.setItem('gen-ref-images', JSON.stringify(urls));
+  } catch { /* ignore */ }
+}
+
+function loadPersistedReferenceImages(): string[] {
+  try {
+    const raw = localStorage.getItem('gen-ref-images');
+    if (raw) return JSON.parse(raw);
+  } catch { /* ignore */ }
+  return [];
+}
+
 // Save a completed generation to the database
 async function saveToDb(img: GeneratedImage, storageUrl: string) {
   const { error } = await supabase.from('generations').insert({
@@ -151,7 +173,7 @@ async function saveToDb(img: GeneratedImage, storageUrl: string) {
 
 export const useGeneratorStore = create<GeneratorState>()((set, get) => ({
   prompt: localStorage.getItem('gen-last-prompt') || '',
-  referenceImages: [],
+  referenceImages: loadPersistedReferenceImages(),
   model: (localStorage.getItem('gen-last-model') as string) || 'gemini-3.1-flash-image',
   quality: (localStorage.getItem('gen-last-quality') as string) || '2K',
   aspectRatio: (localStorage.getItem('gen-last-ar') as string) || '1:1',
@@ -166,19 +188,31 @@ export const useGeneratorStore = create<GeneratorState>()((set, get) => ({
     if (refs.length < 5) {
       const next = [...refs, img];
       set({ referenceImages: next });
-      set({ referenceImages: next });
+      // If it's base64, upload to storage then swap with URL
+      if (img.startsWith('data:')) {
+        uploadReferenceImage(img).then((url) => {
+          if (url !== img) {
+            const updated = get().referenceImages.map(r => r === img ? url : r);
+            set({ referenceImages: updated });
+            persistReferenceImages(updated);
+          }
+        });
+      } else {
+        persistReferenceImages(next);
+      }
     }
   },
   removeReferenceImage: (index) => {
     const next = get().referenceImages.filter((_, i) => i !== index);
     set({ referenceImages: next });
-    set({ referenceImages: next });
+    persistReferenceImages(next);
   },
   reorderReferenceImages: (fromIndex, toIndex) => {
     const imgs = [...get().referenceImages];
     const [moved] = imgs.splice(fromIndex, 1);
     imgs.splice(toIndex, 0, moved);
     set({ referenceImages: imgs });
+    persistReferenceImages(imgs);
   },
   setModel: (model) => { set({ model }); localStorage.setItem('gen-last-model', model); },
   setQuality: (quality) => { set({ quality }); localStorage.setItem('gen-last-quality', quality); },
