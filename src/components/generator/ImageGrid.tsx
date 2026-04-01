@@ -205,6 +205,17 @@ function ImageCard({ image }: {
         </div>
       )}
 
+      {/* Delete icon - always visible on hover, bottom-right */}
+      {!showMenu && (
+        <button
+          onClick={(e) => { e.stopPropagation(); deleteImage(image.id); }}
+          className="absolute bottom-2 right-2 flex items-center justify-center w-7 h-7 rounded-full bg-black/50 text-white/90 hover:bg-red-600/80 hover:text-white backdrop-blur-sm transition-colors opacity-0 group-hover:opacity-100 duration-200"
+          title="Delete"
+        >
+          <Trash2 className="w-3.5 h-3.5" />
+        </button>
+      )}
+
       {/* Bottom info on hover */}
       <div className="absolute bottom-2 left-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
         <p className="text-[10px] text-white/70 truncate">{image.prompt}</p>
