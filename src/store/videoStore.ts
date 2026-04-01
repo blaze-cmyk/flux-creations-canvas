@@ -22,6 +22,7 @@ export type GeneratedVideo = {
   thumbnailUrl?: string;
   createdAt: number;
   error?: string;
+  progress?: number;
   characterOrientation?: 'video' | 'image';
 };
 
@@ -178,12 +179,18 @@ async function callGenerate(payload: Record<string, unknown>, videoId: string, g
           const { data: pollData, error: pollError } = await supabase.functions.invoke('generate-video', { body: pollBody });
           if (pollError) continue;
           if (pollData?.status === 'complete' && pollData?.videoUrl) {
-            updateVideoAndSave(videoId, { status: 'complete', videoUrl: pollData.videoUrl }, get, set);
+            updateVideoAndSave(videoId, { status: 'complete', videoUrl: pollData.videoUrl, progress: 100 }, get, set);
             return;
           }
           if (pollData?.status === 'failed') {
             updateVideoAndSave(videoId, { status: 'failed', error: pollData.error || 'Generation failed' }, get, set);
             return;
+          }
+          // Update progress in memory (don't save to DB for every tick)
+          const prog = pollData?.progress;
+          if (typeof prog === 'number' && prog > 0) {
+            const videos = get().videos.map(v => v.id === videoId ? { ...v, progress: Math.round(prog) } : v);
+            set({ videos });
           }
         } catch {}
       }
