@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { ChevronLeft, PanelBottomOpen, PanelLeftOpen } from 'lucide-react';
 import { VideoPromptBar } from '@/components/video/VideoPromptBar';
