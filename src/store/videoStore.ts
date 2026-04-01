@@ -84,7 +84,7 @@ type VideoState = {
 
 async function saveVideoToDb(video: GeneratedVideo) {
   try {
-    await supabase.from('video_generations').upsert({
+    await (supabase as any).from('video_generations').upsert({
       id: video.id,
       prompt: video.prompt,
       model: video.model,
@@ -303,13 +303,13 @@ export const useVideoStore = create<VideoState>()((set, get) => ({
       videos: get().videos.filter(v => v.id !== id),
       selectedVideoId: get().selectedVideoId === id ? null : get().selectedVideoId,
     });
-    supabase.from('video_generations').delete().eq('id', id).then(() => {});
+    (supabase as any).from('video_generations').delete().eq('id', id).then(() => {});
   },
 
   loadHistory: async () => {
     if (get()._historyLoaded) return;
     try {
-      const { data } = await supabase
+      const { data } = await (supabase as any)
         .from('video_generations')
         .select('*')
         .order('created_at', { ascending: false })
