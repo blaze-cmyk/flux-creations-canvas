@@ -284,7 +284,7 @@ serve(async (req) => {
       } else {
         // Async queue — poll response_url
         console.log(`Polling fal.ai: request_id=${submitData.request_id}, response_url=${responseUrl}`);
-        const result = await pollFalResult(responseUrl, FAL_KEY);
+        const result = await pollFalResult(responseUrl, submitData.status_url || null, FAL_KEY);
         const payload = result?.data ?? result;
         const vid = payload?.video?.url || payload?.video;
         if (vid) {
