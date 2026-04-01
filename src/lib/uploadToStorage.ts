@@ -30,8 +30,18 @@ async function dataUriToFile(dataUri: string) {
   });
 }
 
-async function compressImageToLimit(file: File, maxBytes = PROVIDER_IMAGE_LIMIT_BYTES): Promise<File> {
-  if (!file.type.startsWith('image/') || file.size <= maxBytes) return file;
+export type CompressionResult = {
+  file: File;
+  wasCompressed: boolean;
+  originalSize: number;
+  finalSize: number;
+};
+
+async function compressImageToLimit(file: File, maxBytes = PROVIDER_IMAGE_LIMIT_BYTES): Promise<CompressionResult> {
+  const originalSize = file.size;
+  if (!file.type.startsWith('image/') || file.size <= maxBytes) {
+    return { file, wasCompressed: false, originalSize, finalSize: file.size };
+  }
 
   const bitmap = await createImageBitmap(file);
   const canvas = document.createElement('canvas');
@@ -85,9 +95,11 @@ async function compressImageToLimit(file: File, maxBytes = PROVIDER_IMAGE_LIMIT_
     throw new Error('Reference image is still above the provider size limit after compression. Please upload a smaller image.');
   }
 
-  return new File([output], replaceExtension(file.name || 'reference', 'jpg'), {
+  const compressedFile = new File([output], replaceExtension(file.name || 'reference', 'jpg'), {
     type: 'image/jpeg',
   });
+
+  return { file: compressedFile, wasCompressed: true, originalSize, finalSize: compressedFile.size };
 }
 
 async function uploadFile(file: File): Promise<string> {
