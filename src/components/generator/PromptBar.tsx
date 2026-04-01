@@ -106,30 +106,32 @@ export function PromptBar() {
             />
           )}
 
-          {/* Prompt row */}
+          {/* Prompt area */}
           <div className="flex items-end gap-3">
-            {referenceImages.length === 0 && (
+            <div className="flex-1 flex flex-col gap-1">
+              {/* Upload icon — top-left, always visible */}
               <button
                 onClick={() => fileInputRef.current?.click()}
-                className="shrink-0 w-9 h-9 rounded-lg border border-border flex items-center justify-center text-muted-foreground hover:text-foreground hover:border-foreground/30 transition-colors"
+                className="self-start w-9 h-9 rounded-lg border border-border flex items-center justify-center text-muted-foreground hover:text-foreground hover:border-foreground/30 transition-colors"
               >
                 <ImagePlus className="w-4 h-4" />
               </button>
-            )}
 
-            <input ref={fileInputRef} type="file" accept="image/*" multiple className="hidden" onChange={handleFileUpload} />
+              <input ref={fileInputRef} type="file" accept="image/*" multiple className="hidden" onChange={handleFileUpload} />
 
-            <textarea
-              ref={textareaRef}
-              value={prompt}
-              onChange={(e) => setPrompt(e.target.value)}
-              onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSubmit(); } }}
-              placeholder="Describe what you want to generate..."
-              rows={1}
-              className="flex-1 bg-transparent text-sm text-foreground placeholder:text-muted-foreground/50 resize-none border-0 focus:outline-none py-2 leading-5"
-            />
+              <textarea
+                ref={textareaRef}
+                value={prompt}
+                onChange={(e) => setPrompt(e.target.value)}
+                onPaste={handlePaste}
+                onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSubmit(); } }}
+                placeholder="Describe what you want to generate..."
+                rows={1}
+                className="w-full bg-transparent text-sm text-foreground placeholder:text-muted-foreground/50 resize-none border-0 focus:outline-none py-1 leading-5"
+              />
+            </div>
 
-            {/* Generate button — lime/chartreuse like Higgsfield */}
+            {/* Generate button */}
             <button
               onClick={handleSubmit}
               disabled={!prompt.trim()}
