@@ -234,24 +234,8 @@ serve(async (req) => {
         });
       }
 
-      const submitData = await submitResp.json();
-      console.log("Fal submit response:", JSON.stringify(submitData).substring(0, 300));
-
-      let resultData: any;
-
-      // Check if we got an immediate result or need to poll
-      if (submitData.images && submitData.images.length > 0) {
-        resultData = submitData;
-      } else if (submitData.request_id) {
-        console.log(`Fal queued, request_id: ${submitData.request_id}`);
-        resultData = await pollFalResult(submitData.request_id, falModel, FAL_KEY);
-      } else {
-        console.error("Unexpected fal response:", JSON.stringify(submitData).substring(0, 500));
-        return new Response(JSON.stringify({ error: "Unexpected fal.ai response" }), {
-          status: 502,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
+      const resultData = await submitResp.json();
+      console.log("Fal result keys:", Object.keys(resultData || {}));
 
       // Check for NSFW
       if (resultData?.has_nsfw_concepts?.[0]) {
