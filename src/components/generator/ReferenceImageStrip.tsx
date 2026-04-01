@@ -112,33 +112,24 @@ type SortableThumbnailProps = {
 function SortableThumbnail({ id, src, index, onPreview, onRemove }: SortableThumbnailProps) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id });
 
-  return (
+   return (
     <div
       ref={setNodeRef}
-      style={{ transform: CSS.Transform.toString(transform), transition }}
-      className={`group relative shrink-0 ${isDragging ? 'z-20' : ''}`}
+      {...attributes}
+      {...listeners}
+      style={{ transform: CSS.Transform.toString(transform), transition, touchAction: 'none' }}
+      className={`group relative h-10 w-10 shrink-0 cursor-grab rounded-lg overflow-hidden border border-border/80 bg-muted/20 active:cursor-grabbing ${isDragging ? 'z-20 opacity-60 scale-105 shadow-xl' : ''}`}
     >
-      <button
-        type="button"
-        onClick={onPreview}
-        className={`relative block h-10 w-10 cursor-grab overflow-hidden rounded-lg border border-border/80 bg-muted/20 transition-all duration-200 hover:-translate-y-0.5 hover:border-foreground/20 hover:shadow-lg active:cursor-grabbing focus:outline-none ${isDragging ? 'scale-105 shadow-xl' : ''}`}
-        {...attributes}
-        {...listeners}
-      >
-        <img src={src} alt="" className="h-full w-full select-none object-cover" draggable={false} />
-        <span className="absolute bottom-0.5 left-0.5 flex h-4 w-4 items-center justify-center rounded bg-black/60 text-[9px] font-bold text-white backdrop-blur-sm">
-          {index + 1}
-        </span>
-      </button>
+      <img src={src} alt="" className="pointer-events-none h-full w-full select-none object-cover" draggable={false} />
+      <span className="pointer-events-none absolute bottom-0.5 left-0.5 flex h-4 w-4 items-center justify-center rounded bg-black/60 text-[9px] font-bold text-white backdrop-blur-sm">
+        {index + 1}
+      </span>
 
       <button
         type="button"
-        onPointerDown={(event) => event.stopPropagation()}
-        onClick={(event) => {
-          event.stopPropagation();
-          onRemove();
-        }}
-        className="absolute -right-1 -top-1 flex h-4 w-4 items-center justify-center rounded-full border border-border/50 bg-background/80 text-foreground/75 opacity-0 shadow-sm backdrop-blur-sm transition-opacity group-hover:opacity-100 hover:text-foreground"
+        onPointerDown={(e) => e.stopPropagation()}
+        onClick={(e) => { e.stopPropagation(); onRemove(); }}
+        className="absolute -right-1 -top-1 z-20 flex h-4 w-4 items-center justify-center rounded-full border border-border/50 bg-background/80 text-foreground/75 opacity-0 shadow-sm backdrop-blur-sm transition-opacity group-hover:opacity-100 hover:text-foreground"
       >
         <X className="h-2.5 w-2.5" />
       </button>
