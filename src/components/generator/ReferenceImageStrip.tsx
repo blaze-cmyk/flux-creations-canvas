@@ -117,6 +117,7 @@ function SortableThumbnail({ id, src, index, onPreview, onRemove }: SortableThum
       ref={setNodeRef}
       {...attributes}
       {...listeners}
+      onClick={() => onPreview()}
       style={{ transform: CSS.Transform.toString(transform), transition, touchAction: 'none' }}
       className={`group relative h-10 w-10 shrink-0 cursor-grab rounded-lg overflow-hidden border border-border/80 bg-muted/20 active:cursor-grabbing ${isDragging ? 'z-20 opacity-60 scale-105 shadow-xl' : ''}`}
     >
