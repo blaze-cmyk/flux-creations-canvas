@@ -121,7 +121,7 @@ function SortableThumbnail({ id, src, index, onPreview, onRemove }: SortableThum
       <button
         type="button"
         onClick={onPreview}
-        className={`relative block h-20 w-20 cursor-grab overflow-hidden rounded-[1.35rem] border border-border/80 bg-muted/20 transition-all duration-200 hover:-translate-y-0.5 hover:border-foreground/20 hover:shadow-lg active:cursor-grabbing focus:outline-none ${isDragging ? 'scale-105 shadow-xl' : ''}`}
+        className={`relative block h-10 w-10 cursor-grab overflow-hidden rounded-lg border border-border/80 bg-muted/20 transition-all duration-200 hover:-translate-y-0.5 hover:border-foreground/20 hover:shadow-lg active:cursor-grabbing focus:outline-none ${isDragging ? 'scale-105 shadow-xl' : ''}`}
         {...attributes}
         {...listeners}
       >
