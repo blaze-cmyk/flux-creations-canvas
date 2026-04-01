@@ -81,32 +81,6 @@ async function mergeImagesSideBySide(imageDataList: { bytes: Uint8Array; mimeTyp
   return { bytes: new Uint8Array(pngBytes), mimeType: "image/png" };
 }
 
-// Rewrite prompt: replace "image 1", "image 2" etc with positional terms
-function rewritePromptForMerged(prompt: string, count: number): string {
-  const positions = ["the left", "the right", "the center", "the far left", "the far right"];
-  let result = prompt;
-  for (let i = 1; i <= count; i++) {
-    const pos = count === 2
-      ? (i === 1 ? "the left" : "the right")
-      : (i === 1 ? "the left" : i === count ? "the right" : "the center");
-    const patterns = [
-      new RegExp(`image\\s*${i}`, "gi"),
-      new RegExp(`img\\s*${i}`, "gi"),
-      new RegExp(`photo\\s*${i}`, "gi"),
-      new RegExp(`picture\\s*${i}`, "gi"),
-      new RegExp(`person\\s*${i}`, "gi"),
-      new RegExp(`model\\s*${i}`, "gi"),
-    ];
-    for (const p of patterns) {
-      result = result.replace(p, `the person on ${pos} side`);
-    }
-  }
-  // Add context about the merged image
-  if (!result.toLowerCase().includes("side by side") && !result.toLowerCase().includes("left") && !result.toLowerCase().includes("right")) {
-    result = `This image shows ${count} people side by side (left to right). ${result}`;
-  }
-  return result;
-}
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {
