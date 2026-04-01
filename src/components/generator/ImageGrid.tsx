@@ -1,8 +1,9 @@
 import { useGeneratorStore } from '@/store/generatorStore';
-import { AlertCircle, Eye, RefreshCw, Trash2, Loader2 } from 'lucide-react';
+import { AlertCircle, Eye, RefreshCw, Trash2, Loader2, Download, Link2, Heart, MoreHorizontal, Maximize2 } from 'lucide-react';
+import { useState, useRef, useEffect } from 'react';
 
 export function ImageGrid() {
-  const { images, setSelectedImageId, retryImage, deleteImage } = useGeneratorStore();
+  const { images } = useGeneratorStore();
 
   if (images.length === 0) {
     return (
@@ -16,92 +17,188 @@ export function ImageGrid() {
   }
 
   return (
-    <div className="p-4">
-      <div className="columns-2 sm:columns-3 md:columns-4 lg:columns-5" style={{ columnGap: '12px' }}>
+    <div className="h-full overflow-y-auto p-3">
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-2">
         {images.map((img) => (
-          <div key={img.id} className="break-inside-avoid" style={{ marginBottom: '12px' }}>
-            <ImageCard
-              image={img}
-              onView={() => setSelectedImageId(img.id)}
-              onRetry={() => retryImage(img.id)}
-              onDelete={() => deleteImage(img.id)}
-            />
-          </div>
+          <ImageCard key={img.id} image={img} />
         ))}
       </div>
     </div>
   );
 }
 
-function ImageCard({ image, onView, onRetry, onDelete }: {
+function ImageCard({ image }: {
   image: ReturnType<typeof useGeneratorStore.getState>['images'][0];
-  onView: () => void;
-  onRetry: () => void;
-  onDelete: () => void;
 }) {
-  const statusBadge = image.status === 'failed' ? (
-    <div className="flex items-center gap-1.5">
-      <span className="flex items-center gap-1 bg-destructive/80 text-destructive-foreground text-[10px] px-2 py-0.5 rounded-full font-medium">
-        <AlertCircle className="w-3 h-3" /> Failed
-      </span>
-      <span className="flex items-center gap-1 bg-muted/80 text-muted-foreground text-[10px] px-2 py-0.5 rounded-full">
-        Credits refunded
-      </span>
-    </div>
-  ) : image.status === 'nsfw' ? (
-    <div className="flex items-center gap-1.5">
-      <span className="flex items-center gap-1 bg-muted/80 text-muted-foreground text-[10px] px-2 py-0.5 rounded-full font-medium">
-        <Eye className="w-3 h-3" /> NSFW
-      </span>
-      <span className="flex items-center gap-1 bg-muted/80 text-muted-foreground text-[10px] px-2 py-0.5 rounded-full">
-        Credits refunded
-      </span>
-    </div>
-  ) : null;
+  const { setSelectedImageId, retryImage, deleteImage, useAsReference } = useGeneratorStore();
+  const [showMenu, setShowMenu] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
 
-  return (
-    <div className="group relative rounded-xl overflow-hidden bg-card border border-border hover:border-foreground/20 transition-colors cursor-pointer">
-      {image.status === 'generating' ? (
-        <div className="aspect-[9/16] flex items-center justify-center bg-muted/20">
-          <div className="flex flex-col items-center gap-2">
-            <Loader2 className="w-6 h-6 text-primary animate-spin" />
-            <span className="text-xs text-muted-foreground">Generating...</span>
-          </div>
-        </div>
-      ) : image.status === 'complete' && image.imageUrl ? (
-        <img
-          src={image.imageUrl}
-          alt=""
-          className="w-full object-cover"
-          onClick={onView}
-          loading="lazy"
-        />
-      ) : (
-        <div className="aspect-[9/16] bg-muted/10 flex flex-col items-center justify-center gap-3 p-4">
-          {statusBadge && <div className="absolute top-2 left-2">{statusBadge}</div>}
-          <div className="text-xs text-muted-foreground text-center mt-8 px-2 line-clamp-3">
-            {image.status === 'failed' ? 'Please try again, or change your input files or prompt.' : 'Restricted content detected'}
-          </div>
-          <p className="text-[10px] text-muted-foreground/60 line-clamp-1 px-2">{image.model} model</p>
-        </div>
-      )}
+  useEffect(() => {
+    if (!showMenu) return;
+    const handler = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) setShowMenu(false);
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [showMenu]);
 
-      {/* Hover overlay with actions */}
-      {(image.status === 'failed' || image.status === 'nsfw') && (
-        <div className="absolute bottom-2 left-2 right-2 flex items-center gap-1.5">
-          <button onClick={(e) => { e.stopPropagation(); onRetry(); }} className="flex items-center gap-1 bg-card/90 text-foreground text-xs px-3 py-1.5 rounded-lg hover:bg-muted transition-colors border border-border">
+  const handleDownload = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!image.imageUrl) return;
+    try {
+      const res = await fetch(image.imageUrl);
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `generation-${image.id}.png`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch {
+      window.open(image.imageUrl, '_blank');
+    }
+  };
+
+  // Generating state
+  if (image.status === 'generating') {
+    return (
+      <div className="relative aspect-[3/4] rounded-xl overflow-hidden bg-card border border-border flex items-center justify-center">
+        <div className="flex flex-col items-center gap-2">
+          <Loader2 className="w-6 h-6 text-primary animate-spin" />
+          <span className="text-xs text-muted-foreground">Generating...</span>
+        </div>
+      </div>
+    );
+  }
+
+  // Failed / NSFW state
+  if (image.status === 'failed' || image.status === 'nsfw') {
+    return (
+      <div className="relative aspect-[3/4] rounded-xl overflow-hidden bg-card border border-border flex flex-col items-center justify-center gap-3 p-3">
+        <div className="flex items-center gap-1.5">
+          {image.status === 'failed' ? (
+            <span className="flex items-center gap-1 bg-destructive/80 text-destructive-foreground text-[10px] px-2 py-0.5 rounded-full font-medium">
+              <AlertCircle className="w-3 h-3" /> Failed
+            </span>
+          ) : (
+            <span className="flex items-center gap-1 bg-muted/80 text-muted-foreground text-[10px] px-2 py-0.5 rounded-full font-medium">
+              <Eye className="w-3 h-3" /> NSFW
+            </span>
+          )}
+        </div>
+        <p className="text-[11px] text-muted-foreground text-center leading-snug">
+          {image.status === 'failed' ? 'Generation failed' : 'Content filtered'}
+        </p>
+        <div className="flex items-center gap-1.5 mt-1">
+          <button
+            onClick={() => retryImage(image.id)}
+            className="flex items-center gap-1 bg-muted/60 text-foreground text-xs px-3 py-1.5 rounded-lg hover:bg-muted transition-colors"
+          >
             <RefreshCw className="w-3 h-3" /> Retry
           </button>
-          <button onClick={(e) => { e.stopPropagation(); onDelete(); }} className="flex items-center gap-1 bg-card/90 text-foreground text-xs px-3 py-1.5 rounded-lg hover:bg-muted transition-colors border border-border">
+          <button
+            onClick={() => deleteImage(image.id)}
+            className="flex items-center gap-1 bg-muted/60 text-foreground text-xs px-3 py-1.5 rounded-lg hover:bg-muted transition-colors"
+          >
             <Trash2 className="w-3 h-3" /> Delete
           </button>
         </div>
+      </div>
+    );
+  }
+
+  // Complete state with hover overlay
+  return (
+    <div
+      className="group relative aspect-[3/4] rounded-xl overflow-hidden bg-card border border-border hover:border-foreground/20 transition-colors cursor-pointer"
+      onClick={() => setSelectedImageId(image.id)}
+    >
+      <img
+        src={image.imageUrl}
+        alt=""
+        className="absolute inset-0 w-full h-full object-cover"
+        loading="lazy"
+        draggable={false}
+      />
+
+      {/* Hover gradient overlay */}
+      <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-black/30 opacity-0 group-hover:opacity-100 transition-opacity duration-200" />
+
+      {/* Top-right action icons on hover */}
+      <div className="absolute top-2 right-2 flex flex-col gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+        <button
+          onClick={(e) => { e.stopPropagation(); setSelectedImageId(image.id); }}
+          className="flex items-center justify-center w-7 h-7 rounded-full bg-black/50 text-white/90 hover:bg-black/70 hover:text-white backdrop-blur-sm transition-colors"
+          title="Open"
+        >
+          <Maximize2 className="w-3.5 h-3.5" />
+        </button>
+        <button
+          onClick={handleDownload}
+          className="flex items-center justify-center w-7 h-7 rounded-full bg-black/50 text-white/90 hover:bg-black/70 hover:text-white backdrop-blur-sm transition-colors"
+          title="Download"
+        >
+          <Download className="w-3.5 h-3.5" />
+        </button>
+        <button
+          onClick={(e) => { e.stopPropagation(); if (image.imageUrl) useAsReference(image.imageUrl); }}
+          className="flex items-center justify-center w-7 h-7 rounded-full bg-black/50 text-white/90 hover:bg-black/70 hover:text-white backdrop-blur-sm transition-colors"
+          title="Use as reference"
+        >
+          <Link2 className="w-3.5 h-3.5" />
+        </button>
+        <button
+          onClick={(e) => { e.stopPropagation(); setShowMenu(!showMenu); }}
+          className="flex items-center justify-center w-7 h-7 rounded-full bg-black/50 text-white/90 hover:bg-black/70 hover:text-white backdrop-blur-sm transition-colors"
+          title="More"
+        >
+          <MoreHorizontal className="w-3.5 h-3.5" />
+        </button>
+      </div>
+
+      {/* Context menu */}
+      {showMenu && (
+        <div
+          ref={menuRef}
+          className="absolute top-2 right-11 z-30 bg-popover border border-border rounded-xl shadow-2xl py-1.5 min-w-[140px] animate-in fade-in-0 zoom-in-95"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <MenuItem icon={<Maximize2 className="w-3.5 h-3.5" />} label="Open" onClick={() => { setSelectedImageId(image.id); setShowMenu(false); }} />
+          <MenuItem icon={<RefreshCw className="w-3.5 h-3.5" />} label="Regenerate" onClick={() => { retryImage(image.id); setShowMenu(false); }} />
+          <MenuItem icon={<Link2 className="w-3.5 h-3.5" />} label="Use as Reference" onClick={() => { if (image.imageUrl) useAsReference(image.imageUrl); setShowMenu(false); }} />
+          <MenuItem icon={<Heart className="w-3.5 h-3.5" />} label="Like" onClick={() => setShowMenu(false)} />
+          <MenuItem icon={<Download className="w-3.5 h-3.5" />} label="Download" onClick={(e) => { handleDownload(e); setShowMenu(false); }} />
+          <div className="my-1 border-t border-border/50" />
+          <MenuItem icon={<Trash2 className="w-3.5 h-3.5" />} label="Delete" onClick={() => { deleteImage(image.id); setShowMenu(false); }} destructive />
+        </div>
       )}
 
-      {/* Hover overlay for completed images */}
-      {image.status === 'complete' && (
-        <div className="absolute inset-0 bg-background/0 group-hover:bg-background/20 transition-colors" onClick={onView} />
-      )}
+      {/* Bottom info on hover */}
+      <div className="absolute bottom-2 left-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+        <p className="text-[10px] text-white/70 truncate">{image.prompt}</p>
+      </div>
     </div>
+  );
+}
+
+function MenuItem({ icon, label, onClick, destructive }: {
+  icon: React.ReactNode;
+  label: string;
+  onClick: (e: React.MouseEvent) => void;
+  destructive?: boolean;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className={`w-full flex items-center gap-2.5 px-3 py-1.5 text-xs transition-colors ${
+        destructive
+          ? 'text-destructive hover:bg-destructive/10'
+          : 'text-foreground/80 hover:bg-muted hover:text-foreground'
+      }`}
+    >
+      {icon}
+      {label}
+    </button>
   );
 }
