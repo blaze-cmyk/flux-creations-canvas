@@ -109,13 +109,15 @@ export function PromptBar() {
           {/* Prompt area */}
           <div className="flex items-end gap-3">
             <div className="flex-1 flex flex-col gap-1">
-              {/* Upload icon — top-left, always visible */}
-              <button
-                onClick={() => fileInputRef.current?.click()}
-                className="self-start w-9 h-9 rounded-lg border border-border flex items-center justify-center text-muted-foreground hover:text-foreground hover:border-foreground/30 transition-colors"
-              >
-                <ImagePlus className="w-4 h-4" />
-              </button>
+              {/* Upload icon — only show when no reference images yet */}
+              {referenceImages.length === 0 && (
+                <button
+                  onClick={() => fileInputRef.current?.click()}
+                  className="self-start w-9 h-9 rounded-lg border border-border flex items-center justify-center text-muted-foreground hover:text-foreground hover:border-foreground/30 transition-colors"
+                >
+                  <ImagePlus className="w-4 h-4" />
+                </button>
+              )}
 
               <input ref={fileInputRef} type="file" accept="image/*" multiple className="hidden" onChange={handleFileUpload} />
 
