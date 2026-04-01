@@ -66,7 +66,11 @@ export const MODELS = [
   // Runware Flux models (no content filter)
   { id: 'rw-flux-1-dev', name: 'RW Flux 1 Dev', desc: 'Flux 1 Dev via Runware, no content filter', featured: true, badge: 'NEW' as const },
   { id: 'rw-flux-1-schnell', name: 'RW Flux 1 Schnell', desc: 'Ultra-fast Flux via Runware', featured: false },
+  { id: 'rw-flux-2-pro', name: 'RW Flux 2 Pro', desc: 'Flux 2 Pro via Runware, unrestricted', featured: true },
+  { id: 'rw-flux-2-flex', name: 'RW Flux 2 Flex', desc: 'Flux 2 Flex via Runware, unrestricted', featured: false },
   { id: 'rw-flux-2-dev', name: 'RW Flux 2 Dev', desc: 'Flux 2 Dev via Runware, unrestricted', featured: false },
+  { id: 'rw-flux-1.1-pro', name: 'RW Flux 1.1 Pro', desc: 'Flux 1.1 Pro via Runware', featured: false },
+  { id: 'rw-flux-1.1-pro-ultra', name: 'RW Flux 1.1 Pro Ultra', desc: 'Highest quality Flux 1.1 via Runware', featured: false },
   { id: 'rw-flux-kontext-dev', name: 'RW Flux Kontext Dev', desc: 'Flux Kontext via Runware, unrestricted editing', featured: true },
 ];
 
