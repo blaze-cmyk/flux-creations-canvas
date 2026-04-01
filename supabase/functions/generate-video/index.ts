@@ -222,6 +222,11 @@ serve(async (req) => {
       if (!submitResp.ok) {
         const errText = await submitResp.text();
         console.error("Evolink submit error:", submitResp.status, errText);
+        if (submitResp.status === 402) {
+          return new Response(JSON.stringify({ error: "Insufficient Evolink credits. Please top up your Evolink account.", details: errText }), {
+            status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
         return new Response(JSON.stringify({ error: `Evolink API error: ${submitResp.status}`, details: errText }), {
           status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
