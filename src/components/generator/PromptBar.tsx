@@ -269,7 +269,7 @@ function ModelDropdown({ model, setModel, search, setSearch, onClose }: { model:
   );
 }
 
-function ModelRow({ m, selected, onClick }: { m: typeof MODELS[number]; selected: boolean; onClick: () => void }) {
+function ModelRow({ m, selected, onClick }: { m: { id: string; name: string; desc: string; featured: boolean; badge?: string }; selected: boolean; onClick: () => void }) {
   return (
     <button onClick={onClick} className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-left hover:bg-muted transition-colors ${selected ? 'bg-muted' : ''}`}>
       <span className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center text-xs font-bold text-primary shrink-0">G</span>
@@ -277,7 +277,7 @@ function ModelRow({ m, selected, onClick }: { m: typeof MODELS[number]; selected
         <div className="flex items-center gap-1.5">
           <span className="text-sm text-foreground">{m.name}</span>
           {m.badge && (
-            <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${m.badge === 'NEW' ? 'bg-[hsl(var(--badge-bg))] text-[hsl(var(--badge-text))]' : m.badge === 'UNLIMITED' ? 'bg-[hsl(var(--badge-bg))] text-[hsl(var(--badge-text))]' : 'bg-muted text-muted-foreground'}`}>
+            <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-primary/20 text-primary">
               {m.badge}
             </span>
           )}
