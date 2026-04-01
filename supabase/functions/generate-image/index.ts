@@ -13,6 +13,7 @@ const RUNWARE_BASE = "https://api.runware.ai/v1";
 type ModelConfig = {
   type: "gemini" | "fal" | "runware";
   falModel?: string;
+  falImageModel?: string;
   apiModel?: string;
   runwareModel?: string;
   supportsImageInput?: boolean;
@@ -41,7 +42,7 @@ const MODEL_MAP: Record<string, ModelConfig> = {
 
   // Flux 1 (via fal.ai) — text-to-image
   "flux-schnell": { falModel: "fal-ai/flux/schnell", type: "fal", supportsImageInput: false },
-  "flux-uncensored-v2": { falModel: "fal-ai/flux-lora", type: "fal", supportsImageInput: true, isMultiRef: false, lora: "https://huggingface.co/enhanceaiteam/Flux-Uncensored-V2/resolve/main/lora.safetensors" },
+  "flux-uncensored-v2": { falModel: "fal-ai/flux-lora", falImageModel: "fal-ai/flux-lora/image-to-image", type: "fal", supportsImageInput: true, isMultiRef: false, lora: "https://huggingface.co/enhanceaiteam/Flux-Uncensored-V2/resolve/main/lora.safetensors" },
   "flux-dev": { falModel: "fal-ai/flux/dev", type: "fal", supportsImageInput: false },
   "flux-pro-v1.1": { falModel: "fal-ai/flux-pro/v1.1", type: "fal", supportsImageInput: false },
 
@@ -214,15 +215,25 @@ serve(async (req) => {
         });
       }
 
-      let falModel = modelConfig.falModel!;
+      const hasReferenceInput = modelConfig.supportsImageInput && referenceImages.length > 0;
+      let falModel = hasReferenceInput && modelConfig.falImageModel
+        ? modelConfig.falImageModel
+        : modelConfig.falModel!;
       if (modelConfig.requiresImage && referenceImages.length === 0 && modelConfig.textFallback) {
         falModel = modelConfig.textFallback;
         console.log(`No reference images for editing model, falling back to: ${falModel}`);
       }
 
       const reqBody: Record<string, unknown> = {
-        prompt, num_images: 1, output_format: "png", safety_tolerance: "6",
+        prompt,
+        num_images: 1,
+        output_format: "png",
       };
+
+      const imageSize = arToSize(ar, quality);
+      reqBody.image_size = imageSize;
+      reqBody.num_inference_steps = 28;
+      reqBody.guidance_scale = 3.5;
 
       // Add LoRA if configured + disable safety checker for LoRA models
       if (modelConfig.lora) {
@@ -231,8 +242,11 @@ serve(async (req) => {
       }
       if (ar !== "Auto") reqBody.aspect_ratio = ar;
 
-      if (modelConfig.supportsImageInput && referenceImages.length > 0) {
-        if (modelConfig.isMultiRef && referenceImages.length > 1) {
+      if (hasReferenceInput) {
+        if (falModel.includes("image-to-image")) {
+          reqBody.image_url = referenceImages[0];
+          reqBody.strength = 0.85;
+        } else if (modelConfig.isMultiRef && referenceImages.length > 1) {
           reqBody.image_urls = referenceImages;
         } else {
           reqBody.image_url = referenceImages[0];
