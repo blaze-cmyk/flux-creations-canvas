@@ -173,34 +173,38 @@ async function saveToDb(img: GeneratedImage, storageUrl: string) {
 
 export const useGeneratorStore = create<GeneratorState>()((set, get) => ({
   prompt: localStorage.getItem('gen-last-prompt') || '',
-  referenceImages: [],
-  model: (localStorage.getItem('gen-last-model') as string) || 'gemini-3.1-flash-image',
-  quality: (localStorage.getItem('gen-last-quality') as string) || '2K',
-  aspectRatio: (localStorage.getItem('gen-last-ar') as string) || '1:1',
-  quantity: 4,
-  images: [],
-  selectedImageId: null,
-  historyLoaded: false,
+  referenceImages: loadPersistedReferenceImages(),
 
-  setPrompt: (prompt) => { set({ prompt }); localStorage.setItem('gen-last-prompt', prompt); },
   addReferenceImage: (img) => {
     const refs = get().referenceImages;
     if (refs.length < 5) {
       const next = [...refs, img];
       set({ referenceImages: next });
-      set({ referenceImages: next });
+      // If it's base64, upload to storage then swap with URL
+      if (img.startsWith('data:')) {
+        uploadReferenceImage(img).then((url) => {
+          if (url !== img) {
+            const updated = get().referenceImages.map(r => r === img ? url : r);
+            set({ referenceImages: updated });
+            persistReferenceImages(updated);
+          }
+        });
+      } else {
+        persistReferenceImages(next);
+      }
     }
   },
   removeReferenceImage: (index) => {
     const next = get().referenceImages.filter((_, i) => i !== index);
     set({ referenceImages: next });
-    set({ referenceImages: next });
+    persistReferenceImages(next);
   },
   reorderReferenceImages: (fromIndex, toIndex) => {
     const imgs = [...get().referenceImages];
     const [moved] = imgs.splice(fromIndex, 1);
     imgs.splice(toIndex, 0, moved);
     set({ referenceImages: imgs });
+    persistReferenceImages(imgs);
   },
   setModel: (model) => { set({ model }); localStorage.setItem('gen-last-model', model); },
   setQuality: (quality) => { set({ quality }); localStorage.setItem('gen-last-quality', quality); },
