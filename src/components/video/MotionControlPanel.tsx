@@ -153,8 +153,9 @@ export function MotionControlPanel({
                 value={motionPrompt}
                 onChange={e => setMotionPrompt(e.target.value)}
                 placeholder='Describe background and scene details — e.g., "A corgi runs in" or "Snowy park setting". Motion is controlled by your reference video'
-                rows={3}
-                className="w-full bg-background rounded-xl p-3 text-xs text-foreground placeholder:text-muted-foreground/40 resize-none border border-border focus:outline-none focus:ring-1 focus:ring-primary/50 leading-relaxed break-words"
+                rows={4}
+                className="w-full bg-background rounded-xl p-3 text-xs text-foreground placeholder:text-muted-foreground/40 resize-none border-0 focus:outline-none leading-relaxed break-words overflow-hidden"
+                style={{ scrollbarWidth: 'none' }}
               />
             </div>
 
