@@ -28,6 +28,7 @@ type GeneratorState = {
   setPrompt: (prompt: string) => void;
   addReferenceImage: (img: string) => void;
   removeReferenceImage: (index: number) => void;
+  reorderReferenceImages: (fromIndex: number, toIndex: number) => void;
   setModel: (model: string) => void;
   setQuality: (quality: string) => void;
   setAspectRatio: (ar: string) => void;
