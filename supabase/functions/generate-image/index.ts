@@ -25,10 +25,10 @@ type ModelConfig = {
 };
 
 const MODEL_MAP: Record<string, ModelConfig> = {
-  // Gemini models (via apiyi)
-  "gemini-3.1-flash-image": { apiModel: "gemini-3.1-flash-image-preview", type: "gemini", supportsImageInput: true, isMultiRef: true },
-  "gemini-3-pro-image": { apiModel: "gemini-3-pro-image-preview", type: "gemini", supportsImageInput: true, isMultiRef: true },
-  "gemini-2.5-flash-image": { apiModel: "gemini-2.5-flash-image", type: "gemini", supportsImageInput: true, isMultiRef: true },
+  // Gemini models (via apiyi, fallback to fal/runware)
+  "gemini-3.1-flash-image": { apiModel: "gemini-3.1-flash-image-preview", type: "gemini", supportsImageInput: true, isMultiRef: true, fallbackModel: "rw-flux-2-pro" },
+  "gemini-3-pro-image": { apiModel: "gemini-3-pro-image-preview", type: "gemini", supportsImageInput: true, isMultiRef: true, fallbackModel: "rw-flux-2-pro" },
+  "gemini-2.5-flash-image": { apiModel: "gemini-2.5-flash-image", type: "gemini", supportsImageInput: true, isMultiRef: true, fallbackModel: "flux-schnell" },
 
   // Flux Kontext (via fal.ai) — editing models
   "flux-kontext-pro": { falModel: "fal-ai/flux-pro/kontext", type: "fal", supportsImageInput: true, requiresImage: true, textFallback: "fal-ai/flux-pro/v1.1" },
