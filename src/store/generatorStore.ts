@@ -86,7 +86,9 @@ async function callGenerateAPI(params: {
   return { imageUrl: data?.imageUrl, imageBase64: data?.imageBase64 };
 }
 
-export const useGeneratorStore = create<GeneratorState>((set, get) => ({
+export const useGeneratorStore = create<GeneratorState>()(
+  persist(
+    (set, get) => ({
   prompt: '',
   referenceImages: [],
   model: 'gemini-3.1-flash-image',
