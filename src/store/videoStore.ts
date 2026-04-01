@@ -92,7 +92,20 @@ export const useVideoStore = create<VideoState>()((set, get) => ({
     const refs = get().referenceImages;
     if (refs.length < 3) set({ referenceImages: [...refs, img] });
   },
-  removeReferenceImage: (idx) => set({ referenceImages: get().referenceImages.filter((_, i) => i !== idx) }),
+  setReferenceImageAt: (idx, img) => {
+    const refs = [...get().referenceImages];
+    // Pad with empty strings if needed
+    while (refs.length <= idx) refs.push('');
+    refs[idx] = img;
+    set({ referenceImages: refs });
+  },
+  removeReferenceImage: (idx) => {
+    const refs = [...get().referenceImages];
+    refs[idx] = '';
+    // Trim trailing empty strings
+    while (refs.length > 0 && refs[refs.length - 1] === '') refs.pop();
+    set({ referenceImages: refs });
+  },
   setMotionVideo: (v) => set({ motionVideo: v }),
   setModel: (model) => set({ model }),
   setMode: (mode) => set({ mode }),
