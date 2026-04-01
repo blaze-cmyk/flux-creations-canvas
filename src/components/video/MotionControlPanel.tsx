@@ -5,6 +5,7 @@ import { DropZone, readFileAsDataURL } from './DropZone';
 interface MotionControlPanelProps {
   referenceImages: string[];
   addReferenceImage: (url: string) => void;
+  setReferenceImageAt: (idx: number, url: string) => void;
   removeReferenceImage: (index: number) => void;
   fileInputRef: RefObject<HTMLInputElement>;
 }
