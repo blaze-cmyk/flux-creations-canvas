@@ -116,7 +116,10 @@ async function pollEvolinkTask(taskId: string, apiKey: string, maxWaitMs = 30000
     }
     const data = await resp.json();
     if (data.status === "completed") return data;
-    if (data.status === "failed") throw new Error(data.error?.message || "Evolink task failed");
+    if (data.status === "failed") {
+      console.error("Evolink task failed:", JSON.stringify(data));
+      throw new Error(data.error?.message || JSON.stringify(data.error) || "Evolink task failed");
+    }
     console.log(`Evolink task ${taskId}: ${data.status} (${data.progress || 0}%)`);
     await new Promise(r => setTimeout(r, 5000));
   }
