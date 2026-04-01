@@ -302,5 +302,42 @@ export const useVideoStore = create<VideoState>()((set, get) => ({
       videos: get().videos.filter(v => v.id !== id),
       selectedVideoId: get().selectedVideoId === id ? null : get().selectedVideoId,
     });
+    supabase.from('video_generations').delete().eq('id', id).then(() => {});
+  },
+
+  loadHistory: async () => {
+    if (get()._historyLoaded) return;
+    try {
+      const { data } = await supabase
+        .from('video_generations')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(100);
+      if (data && data.length > 0) {
+        const loaded: GeneratedVideo[] = data.map((row: any) => ({
+          id: row.id,
+          prompt: row.prompt || '',
+          referenceImages: row.reference_images || [],
+          model: row.model,
+          mode: row.mode as GeneratedVideo['mode'],
+          aspectRatio: row.aspect_ratio,
+          duration: row.duration,
+          status: row.status === 'processing' ? 'generating' : row.status as GeneratedVideo['status'],
+          videoUrl: row.video_url || undefined,
+          thumbnailUrl: row.thumbnail_url || undefined,
+          createdAt: new Date(row.created_at).getTime(),
+          error: row.error || undefined,
+        }));
+        // Merge with any in-memory videos (active generations)
+        const existingIds = new Set(get().videos.map(v => v.id));
+        const newOnes = loaded.filter(v => !existingIds.has(v.id));
+        set({ videos: [...get().videos, ...newOnes], _historyLoaded: true });
+      } else {
+        set({ _historyLoaded: true });
+      }
+    } catch (e) {
+      console.error('Failed to load video history:', e);
+      set({ _historyLoaded: true });
+    }
   },
 }));
