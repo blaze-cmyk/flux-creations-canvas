@@ -295,9 +295,10 @@ export const useGeneratorStore = create<GeneratorState>()((set, get) => ({
         const result = await callGenerateAPI({ prompt, referenceImages, model, quality, aspectRatio });
 
         if (result.error) {
+          const status = result.nsfw ? 'nsfw' as const : 'failed' as const;
           set({
             images: get().images.map((i) =>
-              i.id === img.id ? { ...i, status: 'failed' as const, error: result.error } : i
+              i.id === img.id ? { ...i, status, error: result.error } : i
             ),
           });
         } else {
