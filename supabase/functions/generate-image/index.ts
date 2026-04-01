@@ -7,7 +7,7 @@ const corsHeaders = {
 };
 
 const APIYI_BASE = "https://api.apiyi.com";
-const FAL_BASE = "https://queue.fal.run";
+const FAL_BASE = "https://fal.run";
 
 type ModelConfig = {
   type: "gemini" | "fal";
