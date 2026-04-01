@@ -17,9 +17,9 @@ export function ImageGrid() {
 
   return (
     <div className="p-4">
-      <div className="columns-2 sm:columns-3 md:columns-4 lg:columns-5 gap-3 space-y-3">
+      <div className="columns-2 sm:columns-3 md:columns-4 lg:columns-5" style={{ columnGap: '12px' }}>
         {images.map((img) => (
-          <div key={img.id} className="break-inside-avoid">
+          <div key={img.id} className="break-inside-avoid" style={{ marginBottom: '12px' }}>
             <ImageCard
               image={img}
               onView={() => setSelectedImageId(img.id)}
