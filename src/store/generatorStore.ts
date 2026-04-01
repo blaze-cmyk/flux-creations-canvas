@@ -172,7 +172,7 @@ export const useGeneratorStore = create<GeneratorState>()((set, get) => ({
   removeReferenceImage: (index) => {
     const next = get().referenceImages.filter((_, i) => i !== index);
     set({ referenceImages: next });
-    localStorage.setItem('gen-last-refs', JSON.stringify(next));
+    set({ referenceImages: next });
   },
   reorderReferenceImages: (fromIndex, toIndex) => {
     const imgs = [...get().referenceImages];
