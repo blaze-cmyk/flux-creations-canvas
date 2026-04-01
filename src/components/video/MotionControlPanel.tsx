@@ -94,7 +94,7 @@ export function MotionControlPanel({
             </div>
           ) : (
             <button
-              onClick={() => uploadFile((result) => addReferenceImage(result))}
+              onClick={() => uploadFileAt(1, 'image/*')}
               className="w-full aspect-[3/4] border border-dashed border-border rounded-xl flex flex-col items-center justify-center gap-1.5 text-muted-foreground hover:border-foreground/30 transition-colors"
             >
               <Plus className="w-5 h-5" />
