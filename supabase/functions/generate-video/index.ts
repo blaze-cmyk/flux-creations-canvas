@@ -7,7 +7,6 @@ const corsHeaders = {
 };
 
 const FAL_QUEUE = "https://queue.fal.run";
-const FAL_BASE = "https://fal.run";
 const RUNWARE_BASE = "https://api.runware.ai/v1";
 
 type VideoModelConfig = {
@@ -19,7 +18,6 @@ type VideoModelConfig = {
 };
 
 const VIDEO_MODEL_MAP: Record<string, VideoModelConfig> = {
-  // Kling (fal.ai)
   "kling-v3-pro": {
     type: "fal",
     textToVideo: "fal-ai/kling-video/v3/pro/text-to-video",
@@ -50,7 +48,6 @@ const VIDEO_MODEL_MAP: Record<string, VideoModelConfig> = {
     type: "fal",
     motionControl: "fal-ai/kling-video/v2.6/pro/motion-control",
   },
-  // Veo (fal.ai)
   "veo-3.1": {
     type: "fal",
     textToVideo: "fal-ai/veo3.1",
@@ -66,25 +63,21 @@ const VIDEO_MODEL_MAP: Record<string, VideoModelConfig> = {
     textToVideo: "fal-ai/veo3.1/lite",
     imageToVideo: "fal-ai/veo3.1/lite/image-to-video",
   },
-  // MiniMax (fal.ai)
   "minimax-video": {
     type: "fal",
     textToVideo: "fal-ai/minimax/video-01-live",
     imageToVideo: "fal-ai/minimax/video-01-live/image-to-video",
   },
-  // PixVerse (fal.ai)
   "pixverse-v6": {
     type: "fal",
     textToVideo: "fal-ai/pixverse/v6/text-to-video",
     imageToVideo: "fal-ai/pixverse/v6/image-to-video",
   },
-  // LTX (fal.ai)
   "ltx-2-19b": {
     type: "fal",
     textToVideo: "fal-ai/ltx-2-19b",
     imageToVideo: "fal-ai/ltx-2-19b/image-to-video",
   },
-  // Runware models
   "rw-seedance-1.5-pro": {
     type: "runware",
     runwareModel: "bytedance:seedance@1.5-pro",
@@ -111,48 +104,53 @@ const VIDEO_MODEL_MAP: Record<string, VideoModelConfig> = {
   },
 };
 
-async function pollFalResult(responseUrl: string, statusUrl: string, falKey: string, maxWaitMs = 300000): Promise<any> {
-  const headers: Record<string, string> = { Authorization: `Key ${falKey}`, Accept: "application/json" };
-
+// Poll fal.ai queue using status_url then fetch result from response_url
+async function pollFalResult(responseUrl: string, statusUrl: string | null, falKey: string, maxWaitMs = 300000): Promise<any> {
+  const headers = { Authorization: `Key ${falKey}`, Accept: "application/json" };
   const start = Date.now();
+  const pollUrl = statusUrl || responseUrl;
+
   while (Date.now() - start < maxWaitMs) {
-    // Check status
-    const resp = await fetch(statusUrl, { method: "GET", headers });
-    
-    if (resp.status === 405 || resp.status === 404) {
-      // No status endpoint — use response_url directly (blocks until ready)
-      console.log(`Status endpoint returned ${resp.status}, using response_url`);
-      await resp.text();
-      const resultResp = await fetch(responseUrl, { method: "GET", headers });
-      if (resultResp.status === 202) {
-        await resultResp.text();
-        await new Promise(r => setTimeout(r, 5000));
-        continue;
+    const resp = await fetch(pollUrl, { method: "GET", headers });
+
+    if (resp.status === 202 || resp.status === 400) {
+      // Still in progress (fal returns 400 with "still in progress" for some models)
+      const body = await resp.text();
+      if (resp.status === 400 && !body.includes("in progress")) {
+        throw new Error(`Poll error: ${resp.status} ${body}`);
       }
-      if (!resultResp.ok) {
-        const body = await resultResp.text();
-        throw new Error(`Result fetch failed: ${resultResp.status} ${body}`);
-      }
-      return await resultResp.json();
+      console.log(`Still processing, waiting 5s...`);
+      await new Promise(r => setTimeout(r, 5000));
+      continue;
     }
 
     if (!resp.ok) {
-      const errBody = await resp.text();
-      throw new Error(`Status check failed: ${resp.status} ${errBody}`);
-    }
-    const statusData = await resp.json();
-
-    if (statusData.status === "COMPLETED") {
-      const resultResp = await fetch(responseUrl, { method: "GET", headers });
-      if (!resultResp.ok) throw new Error(`Result fetch failed: ${resultResp.status}`);
-      return await resultResp.json();
+      const body = await resp.text();
+      throw new Error(`Result fetch failed: ${resp.status} ${body}`);
     }
 
-    if (statusData.status === "FAILED") {
-      throw new Error(statusData.error || "Video generation failed");
+    const data = await resp.json();
+
+    // If polling status_url, check for COMPLETED/FAILED
+    if (pollUrl !== responseUrl) {
+      if (data.status === "COMPLETED") {
+        const resultResp = await fetch(responseUrl, { method: "GET", headers });
+        if (!resultResp.ok) {
+          const rb = await resultResp.text();
+          throw new Error(`Result fetch failed: ${resultResp.status} ${rb}`);
+        }
+        return await resultResp.json();
+      }
+      if (data.status === "FAILED") {
+        throw new Error(data.error || "Video generation failed");
+      }
+      // IN_QUEUE or IN_PROGRESS
+      await new Promise(r => setTimeout(r, 5000));
+      continue;
     }
 
-    await new Promise(r => setTimeout(r, 5000));
+    // If polling response_url directly, the response IS the result
+    return data;
   }
   throw new Error("Video generation timed out");
 }
@@ -166,7 +164,7 @@ serve(async (req) => {
     const body = await req.json();
     const prompt = typeof body?.prompt === "string" ? body.prompt : "";
     const referenceImages = Array.isArray(body?.referenceImages)
-      ? body.referenceImages.filter((img: unknown): img is string => typeof img === "string")
+      ? body.referenceImages.filter((img: unknown): img is string => typeof img === "string" && img.length > 0)
       : [];
     const model = typeof body?.model === "string" ? body.model : "kling-v2.5-turbo-pro";
     const mode = typeof body?.mode === "string" ? body.mode : "text-to-video";
@@ -192,7 +190,7 @@ serve(async (req) => {
       }
 
       const isMotionControl = mode === "motion-control";
-      const isImageMode = (mode === "image-to-video") && referenceImages.length > 0;
+      const isImageMode = mode === "image-to-video" && referenceImages.length > 0;
 
       let endpoint: string | undefined;
       if (isMotionControl) {
@@ -218,75 +216,86 @@ serve(async (req) => {
         }
       }
 
-      const reqBody: Record<string, unknown> = {};
+      // Build the input payload
+      const input: Record<string, unknown> = {};
 
       if (isMotionControl) {
+        // Motion control: slot 0 = motion video, slot 1 = character image
         const motionVideo = referenceImages[0];
         const characterImage = referenceImages[1];
 
         if (!motionVideo || !characterImage) {
-          return new Response(JSON.stringify({ error: "Motion control requires both a motion reference video and a character image" }), {
+          return new Response(JSON.stringify({ error: "Motion control requires both a motion reference video (slot 0) and a character image (slot 1)" }), {
             status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
           });
         }
 
-        reqBody.video_url = motionVideo;
-        reqBody.image_url = characterImage;
-        if (prompt) reqBody.prompt = prompt;
-        reqBody.character_orientation = body?.characterOrientation === "image" ? "image" : "video";
-        reqBody.keep_original_sound = body?.keepOriginalSound !== false;
+        // Per fal.ai docs: image_url (character), video_url (motion ref), character_orientation (required)
+        input.image_url = characterImage;
+        input.video_url = motionVideo;
+        input.character_orientation = body?.characterOrientation === "image" ? "image" : "video";
+        input.keep_original_sound = body?.keepOriginalSound !== false;
+        if (prompt) input.prompt = prompt;
       } else {
-        reqBody.prompt = prompt;
-        reqBody.duration = duration;
-        reqBody.aspect_ratio = aspectRatio;
-        reqBody.negative_prompt = "blur, distort, and low quality";
+        input.prompt = prompt;
+        input.duration = duration;
+        input.aspect_ratio = aspectRatio;
+        input.negative_prompt = "blur, distort, and low quality";
 
-        if (isImageMode && referenceImages.length > 0) {
-          reqBody.image_url = referenceImages[0];
+        if (isImageMode) {
+          input.image_url = referenceImages[0];
           if (referenceImages.length > 1) {
-            reqBody.tail_image_url = referenceImages[1];
+            input.tail_image_url = referenceImages[1];
           }
         }
       }
 
-      console.log(`Calling fal.ai video: ${endpoint}, mode=${mode}, keys=${Object.keys(reqBody).join(",")}`);
+      console.log(`Submitting to fal.ai queue: ${endpoint}, mode=${mode}, input_keys=${Object.keys(input).join(",")}`);
 
+      // Submit to queue with { input: ... } wrapper per fal.ai docs
       const submitResp = await fetch(`${FAL_QUEUE}/${endpoint}`, {
         method: "POST",
-        headers: { Authorization: `Key ${FAL_KEY}`, "Content-Type": "application/json" },
-        body: JSON.stringify(reqBody),
+        headers: {
+          Authorization: `Key ${FAL_KEY}`,
+          "Content-Type": "application/json",
+          Accept: "application/json",
+        },
+        body: JSON.stringify(input),
       });
 
       if (!submitResp.ok) {
         const errText = await submitResp.text();
-        console.error("Fal video submit error:", submitResp.status, errText);
+        console.error("Fal submit error:", submitResp.status, errText);
         return new Response(JSON.stringify({ error: `Fal API error: ${submitResp.status}`, details: errText }), {
           status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
 
       const submitData = await submitResp.json();
-      const requestId = submitData.request_id;
-      const responseUrl = submitData.response_url;
-      const statusUrl = submitData.status_url;
-      const submitPayload = submitData?.data ?? submitData;
+      console.log(`Fal submit response keys: ${Object.keys(submitData).join(",")}`);
 
-      if (!requestId || !responseUrl) {
-        const vid = submitPayload?.video?.url || submitPayload?.video;
+      const responseUrl = submitData.response_url;
+
+      if (!responseUrl) {
+        // Synchronous response — extract video directly
+        const payload = submitData?.data ?? submitData;
+        const vid = payload?.video?.url || payload?.video;
         if (vid) {
           videoUrl = typeof vid === "string" ? vid : vid.url;
         }
       } else {
-        console.log(`Polling fal.ai request: ${requestId}, response_url: ${responseUrl}`);
-        const result = await pollFalResult(responseUrl, statusUrl || `https://queue.fal.run/${endpoint}/requests/${requestId}/status`, FAL_KEY);
-        const resultPayload = result?.data ?? result;
-        const vid = resultPayload?.video?.url || resultPayload?.video;
+        // Async queue — poll response_url
+        console.log(`Polling fal.ai: request_id=${submitData.request_id}, response_url=${responseUrl}`);
+        const result = await pollFalResult(responseUrl, submitData.status_url || null, FAL_KEY);
+        const payload = result?.data ?? result;
+        const vid = payload?.video?.url || payload?.video;
         if (vid) {
           videoUrl = typeof vid === "string" ? vid : vid.url;
         }
       }
 
       if (!videoUrl) {
+        console.error("No video URL found in fal response");
         return new Response(JSON.stringify({ error: "No video in fal.ai response" }), {
           status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
