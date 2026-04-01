@@ -18,13 +18,31 @@ export function ImageGrid() {
 
   return (
     <div className="h-full overflow-y-auto p-3">
-      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-2">
+      <div className="columns-2 sm:columns-3 md:columns-4 lg:columns-5 xl:columns-6 gap-2 [column-fill:_balance]">
         {images.map((img) => (
-          <ImageCard key={img.id} image={img} />
+          <div key={img.id} className="break-inside-avoid mb-2">
+            <ImageCard image={img} />
+          </div>
         ))}
       </div>
     </div>
   );
+}
+
+function getAspectClass(ratio: string): string {
+  const map: Record<string, string> = {
+    '1:1': 'aspect-square',
+    '3:4': 'aspect-[3/4]',
+    '4:3': 'aspect-[4/3]',
+    '2:3': 'aspect-[2/3]',
+    '3:2': 'aspect-[3/2]',
+    '9:16': 'aspect-[9/16]',
+    '16:9': 'aspect-video',
+    '5:4': 'aspect-[5/4]',
+    '4:5': 'aspect-[4/5]',
+    '21:9': 'aspect-[21/9]',
+  };
+  return map[ratio] || 'aspect-[3/4]';
 }
 
 function ImageCard({ image }: {
@@ -33,6 +51,7 @@ function ImageCard({ image }: {
   const { setSelectedImageId, retryImage, deleteImage, useAsReference } = useGeneratorStore();
   const [showMenu, setShowMenu] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
+  const [naturalAspect, setNaturalAspect] = useState<number | null>(null);
 
   useEffect(() => {
     if (!showMenu) return;
@@ -60,10 +79,12 @@ function ImageCard({ image }: {
     }
   };
 
+  const aspectClass = getAspectClass(image.aspectRatio);
+
   // Generating state
   if (image.status === 'generating') {
     return (
-      <div className="relative aspect-[3/4] rounded-xl overflow-hidden bg-card border border-border flex items-center justify-center">
+      <div className={`relative ${aspectClass} rounded-xl overflow-hidden bg-card border border-border flex items-center justify-center`}>
         <div className="flex flex-col items-center gap-2">
           <Loader2 className="w-6 h-6 text-primary animate-spin" />
           <span className="text-xs text-muted-foreground">Generating...</span>
@@ -75,7 +96,7 @@ function ImageCard({ image }: {
   // Failed / NSFW state
   if (image.status === 'failed' || image.status === 'nsfw') {
     return (
-      <div className="relative aspect-[3/4] rounded-xl overflow-hidden bg-card border border-border flex flex-col items-center justify-center gap-3 p-3">
+      <div className={`relative ${aspectClass} rounded-xl overflow-hidden bg-card border border-border flex flex-col items-center justify-center gap-3 p-3`}>
         <div className="flex items-center gap-1.5">
           {image.status === 'failed' ? (
             <span className="flex items-center gap-1 bg-destructive/80 text-destructive-foreground text-[10px] px-2 py-0.5 rounded-full font-medium">
@@ -108,10 +129,14 @@ function ImageCard({ image }: {
     );
   }
 
-  // Complete state with hover overlay
+  // Use natural image aspect if loaded, otherwise fall back to aspectRatio setting
+  const style = naturalAspect ? { aspectRatio: naturalAspect } : undefined;
+  const containerClass = naturalAspect ? '' : aspectClass;
+
   return (
     <div
-      className="group relative aspect-[3/4] rounded-xl overflow-hidden bg-card border border-border hover:border-foreground/20 transition-colors cursor-pointer"
+      className={`group relative ${containerClass} rounded-xl overflow-hidden bg-card border border-border hover:border-foreground/20 transition-colors cursor-pointer`}
+      style={style}
       onClick={() => setSelectedImageId(image.id)}
     >
       <img
@@ -120,6 +145,12 @@ function ImageCard({ image }: {
         className="absolute inset-0 w-full h-full object-cover"
         loading="lazy"
         draggable={false}
+        onLoad={(e) => {
+          const img = e.currentTarget;
+          if (img.naturalWidth && img.naturalHeight) {
+            setNaturalAspect(img.naturalWidth / img.naturalHeight);
+          }
+        }}
       />
 
       {/* Hover gradient overlay */}
