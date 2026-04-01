@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { supabase } from '@/integrations/supabase/client';
 
 export type GeneratedImage = {
   id: string;
@@ -12,11 +13,12 @@ export type GeneratedImage = {
   width?: number;
   height?: number;
   createdAt: number;
+  error?: string;
 };
 
 type GeneratorState = {
   prompt: string;
-  referenceImages: string[]; // base64 or URLs, max 5
+  referenceImages: string[];
   model: string;
   quality: string;
   aspectRatio: string;
@@ -38,33 +40,54 @@ type GeneratorState = {
 };
 
 export const MODELS = [
-  { id: 'auto', name: 'Auto', desc: 'The best model for any prompt, chosen for you', featured: true },
-  { id: 'higgsfield-soul-2', name: 'Higgsfield Soul 2.0', desc: 'Next generation ultra-realistic fashion visuals', featured: true, badge: 'NEW' },
-  { id: 'higgsfield-soul-cinema', name: 'Higgsfield Soul Cinema', desc: 'Cinema-grade visual creation', featured: true, badge: 'NEW' },
-  { id: 'seedream-5-lite', name: 'Seedream 5.0 lite', desc: 'Intelligent visual reasoning', featured: true, badge: 'UNLIMITED' },
-  { id: 'seedream-4.5', name: 'Seedream 4.5', desc: "ByteDance's next-gen 4K image model", featured: true, badge: 'UNLIMITED' },
-  { id: 'nano-banana-2', name: 'Nano Banana 2', desc: 'Pro quality at Flash speed', featured: true },
-  { id: 'nano-banana-pro', name: 'Nano Banana Pro', desc: "Google's flagship generation model", featured: true },
-  { id: 'nano-banana', name: 'Nano Banana', desc: "Google's standard generation model", badge: 'UNLIMITED' },
-  { id: 'higgsfield-soul', name: 'Higgsfield Soul', desc: 'Ultra-realistic fashion visuals', badge: 'UNLIMITED' },
-  { id: 'flux-dev', name: 'Flux Dev', desc: 'High quality open source model' },
-  { id: 'flux-pro', name: 'Flux Pro', desc: 'Professional quality generation' },
-  { id: 'dall-e-3', name: 'DALL-E 3', desc: 'OpenAI image generation' },
-  { id: 'sdxl', name: 'Stable Diffusion XL', desc: 'Open source diffusion model' },
+  { id: 'nano-banana-2', name: 'Nano Banana 2', desc: 'Pro quality at Flash speed, supports image editing', featured: true, badge: 'NEW' as const },
+  { id: 'nano-banana-pro', name: 'Nano Banana Pro', desc: '4K, best text rendering, local editing', featured: true },
+  { id: 'nano-banana', name: 'Nano Banana', desc: 'Fast & stable, great value', featured: true, badge: 'UNLIMITED' as const },
+  { id: 'flux-kontext-pro', name: 'Flux Kontext Pro', desc: 'High quality, flexible aspect ratios', featured: true },
+  { id: 'flux-kontext-max', name: 'Flux Kontext Max', desc: 'Maximum quality, professional grade', featured: true },
 ];
 
 export const ASPECT_RATIOS = [
-  'Auto', '1:1', '3:4', '4:3', '2:3', '3:2', '9:16', '16:9', '5:4', '4:5', '21:9'
+  'Auto', '1:1', '3:4', '4:3', '2:3', '3:2', '9:16', '16:9', '5:4', '4:5', '21:9',
 ];
 
 export const QUALITIES = ['1K', '2K', '4K'];
+
+async function callGenerateAPI(params: {
+  prompt: string;
+  referenceImages: string[];
+  model: string;
+  quality: string;
+  aspectRatio: string;
+}): Promise<{ imageUrl?: string; imageBase64?: string; error?: string }> {
+  const { data, error } = await supabase.functions.invoke('generate-image', {
+    body: {
+      prompt: params.prompt,
+      referenceImages: params.referenceImages,
+      model: params.model,
+      quality: params.quality,
+      aspectRatio: params.aspectRatio,
+    },
+  });
+
+  if (error) {
+    console.error('Edge function error:', error);
+    return { error: error.message || 'Generation failed' };
+  }
+
+  if (data?.error) {
+    return { error: data.error };
+  }
+
+  return { imageUrl: data?.imageUrl, imageBase64: data?.imageBase64 };
+}
 
 export const useGeneratorStore = create<GeneratorState>((set, get) => ({
   prompt: '',
   referenceImages: [],
   model: 'nano-banana-pro',
-  quality: '4K',
-  aspectRatio: '9:16',
+  quality: '2K',
+  aspectRatio: '1:1',
   quantity: 4,
   images: [],
   selectedImageId: null,
@@ -100,50 +123,85 @@ export const useGeneratorStore = create<GeneratorState>((set, get) => ({
 
     set({ images: [...newImages, ...get().images] });
 
-    // Simulate generation (replace with real API call)
-    newImages.forEach((img) => {
-      const delay = 2000 + Math.random() * 3000;
-      setTimeout(() => {
-        const statuses: GeneratedImage['status'][] = ['complete', 'complete', 'complete', 'failed'];
-        const status = statuses[Math.floor(Math.random() * statuses.length)];
+    // Call API for each image
+    newImages.forEach(async (img) => {
+      try {
+        const result = await callGenerateAPI({
+          prompt,
+          referenceImages,
+          model,
+          quality,
+          aspectRatio,
+        });
+
+        if (result.error) {
+          set({
+            images: get().images.map((i) =>
+              i.id === img.id ? { ...i, status: 'failed' as const, error: result.error } : i
+            ),
+          });
+        } else {
+          const finalUrl = result.imageBase64 || result.imageUrl;
+          set({
+            images: get().images.map((i) =>
+              i.id === img.id
+                ? { ...i, status: 'complete' as const, imageUrl: finalUrl }
+                : i
+            ),
+          });
+        }
+      } catch (e) {
+        console.error('Generation error:', e);
         set({
           images: get().images.map((i) =>
             i.id === img.id
-              ? {
-                  ...i,
-                  status,
-                  imageUrl: status === 'complete'
-                    ? `https://picsum.photos/seed/${img.id}/${aspectRatio === '9:16' ? '576/1024' : aspectRatio === '16:9' ? '1024/576' : aspectRatio === '1:1' ? '768/768' : aspectRatio === '3:4' ? '576/768' : aspectRatio === '4:3' ? '768/576' : '576/1024'}`
-                    : undefined,
-                  width: 3072,
-                  height: 5504,
-                }
+              ? { ...i, status: 'failed' as const, error: e instanceof Error ? e.message : 'Unknown error' }
               : i
           ),
         });
-      }, delay);
+      }
     });
   },
 
   retryImage: (id) => {
+    const img = get().images.find((i) => i.id === id);
+    if (!img) return;
+
     set({
       images: get().images.map((i) =>
-        i.id === id ? { ...i, status: 'generating' } : i
+        i.id === id ? { ...i, status: 'generating' as const, error: undefined } : i
       ),
     });
-    setTimeout(() => {
-      set({
-        images: get().images.map((i) =>
-          i.id === id
-            ? { ...i, status: 'complete', imageUrl: `https://picsum.photos/seed/${id}-retry/576/1024`, width: 3072, height: 5504 }
-            : i
-        ),
-      });
-    }, 3000);
+
+    callGenerateAPI({
+      prompt: img.prompt,
+      referenceImages: img.referenceImages,
+      model: img.model,
+      quality: img.quality,
+      aspectRatio: img.aspectRatio,
+    }).then((result) => {
+      if (result.error) {
+        set({
+          images: get().images.map((i) =>
+            i.id === id ? { ...i, status: 'failed' as const, error: result.error } : i
+          ),
+        });
+      } else {
+        const finalUrl = result.imageBase64 || result.imageUrl;
+        set({
+          images: get().images.map((i) =>
+            i.id === id ? { ...i, status: 'complete' as const, imageUrl: finalUrl } : i
+          ),
+        });
+      }
+    });
   },
 
   deleteImage: (id) => {
-    set({ images: get().images.filter((i) => i.id !== id), selectedImageId: get().selectedImageId === id ? null : get().selectedImageId });
+    set({
+      images: get().images.filter((i) => i.id !== id),
+      selectedImageId: get().selectedImageId === id ? null : get().selectedImageId,
+    });
   },
 
   useAsReference: (imageUrl) => {
