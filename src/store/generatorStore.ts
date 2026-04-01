@@ -290,8 +290,8 @@ export const useGeneratorStore = create<GeneratorState>()((set, get) => ({
     const { prompt, referenceImages, model, quality, aspectRatio, quantity } = get();
     if (!prompt.trim()) return;
 
-    const newImages: GeneratedImage[] = Array.from({ length: quantity }, (_, i) => ({
-      id: `img-${Date.now()}-${i}`,
+    const newImages: GeneratedImage[] = Array.from({ length: quantity }, () => ({
+      id: crypto.randomUUID(),
       prompt,
       referenceImages: [...referenceImages],
       model,
