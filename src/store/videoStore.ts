@@ -1,6 +1,13 @@
 import { create } from 'zustand';
 import { supabase } from '@/integrations/supabase/client';
 import { resolveAllToUrls } from '@/lib/uploadToStorage';
+import { toast } from 'sonner';
+
+function formatBytes(bytes: number) {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1048576) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / 1048576).toFixed(1)} MB`;
+}
 
 export type GeneratedVideo = {
   id: string;
@@ -84,7 +91,11 @@ async function callGenerate(payload: Record<string, unknown>, videoId: string, g
 
   if (refs && refs.length > 0) {
     try {
-      const resolvedRefs = await resolveAllToUrls(refs);
+      const resolvedRefs = await resolveAllToUrls(refs, (index, originalSize, finalSize) => {
+        toast.info(`Image ${index + 1} auto-compressed`, {
+          description: `${formatBytes(originalSize)} → ${formatBytes(finalSize)} to meet provider limits`,
+        });
+      });
       payload.referenceImages = resolvedRefs;
       set({
         videos: get().videos.map((video) =>

@@ -128,14 +128,24 @@ function VideoCard({ video }: { video: GeneratedVideo }) {
 
   // Failed
   if (video.status === 'failed' || video.status === 'nsfw') {
+    const isProviderError = video.error?.includes('provider') || video.error?.includes('10MB') || video.error?.includes('file_too_large') || video.error?.includes('Upload failed');
+    const errorTitle = video.status === 'nsfw' ? 'Content Filtered' : isProviderError ? 'Upload Issue' : 'Generation Failed';
+
     return (
       <div className="flex border border-border rounded-2xl overflow-hidden bg-card min-h-[320px]">
         {/* Left: error area */}
         <div className="flex-1 bg-background flex flex-col items-center justify-center gap-3 px-6">
-          <span className="flex items-center gap-1 bg-destructive/80 text-destructive-foreground text-[10px] px-2 py-0.5 rounded-full font-medium">
-            <AlertCircle className="w-3 h-3" /> {video.status === 'failed' ? 'Failed' : 'Filtered'}
+          <span className={`flex items-center gap-1 text-[10px] px-2.5 py-1 rounded-full font-medium ${
+            video.status === 'nsfw' ? 'bg-amber-500/20 text-amber-400' : isProviderError ? 'bg-amber-500/20 text-amber-400' : 'bg-destructive/20 text-destructive'
+          }`}>
+            <AlertCircle className="w-3 h-3" /> {errorTitle}
           </span>
-          <p className="text-xs text-muted-foreground text-center max-w-sm">{video.error || 'Generation failed'}</p>
+          <p className="text-xs text-muted-foreground text-center max-w-sm leading-relaxed">{video.error || 'Generation failed'}</p>
+          {isProviderError && (
+            <p className="text-[10px] text-muted-foreground/50 text-center max-w-xs">
+              Tip: Use smaller reference images or try a different model
+            </p>
+          )}
           <div className="flex items-center gap-2 mt-2">
             <button onClick={() => retryVideo(video.id)} className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground bg-muted/60 px-3 py-1.5 rounded-lg transition-colors">
               <RefreshCw className="w-3 h-3" /> Retry

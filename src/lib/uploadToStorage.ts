@@ -30,8 +30,18 @@ async function dataUriToFile(dataUri: string) {
   });
 }
 
-async function compressImageToLimit(file: File, maxBytes = PROVIDER_IMAGE_LIMIT_BYTES): Promise<File> {
-  if (!file.type.startsWith('image/') || file.size <= maxBytes) return file;
+export type CompressionResult = {
+  file: File;
+  wasCompressed: boolean;
+  originalSize: number;
+  finalSize: number;
+};
+
+async function compressImageToLimit(file: File, maxBytes = PROVIDER_IMAGE_LIMIT_BYTES): Promise<CompressionResult> {
+  const originalSize = file.size;
+  if (!file.type.startsWith('image/') || file.size <= maxBytes) {
+    return { file, wasCompressed: false, originalSize, finalSize: file.size };
+  }
 
   const bitmap = await createImageBitmap(file);
   const canvas = document.createElement('canvas');
@@ -85,9 +95,11 @@ async function compressImageToLimit(file: File, maxBytes = PROVIDER_IMAGE_LIMIT_
     throw new Error('Reference image is still above the provider size limit after compression. Please upload a smaller image.');
   }
 
-  return new File([output], replaceExtension(file.name || 'reference', 'jpg'), {
+  const compressedFile = new File([output], replaceExtension(file.name || 'reference', 'jpg'), {
     type: 'image/jpeg',
   });
+
+  return { file: compressedFile, wasCompressed: true, originalSize, finalSize: compressedFile.size };
 }
 
 async function uploadFile(file: File): Promise<string> {
@@ -110,21 +122,56 @@ async function uploadFile(file: File): Promise<string> {
  * If the input is a base64 data URI, upload it to the video-inputs storage bucket
  * and return the public URL. If it's already a URL, return it as-is.
  */
+export type ResolveResult = {
+  url: string;
+  wasCompressed: boolean;
+  originalSize: number;
+  finalSize: number;
+};
+
 export async function resolveToUrl(dataOrUrl: string): Promise<string> {
-  if (!dataOrUrl.startsWith('data:')) return dataOrUrl;
+  const result = await resolveToUrlWithMeta(dataOrUrl);
+  return result.url;
+}
 
-  let file = await dataUriToFile(dataOrUrl);
-
-  if (file.type.startsWith('image/')) {
-    file = await compressImageToLimit(file);
+export async function resolveToUrlWithMeta(dataOrUrl: string): Promise<ResolveResult> {
+  if (!dataOrUrl.startsWith('data:')) {
+    return { url: dataOrUrl, wasCompressed: false, originalSize: 0, finalSize: 0 };
   }
 
-  return uploadFile(file);
+  let file = await dataUriToFile(dataOrUrl);
+  let wasCompressed = false;
+  let originalSize = file.size;
+  let finalSize = file.size;
+
+  if (file.type.startsWith('image/')) {
+    const result = await compressImageToLimit(file);
+    file = result.file;
+    wasCompressed = result.wasCompressed;
+    originalSize = result.originalSize;
+    finalSize = result.finalSize;
+  }
+
+  const url = await uploadFile(file);
+  return { url, wasCompressed, originalSize, finalSize };
 }
 
 /**
  * Resolve an array of references (base64 or URLs) to all URLs.
+ * Returns compression metadata via the callback for UI indicators.
  */
-export async function resolveAllToUrls(refs: string[]): Promise<string[]> {
-  return Promise.all(refs.filter((ref) => ref.length > 0).map(resolveToUrl));
+export async function resolveAllToUrls(
+  refs: string[],
+  onCompressed?: (index: number, originalSize: number, finalSize: number) => void,
+): Promise<string[]> {
+  const filtered = refs.filter((ref) => ref.length > 0);
+  const results = await Promise.all(filtered.map((ref) => resolveToUrlWithMeta(ref)));
+
+  results.forEach((r, i) => {
+    if (r.wasCompressed && onCompressed) {
+      onCompressed(i, r.originalSize, r.finalSize);
+    }
+  });
+
+  return results.map((r) => r.url);
 }
