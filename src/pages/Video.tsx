@@ -9,8 +9,10 @@ import { useVideoStore } from '@/store/videoStore';
 
 export default function Video() {
   const selectedVideoId = useVideoStore(s => s.selectedVideoId);
+  const loadHistory = useVideoStore(s => s.loadHistory);
   const [layout, setLayout] = useState<'sidebar' | 'bottom'>('sidebar');
 
+  useEffect(() => { loadHistory(); }, [loadHistory]);
   return (
     <div className="h-screen w-screen bg-background flex flex-col overflow-hidden">
       {/* Top nav */}
