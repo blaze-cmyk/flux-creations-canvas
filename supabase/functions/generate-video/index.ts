@@ -259,17 +259,19 @@ serve(async (req) => {
 
       const submitData = await submitResp.json();
       const requestId = submitData.request_id;
+      const responseUrl = submitData.response_url;
+      const statusUrl = submitData.status_url;
 
-      if (!requestId) {
+      if (!requestId || !responseUrl) {
         // Direct response (some models return immediately)
         const vid = submitData?.video?.url || submitData?.video;
         if (vid) {
           videoUrl = typeof vid === "string" ? vid : vid.url;
         }
       } else {
-        // Poll for result
-        console.log(`Polling fal.ai request: ${requestId}`);
-        const result = await pollFalResult(requestId, endpoint, FAL_KEY);
+        // Poll for result using URLs from submit response
+        console.log(`Polling fal.ai request: ${requestId}, response_url: ${responseUrl}`);
+        const result = await pollFalResult(responseUrl, statusUrl || `https://queue.fal.run/${endpoint}/requests/${requestId}/status`, FAL_KEY);
         const vid = result?.video?.url || result?.video;
         if (vid) {
           videoUrl = typeof vid === "string" ? vid : vid.url;
