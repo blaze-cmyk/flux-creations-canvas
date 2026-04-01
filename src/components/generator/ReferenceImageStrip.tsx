@@ -78,6 +78,7 @@ export function ReferenceImageStrip({
               key={image.id}
               id={image.id}
               src={image.src}
+              index={image.index}
               onPreview={() => onPreview(image.src)}
               onRemove={() => onRemove(image.index)}
             />
