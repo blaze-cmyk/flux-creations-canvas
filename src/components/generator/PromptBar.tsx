@@ -81,7 +81,7 @@ export function PromptBar() {
         <div className="relative px-4 pt-3 pb-2">
           {/* Reference images row */}
           {referenceImages.length > 0 && (
-            <div className="flex items-center gap-2 mb-2">
+            <div className="flex items-center gap-3 mb-2">
               {referenceImages.map((img, i) => (
                 <div
                   key={i}
@@ -95,23 +95,24 @@ export function PromptBar() {
                     setDragRefIdx(null); setDragOverIdx(null);
                   }}
                   onDragEnd={() => { setDragRefIdx(null); setDragOverIdx(null); }}
-                  className={`relative group cursor-grab active:cursor-grabbing transition-all ${dragRefIdx === i ? 'opacity-40 scale-90' : ''} ${dragOverIdx === i && dragRefIdx !== i ? 'ring-2 ring-primary rounded-lg' : ''}`}
+                  className={`relative group cursor-grab active:cursor-grabbing transition-all duration-200 ${dragRefIdx === i ? 'opacity-40 scale-90' : ''} ${dragOverIdx === i && dragRefIdx !== i ? 'ring-2 ring-primary rounded-xl scale-105' : ''}`}
                 >
-                  <img src={img} alt="" className="w-10 h-10 rounded-lg object-cover border border-border cursor-pointer" onClick={() => setPreviewImg(img)} />
+                  <img src={img} alt="" className="w-20 h-20 rounded-xl object-cover border border-border" onClick={() => setPreviewImg(img)} />
                   <button
                     onClick={(e) => { e.stopPropagation(); removeReferenceImage(i); }}
-                    className="absolute -top-1 -right-1 w-4 h-4 bg-destructive rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                    className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-destructive rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity shadow-md"
                   >
-                    <X className="w-2.5 h-2.5 text-destructive-foreground" />
+                    <X className="w-3 h-3 text-destructive-foreground" />
                   </button>
                 </div>
               ))}
               {referenceImages.length < 5 && (
                 <button
                   onClick={() => fileInputRef.current?.click()}
-                  className="w-10 h-10 rounded-lg border border-dashed border-border flex items-center justify-center text-muted-foreground hover:border-foreground/30 hover:text-foreground/50 transition-colors"
+                  className="w-20 h-20 rounded-xl border border-dashed border-border flex items-center justify-center text-muted-foreground hover:border-foreground/30 hover:text-foreground/50 transition-colors"
+                  title="Upload image"
                 >
-                  <ImagePlus className="w-4 h-4" />
+                  <ImagePlus className="w-5 h-5" />
                 </button>
               )}
             </div>
