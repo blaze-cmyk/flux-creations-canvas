@@ -5,7 +5,7 @@ import { Dialog, DialogContent } from '@/components/ui/dialog';
 
 export function PromptBar() {
   const {
-    prompt, setPrompt, referenceImages, addReferenceImage, removeReferenceImage,
+    prompt, setPrompt, referenceImages, addReferenceImage, removeReferenceImage, reorderReferenceImages,
     model, setModel, quality, setQuality, aspectRatio, setAspectRatio,
     quantity, setQuantity, generate,
   } = useGeneratorStore();
@@ -18,6 +18,8 @@ export function PromptBar() {
   const [aspectOpen, setAspectOpen] = useState(false);
   const [modelSearch, setModelSearch] = useState('');
   const [dragging, setDragging] = useState(false);
+  const [dragRefIdx, setDragRefIdx] = useState<number | null>(null);
+  const [dragOverIdx, setDragOverIdx] = useState<number | null>(null);
   const [freeGens, setFreeGens] = useState(false);
   const [previewImg, setPreviewImg] = useState<string | null>(null);
 
@@ -81,10 +83,23 @@ export function PromptBar() {
           {referenceImages.length > 0 && (
             <div className="flex items-center gap-2 mb-2">
               {referenceImages.map((img, i) => (
-                <div key={i} className="relative group">
+                <div
+                  key={i}
+                  draggable
+                  onDragStart={(e) => { e.dataTransfer.effectAllowed = 'move'; setDragRefIdx(i); }}
+                  onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; setDragOverIdx(i); }}
+                  onDragLeave={() => setDragOverIdx(null)}
+                  onDrop={(e) => {
+                    e.preventDefault(); e.stopPropagation();
+                    if (dragRefIdx !== null && dragRefIdx !== i) reorderReferenceImages(dragRefIdx, i);
+                    setDragRefIdx(null); setDragOverIdx(null);
+                  }}
+                  onDragEnd={() => { setDragRefIdx(null); setDragOverIdx(null); }}
+                  className={`relative group cursor-grab active:cursor-grabbing transition-all ${dragRefIdx === i ? 'opacity-40 scale-90' : ''} ${dragOverIdx === i && dragRefIdx !== i ? 'ring-2 ring-primary rounded-lg' : ''}`}
+                >
                   <img src={img} alt="" className="w-10 h-10 rounded-lg object-cover border border-border cursor-pointer" onClick={() => setPreviewImg(img)} />
                   <button
-                    onClick={() => removeReferenceImage(i)}
+                    onClick={(e) => { e.stopPropagation(); removeReferenceImage(i); }}
                     className="absolute -top-1 -right-1 w-4 h-4 bg-destructive rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
                   >
                     <X className="w-2.5 h-2.5 text-destructive-foreground" />

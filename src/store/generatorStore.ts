@@ -28,6 +28,7 @@ type GeneratorState = {
   setPrompt: (prompt: string) => void;
   addReferenceImage: (img: string) => void;
   removeReferenceImage: (index: number) => void;
+  reorderReferenceImages: (fromIndex: number, toIndex: number) => void;
   setModel: (model: string) => void;
   setQuality: (quality: string) => void;
   setAspectRatio: (ar: string) => void;
@@ -101,6 +102,12 @@ export const useGeneratorStore = create<GeneratorState>((set, get) => ({
   },
   removeReferenceImage: (index) => {
     set({ referenceImages: get().referenceImages.filter((_, i) => i !== index) });
+  },
+  reorderReferenceImages: (fromIndex, toIndex) => {
+    const imgs = [...get().referenceImages];
+    const [moved] = imgs.splice(fromIndex, 1);
+    imgs.splice(toIndex, 0, moved);
+    set({ referenceImages: imgs });
   },
   setModel: (model) => set({ model }),
   setQuality: (quality) => set({ quality }),
