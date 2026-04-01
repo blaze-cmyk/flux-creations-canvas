@@ -160,13 +160,19 @@ export const useGeneratorStore = create<GeneratorState>()((set, get) => ({
   selectedImageId: null,
   historyLoaded: false,
 
-  setPrompt: (prompt) => set({ prompt }),
+  setPrompt: (prompt) => { set({ prompt }); localStorage.setItem('gen-last-prompt', prompt); },
   addReferenceImage: (img) => {
     const refs = get().referenceImages;
-    if (refs.length < 5) set({ referenceImages: [...refs, img] });
+    if (refs.length < 5) {
+      const next = [...refs, img];
+      set({ referenceImages: next });
+      localStorage.setItem('gen-last-refs', JSON.stringify(next));
+    }
   },
   removeReferenceImage: (index) => {
-    set({ referenceImages: get().referenceImages.filter((_, i) => i !== index) });
+    const next = get().referenceImages.filter((_, i) => i !== index);
+    set({ referenceImages: next });
+    localStorage.setItem('gen-last-refs', JSON.stringify(next));
   },
   reorderReferenceImages: (fromIndex, toIndex) => {
     const imgs = [...get().referenceImages];
