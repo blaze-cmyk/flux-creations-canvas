@@ -2,6 +2,7 @@ import { useVideoStore, VIDEO_MODELS, VIDEO_ASPECT_RATIOS, VIDEO_DURATIONS } fro
 import { ImagePlus, ChevronRight, Check, Search, Play, Video, Film, Wand2, Volume2, Sparkles, Plus, Image as ImageIcon } from 'lucide-react';
 import { MotionControlPanel } from './MotionControlPanel';
 import { EditVideoPanel } from './EditVideoPanel';
+import { CreateVideoPanel } from './CreateVideoPanel';
 import { useRef, useState, useEffect, useCallback } from 'react';
 
 export function VideoSidebar() {
@@ -56,69 +57,19 @@ export function VideoSidebar() {
       <div className="flex-1 overflow-y-auto px-3 pb-3 space-y-3 scrollbar-hide" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
         {/* === CREATE VIDEO === */}
         {mode === 'text-to-video' && (
-          <>
-            {/* Hero banner */}
-            <div className="relative rounded-xl overflow-hidden bg-gradient-to-br from-muted to-card h-28 flex items-end p-3">
-              <div>
-                <p className="text-xs font-bold text-foreground uppercase tracking-wider">GENERAL</p>
-                <p className="text-[10px] text-muted-foreground">{selectedModel?.name || 'Select model'}</p>
-              </div>
-            </div>
-
-            {/* Start / End frame */}
-            <div className="flex gap-2">
-              <FrameUpload
-                label="Start frame"
-                image={referenceImages[0]}
-                onUpload={() => fileInputRef.current?.click()}
-                onRemove={() => removeReferenceImage(0)}
-              />
-              <FrameUpload
-                label="End frame"
-                image={referenceImages[1]}
-                onUpload={() => {
-                  const input = document.createElement('input');
-                  input.type = 'file';
-                  input.accept = 'image/*';
-                  input.onchange = (e) => {
-                    const f = (e.target as HTMLInputElement).files?.[0];
-                    if (f) {
-                      const reader = new FileReader();
-                      reader.onload = () => addReferenceImage(reader.result as string);
-                      reader.readAsDataURL(f);
-                    }
-                  };
-                  input.click();
-                }}
-                onRemove={() => removeReferenceImage(1)}
-              />
-            </div>
-
-            {/* Prompt */}
-            <div className="space-y-1.5">
-              <textarea
-                value={prompt}
-                onChange={e => setPrompt(e.target.value)}
-                placeholder='Describe your video, like "A woman walking through a neon-lit city". Add elements using @'
-                rows={3}
-                className="w-full bg-card rounded-xl p-3 text-sm text-foreground placeholder:text-muted-foreground/40 resize-none border border-border focus:outline-none focus:ring-1 focus:ring-primary/50 leading-5"
-              />
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => setEnhance(!enhance)}
-                  className={`flex items-center gap-1 text-[11px] px-2 py-1 rounded-full transition-colors ${enhance ? 'text-primary bg-primary/10' : 'text-muted-foreground'}`}
-                >
-                  <Sparkles className="w-3 h-3" /> Enhance {enhance ? 'on' : 'off'}
-                </button>
-                <button
-                  onClick={() => setSound(!sound)}
-                  className={`flex items-center gap-1 text-[11px] px-2 py-1 rounded-full transition-colors ${sound ? 'text-primary bg-primary/10' : 'text-muted-foreground'}`}
-                >
-                  <Volume2 className="w-3 h-3" /> {sound ? 'On' : 'Off'}
-                </button>
-              </div>
-            </div>
-          </>
+          <CreateVideoPanel
+            prompt={prompt}
+            setPrompt={setPrompt}
+            referenceImages={referenceImages}
+            addReferenceImage={addReferenceImage}
+            removeReferenceImage={removeReferenceImage}
+            fileInputRef={fileInputRef}
+            selectedModel={selectedModel}
+            enhance={enhance}
+            setEnhance={setEnhance}
+            sound={sound}
+            setSound={setSound}
+          />
         )}
 
         {/* === EDIT VIDEO === */}
@@ -217,27 +168,6 @@ export function VideoSidebar() {
   );
 }
 
-function FrameUpload({ label, image, onUpload, onRemove }: { label: string; image?: string; onUpload: () => void; onRemove: () => void }) {
-  return (
-    <div className="flex-1">
-      {image ? (
-        <div className="relative rounded-xl overflow-hidden border border-border aspect-video">
-          <img src={image} alt="" className="w-full h-full object-cover" />
-          <button onClick={onRemove} className="absolute top-1 right-1 w-4 h-4 rounded-full bg-black/60 text-white text-[10px] flex items-center justify-center">×</button>
-        </div>
-      ) : (
-        <button
-          onClick={onUpload}
-          className="w-full aspect-video border border-dashed border-border rounded-xl flex flex-col items-center justify-center gap-1 text-muted-foreground hover:border-foreground/30 transition-colors"
-        >
-          <ImagePlus className="w-4 h-4" />
-          <span className="text-[10px]">{label}</span>
-          <span className="text-[9px] text-muted-foreground/50">Optional</span>
-        </button>
-      )}
-    </div>
-  );
-}
 
 function SidebarModelDropdown({ model, setModel, search, setSearch, onClose, mode }: {
   model: string; setModel: (m: string) => void; search: string; setSearch: (s: string) => void; onClose: () => void; mode: string;
