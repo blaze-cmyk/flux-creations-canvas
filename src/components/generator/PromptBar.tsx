@@ -5,7 +5,7 @@ import { Dialog, DialogContent } from '@/components/ui/dialog';
 
 export function PromptBar() {
   const {
-    prompt, setPrompt, referenceImages, addReferenceImage, removeReferenceImage,
+    prompt, setPrompt, referenceImages, addReferenceImage, removeReferenceImage, reorderReferenceImages,
     model, setModel, quality, setQuality, aspectRatio, setAspectRatio,
     quantity, setQuantity, generate,
   } = useGeneratorStore();
