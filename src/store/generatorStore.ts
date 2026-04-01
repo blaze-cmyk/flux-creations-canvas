@@ -56,13 +56,22 @@ export const MODELS = [
   { id: 'flux-2-max', name: 'Flux 2 Max', desc: 'State-of-the-art generation & editing', featured: true },
   { id: 'flux-2-flex', name: 'Flux 2 Flex', desc: 'Multi-reference editing, enhanced text rendering', featured: false },
   { id: 'flux-2-dev', name: 'Flux 2 Dev', desc: 'Fast Flux 2 editing, dev-friendly', featured: false },
-  // Flux 1 (via fal.ai)
+  // Flux 1 (via fal.ai) — text-to-image
   { id: 'flux-schnell', name: 'Flux Schnell', desc: 'Ultra-fast generation, open source', featured: false },
   { id: 'flux-dev', name: 'Flux 1 Dev', desc: 'High quality open source, 12B params', featured: false },
   { id: 'flux-pro-v1.1', name: 'Flux Pro 1.1', desc: 'Production quality, top Elo score', featured: false },
   // Other fal.ai models
   { id: 'recraft-v3', name: 'Recraft V3', desc: 'Best text rendering & vector art', featured: false },
   { id: 'ideogram-v3', name: 'Ideogram V3', desc: 'Marketing materials, logos with text', featured: false },
+  // Runware Flux models (no content filter)
+  { id: 'rw-flux-1-dev', name: 'RW Flux 1 Dev', desc: 'Flux 1 Dev via Runware, no content filter', featured: true, badge: 'NEW' as const },
+  { id: 'rw-flux-1-schnell', name: 'RW Flux 1 Schnell', desc: 'Ultra-fast Flux via Runware', featured: false },
+  { id: 'rw-flux-2-pro', name: 'RW Flux 2 Pro', desc: 'Flux 2 Pro via Runware, unrestricted', featured: true },
+  { id: 'rw-flux-2-flex', name: 'RW Flux 2 Flex', desc: 'Flux 2 Flex via Runware, unrestricted', featured: false },
+  { id: 'rw-flux-2-dev', name: 'RW Flux 2 Dev', desc: 'Flux 2 Dev via Runware, unrestricted', featured: false },
+  { id: 'rw-flux-1.1-pro', name: 'RW Flux 1.1 Pro', desc: 'Flux 1.1 Pro via Runware', featured: false },
+  { id: 'rw-flux-1.1-pro-ultra', name: 'RW Flux 1.1 Pro Ultra', desc: 'Highest quality Flux 1.1 via Runware', featured: false },
+  { id: 'rw-flux-kontext-dev', name: 'RW Flux Kontext Dev', desc: 'Flux Kontext via Runware, unrestricted editing', featured: true },
 ];
 
 export const ASPECT_RATIOS = [
