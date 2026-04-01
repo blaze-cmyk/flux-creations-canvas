@@ -41,7 +41,7 @@ const MODEL_MAP: Record<string, ModelConfig> = {
 
   // Flux 1 (via fal.ai) — text-to-image
   "flux-schnell": { falModel: "fal-ai/flux/schnell", type: "fal", supportsImageInput: false },
-  "flux-uncensored-v2": { falModel: "fal-ai/flux/dev/lora", type: "fal", supportsImageInput: false, lora: "enhanceaiteam/Flux-Uncensored-V2" },
+  "flux-uncensored-v2": { falModel: "fal-ai/flux-lora", type: "fal", supportsImageInput: false, lora: "enhanceaiteam/Flux-Uncensored-V2" },
   "flux-dev": { falModel: "fal-ai/flux/dev", type: "fal", supportsImageInput: false },
   "flux-pro-v1.1": { falModel: "fal-ai/flux-pro/v1.1", type: "fal", supportsImageInput: false },
 
