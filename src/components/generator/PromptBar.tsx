@@ -18,6 +18,8 @@ export function PromptBar() {
   const [aspectOpen, setAspectOpen] = useState(false);
   const [modelSearch, setModelSearch] = useState('');
   const [dragging, setDragging] = useState(false);
+  const [dragRefIdx, setDragRefIdx] = useState<number | null>(null);
+  const [dragOverIdx, setDragOverIdx] = useState<number | null>(null);
   const [freeGens, setFreeGens] = useState(false);
   const [previewImg, setPreviewImg] = useState<string | null>(null);
 
