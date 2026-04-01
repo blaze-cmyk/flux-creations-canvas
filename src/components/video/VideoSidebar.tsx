@@ -21,7 +21,9 @@ export function VideoSidebar() {
   const [enhance, setEnhance] = useState(true);
   const [sound, setSound] = useState(true);
 
-  const selectedModel = VIDEO_MODELS.find(m => m.id === model);
+  const selectedModel =
+    VIDEO_MODELS.find(m => m.id === model && (m.modes as readonly string[]).includes(mode)) ??
+    VIDEO_MODELS.find(m => (m.modes as readonly string[]).includes(mode));
 
   const handleFiles = useCallback((files: FileList | File[]) => {
     const arr = Array.from(files).filter(f => f.type.startsWith('image/'));

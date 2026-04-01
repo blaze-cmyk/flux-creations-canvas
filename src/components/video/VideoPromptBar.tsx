@@ -14,7 +14,9 @@ export function VideoPromptBar() {
   const [modelOpen, setModelOpen] = useState(false);
   const [modelSearch, setModelSearch] = useState('');
 
-  const selectedModel = VIDEO_MODELS.find(m => m.id === model);
+  const selectedModel =
+    VIDEO_MODELS.find(m => m.id === model && (m.modes as readonly string[]).includes(mode)) ??
+    VIDEO_MODELS.find(m => (m.modes as readonly string[]).includes(mode));
 
   useEffect(() => {
     const ta = textareaRef.current;
