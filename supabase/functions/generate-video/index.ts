@@ -151,6 +151,8 @@ async function pollFalResult(responseUrl: string, statusUrl: string | null, falK
 
     // If polling response_url directly, the response IS the result
     return data;
+  }
+  throw new Error("Video generation timed out");
 }
 
 serve(async (req) => {
