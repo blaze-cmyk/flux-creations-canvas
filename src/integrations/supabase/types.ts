@@ -14,7 +14,42 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      generations: {
+        Row: {
+          aspect_ratio: string
+          created_at: string
+          error: string | null
+          id: string
+          image_url: string | null
+          model: string
+          prompt: string
+          quality: string
+          status: string
+        }
+        Insert: {
+          aspect_ratio?: string
+          created_at?: string
+          error?: string | null
+          id?: string
+          image_url?: string | null
+          model: string
+          prompt: string
+          quality?: string
+          status?: string
+        }
+        Update: {
+          aspect_ratio?: string
+          created_at?: string
+          error?: string | null
+          id?: string
+          image_url?: string | null
+          model?: string
+          prompt?: string
+          quality?: string
+          status?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never

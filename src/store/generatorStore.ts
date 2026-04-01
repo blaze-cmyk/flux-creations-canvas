@@ -1,5 +1,4 @@
 import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
 import { supabase } from '@/integrations/supabase/client';
 
 export type GeneratedImage = {
@@ -26,6 +25,7 @@ type GeneratorState = {
   quantity: number;
   images: GeneratedImage[];
   selectedImageId: string | null;
+  historyLoaded: boolean;
   setPrompt: (prompt: string) => void;
   addReferenceImage: (img: string) => void;
   removeReferenceImage: (index: number) => void;
@@ -39,6 +39,7 @@ type GeneratorState = {
   retryImage: (id: string) => void;
   deleteImage: (id: string) => void;
   useAsReference: (imageUrl: string) => void;
+  loadHistory: () => Promise<void>;
 };
 
 export const MODELS = [
@@ -86,9 +87,69 @@ async function callGenerateAPI(params: {
   return { imageUrl: data?.imageUrl, imageBase64: data?.imageBase64 };
 }
 
-export const useGeneratorStore = create<GeneratorState>()(
-  persist(
-    (set, get) => ({
+// Upload image to storage and return public URL
+async function uploadToStorage(imageData: string, id: string): Promise<string | null> {
+  try {
+    let blob: Blob;
+    let ext = 'png';
+
+    if (imageData.startsWith('data:')) {
+      // Base64 data URI → blob
+      const match = imageData.match(/^data:(image\/(\w+));base64,(.+)$/);
+      if (!match) return null;
+      ext = match[2] === 'jpeg' ? 'jpg' : match[2];
+      const binary = atob(match[3]);
+      const bytes = new Uint8Array(binary.length);
+      for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+      blob = new Blob([bytes], { type: match[1] });
+    } else if (imageData.startsWith('http')) {
+      // URL → fetch and upload
+      const resp = await fetch(imageData);
+      if (!resp.ok) return null;
+      blob = await resp.blob();
+      const ct = resp.headers.get('content-type') || 'image/png';
+      ext = ct.includes('jpeg') || ct.includes('jpg') ? 'jpg' : 'png';
+    } else {
+      return null;
+    }
+
+    const path = `${id}.${ext}`;
+    const { error } = await supabase.storage
+      .from('generated-images')
+      .upload(path, blob, { contentType: blob.type, upsert: true });
+
+    if (error) {
+      console.error('Storage upload error:', error);
+      return null;
+    }
+
+    const { data: urlData } = supabase.storage
+      .from('generated-images')
+      .getPublicUrl(path);
+
+    return urlData.publicUrl;
+  } catch (e) {
+    console.error('Upload error:', e);
+    return null;
+  }
+}
+
+// Save a completed generation to the database
+async function saveToDb(img: GeneratedImage, storageUrl: string) {
+  const { error } = await supabase.from('generations').insert({
+    id: img.id,
+    prompt: img.prompt,
+    model: img.model,
+    quality: img.quality,
+    aspect_ratio: img.aspectRatio,
+    image_url: storageUrl,
+    status: img.status,
+    error: img.error || null,
+  } as any);
+  if (error) console.error('DB insert error:', error);
+}
+
+export const useGeneratorStore = create<GeneratorState>()((set, get) => ({
   prompt: '',
   referenceImages: [],
   model: 'gemini-3.1-flash-image',
@@ -97,6 +158,7 @@ export const useGeneratorStore = create<GeneratorState>()(
   quantity: 4,
   images: [],
   selectedImageId: null,
+  historyLoaded: false,
 
   setPrompt: (prompt) => set({ prompt }),
   addReferenceImage: (img) => {
@@ -118,6 +180,48 @@ export const useGeneratorStore = create<GeneratorState>()(
   setQuantity: (qty) => set({ quantity: Math.max(1, Math.min(4, qty)) }),
   setSelectedImageId: (id) => set({ selectedImageId: id }),
 
+  loadHistory: async () => {
+    if (get().historyLoaded) return;
+    try {
+      const { data, error } = await supabase
+        .from('generations')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(100) as any;
+
+      if (error) {
+        console.error('Load history error:', error);
+        return;
+      }
+
+      if (data && data.length > 0) {
+        const loaded: GeneratedImage[] = data.map((row: any) => ({
+          id: row.id,
+          prompt: row.prompt,
+          referenceImages: [],
+          model: row.model,
+          quality: row.quality,
+          aspectRatio: row.aspect_ratio,
+          status: row.status as GeneratedImage['status'],
+          imageUrl: row.image_url,
+          createdAt: new Date(row.created_at).getTime(),
+          error: row.error,
+        }));
+
+        // Merge: keep any in-progress images, append loaded history
+        const current = get().images;
+        const currentIds = new Set(current.map((i) => i.id));
+        const newFromDb = loaded.filter((i) => !currentIds.has(i.id));
+        set({ images: [...current, ...newFromDb], historyLoaded: true });
+      } else {
+        set({ historyLoaded: true });
+      }
+    } catch (e) {
+      console.error('Load history error:', e);
+      set({ historyLoaded: true });
+    }
+  },
+
   generate: () => {
     const { prompt, referenceImages, model, quality, aspectRatio, quantity } = get();
     if (!prompt.trim()) return;
@@ -135,16 +239,9 @@ export const useGeneratorStore = create<GeneratorState>()(
 
     set({ images: [...newImages, ...get().images] });
 
-    // Call API for each image
     newImages.forEach(async (img) => {
       try {
-        const result = await callGenerateAPI({
-          prompt,
-          referenceImages,
-          model,
-          quality,
-          aspectRatio,
-        });
+        const result = await callGenerateAPI({ prompt, referenceImages, model, quality, aspectRatio });
 
         if (result.error) {
           set({
@@ -153,11 +250,26 @@ export const useGeneratorStore = create<GeneratorState>()(
             ),
           });
         } else {
-          const finalUrl = result.imageBase64 || result.imageUrl;
+          const rawUrl = result.imageBase64 || result.imageUrl;
+          
+          // Upload to storage for persistence
+          let persistentUrl = rawUrl;
+          if (rawUrl) {
+            const storageUrl = await uploadToStorage(rawUrl, img.id);
+            if (storageUrl) {
+              persistentUrl = storageUrl;
+              // Save to database
+              await saveToDb(
+                { ...img, status: 'complete', imageUrl: persistentUrl },
+                persistentUrl
+              );
+            }
+          }
+
           set({
             images: get().images.map((i) =>
               i.id === img.id
-                ? { ...i, status: 'complete' as const, imageUrl: finalUrl }
+                ? { ...i, status: 'complete' as const, imageUrl: persistentUrl }
                 : i
             ),
           });
@@ -191,7 +303,7 @@ export const useGeneratorStore = create<GeneratorState>()(
       model: img.model,
       quality: img.quality,
       aspectRatio: img.aspectRatio,
-    }).then((result) => {
+    }).then(async (result) => {
       if (result.error) {
         set({
           images: get().images.map((i) =>
@@ -199,10 +311,18 @@ export const useGeneratorStore = create<GeneratorState>()(
           ),
         });
       } else {
-        const finalUrl = result.imageBase64 || result.imageUrl;
+        const rawUrl = result.imageBase64 || result.imageUrl;
+        let persistentUrl = rawUrl;
+        if (rawUrl) {
+          const storageUrl = await uploadToStorage(rawUrl, id);
+          if (storageUrl) {
+            persistentUrl = storageUrl;
+            await saveToDb({ ...img, status: 'complete', imageUrl: persistentUrl }, persistentUrl);
+          }
+        }
         set({
           images: get().images.map((i) =>
-            i.id === id ? { ...i, status: 'complete' as const, imageUrl: finalUrl } : i
+            i.id === id ? { ...i, status: 'complete' as const, imageUrl: persistentUrl } : i
           ),
         });
       }
@@ -214,6 +334,10 @@ export const useGeneratorStore = create<GeneratorState>()(
       images: get().images.filter((i) => i.id !== id),
       selectedImageId: get().selectedImageId === id ? null : get().selectedImageId,
     });
+    // Also delete from DB
+    supabase.from('generations').delete().eq('id', id).then(({ error }) => {
+      if (error) console.error('DB delete error:', error);
+    });
   },
 
   useAsReference: (imageUrl) => {
@@ -222,10 +346,4 @@ export const useGeneratorStore = create<GeneratorState>()(
       set({ referenceImages: [...refs, imageUrl], selectedImageId: null });
     }
   },
-}),
-    {
-      name: 'generator-storage',
-      partialize: (state) => ({ images: state.images }),
-    }
-  )
-);
+}));

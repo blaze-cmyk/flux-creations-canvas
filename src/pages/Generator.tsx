@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { PromptBar } from '@/components/generator/PromptBar';
 import { ImageGrid } from '@/components/generator/ImageGrid';
 import { ImageDetailModal } from '@/components/generator/ImageDetailModal';
@@ -7,6 +8,11 @@ import { ChevronLeft, Clock, Users } from 'lucide-react';
 
 export default function Generator() {
   const selectedImageId = useGeneratorStore((s) => s.selectedImageId);
+  const loadHistory = useGeneratorStore((s) => s.loadHistory);
+
+  useEffect(() => {
+    loadHistory();
+  }, [loadHistory]);
 
   return (
     <div className="h-screen w-screen bg-background flex flex-col overflow-hidden">
