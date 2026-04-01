@@ -21,6 +21,7 @@ type ModelConfig = {
   requiresImage?: boolean;
   textFallback?: string;
   lora?: string;
+  fallbackModel?: string; // model ID to retry with if this one fails
 };
 
 const MODEL_MAP: Record<string, ModelConfig> = {
