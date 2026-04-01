@@ -309,7 +309,7 @@ export const useVideoStore = create<VideoState>()((set, get) => ({
   loadHistory: async () => {
     if (get()._historyLoaded) return;
     try {
-      const { data } = await supabase
+      const { data } = await (supabase as any)
         .from('video_generations')
         .select('*')
         .order('created_at', { ascending: false })
