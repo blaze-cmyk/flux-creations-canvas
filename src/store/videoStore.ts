@@ -127,11 +127,7 @@ async function callGenerate(payload: Record<string, unknown>, videoId: string, g
       });
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unknown upload error';
-      set({
-        videos: get().videos.map((video) =>
-          video.id === videoId ? { ...video, status: 'failed', error: `Upload failed: ${message}` } : video,
-        ),
-      });
+      updateVideoAndSave(videoId, { status: 'failed', error: `Upload failed: ${message}` }, get, set);
       return;
     }
   }
@@ -148,24 +144,25 @@ async function callGenerate(payload: Record<string, unknown>, videoId: string, g
           if (body?.error) errMsg = body.error;
         }
       } catch {}
-      set({ videos: get().videos.map(v => v.id === videoId ? { ...v, status: 'failed', error: errMsg } : v) });
+      updateVideoAndSave(videoId, { status: 'failed', error: errMsg }, get, set);
       return;
     }
 
     if (data?.error) {
       const isNsfw = data.filtered;
-      set({ videos: get().videos.map(v => v.id === videoId ? { ...v, status: isNsfw ? 'nsfw' : 'failed', error: data.error } : v) });
+      updateVideoAndSave(videoId, { status: isNsfw ? 'nsfw' : 'failed', error: data.error }, get, set);
       return;
     }
 
-    // Immediate result
     if (data?.videoUrl || data?.status === 'complete') {
-      set({ videos: get().videos.map(v => v.id === videoId ? { ...v, status: 'complete', videoUrl: data.videoUrl } : v) });
+      updateVideoAndSave(videoId, { status: 'complete', videoUrl: data.videoUrl }, get, set);
       return;
     }
 
-    // Async: poll for result
     if (data?.submitted && data?.provider && data?.taskId) {
+      // Save provider/task info to DB for potential recovery
+      saveVideoToDb({ ...get().videos.find(v => v.id === videoId)! });
+
       const pollBody: Record<string, unknown> = {
         action: 'poll',
         provider: data.provider,
@@ -174,33 +171,30 @@ async function callGenerate(payload: Record<string, unknown>, videoId: string, g
       if (data.responseUrl) pollBody.responseUrl = data.responseUrl;
       if (data.statusUrl) pollBody.statusUrl = data.statusUrl;
 
-      const maxAttempts = 120; // 10 min max
+      const maxAttempts = 120;
       for (let i = 0; i < maxAttempts; i++) {
         await new Promise(r => setTimeout(r, 5000));
         try {
           const { data: pollData, error: pollError } = await supabase.functions.invoke('generate-video', { body: pollBody });
           if (pollError) continue;
           if (pollData?.status === 'complete' && pollData?.videoUrl) {
-            set({ videos: get().videos.map(v => v.id === videoId ? { ...v, status: 'complete', videoUrl: pollData.videoUrl } : v) });
+            updateVideoAndSave(videoId, { status: 'complete', videoUrl: pollData.videoUrl }, get, set);
             return;
           }
           if (pollData?.status === 'failed') {
-            set({ videos: get().videos.map(v => v.id === videoId ? { ...v, status: 'failed', error: pollData.error || 'Generation failed' } : v) });
+            updateVideoAndSave(videoId, { status: 'failed', error: pollData.error || 'Generation failed' }, get, set);
             return;
           }
-          // Still processing, continue polling
-        } catch {
-          // Network error, retry
-        }
+        } catch {}
       }
-      set({ videos: get().videos.map(v => v.id === videoId ? { ...v, status: 'failed', error: 'Video generation timed out' } : v) });
+      updateVideoAndSave(videoId, { status: 'failed', error: 'Video generation timed out' }, get, set);
       return;
     }
 
-    set({ videos: get().videos.map(v => v.id === videoId ? { ...v, status: 'complete', videoUrl: data?.videoUrl } : v) });
+    updateVideoAndSave(videoId, { status: 'complete', videoUrl: data?.videoUrl }, get, set);
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown generation error';
-    set({ videos: get().videos.map(v => v.id === videoId ? { ...v, status: 'failed', error: message } : v) });
+    updateVideoAndSave(videoId, { status: 'failed', error: message }, get, set);
   }
 }
 
