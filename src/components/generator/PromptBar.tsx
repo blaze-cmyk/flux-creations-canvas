@@ -1,6 +1,6 @@
 import { useGeneratorStore, MODELS, QUALITIES, ASPECT_RATIOS } from '@/store/generatorStore';
-import { ImagePlus, Minus, Plus, Sparkles, X, ChevronDown, Check, Search } from 'lucide-react';
-import { useRef, useState, useEffect } from 'react';
+import { ImagePlus, Minus, Plus, X, ChevronDown, Check, Search, AtSign, PenLine } from 'lucide-react';
+import { useRef, useState, useEffect, useCallback } from 'react';
 
 export function PromptBar() {
   const {
@@ -10,22 +10,48 @@ export function PromptBar() {
   } = useGeneratorStore();
 
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
   const [modelOpen, setModelOpen] = useState(false);
   const [qualityOpen, setQualityOpen] = useState(false);
   const [aspectOpen, setAspectOpen] = useState(false);
   const [modelSearch, setModelSearch] = useState('');
+  const [dragging, setDragging] = useState(false);
+  const [freeGens, setFreeGens] = useState(false);
 
   const selectedModel = MODELS.find((m) => m.id === model);
 
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files;
-    if (!files) return;
-    Array.from(files).slice(0, 5 - referenceImages.length).forEach((file) => {
+  // Auto-resize textarea
+  useEffect(() => {
+    const ta = textareaRef.current;
+    if (!ta) return;
+    ta.style.height = 'auto';
+    ta.style.height = Math.min(ta.scrollHeight, 120) + 'px';
+  }, [prompt]);
+
+  const handleFiles = useCallback((files: FileList | File[]) => {
+    const arr = Array.from(files).filter(f => f.type.startsWith('image/'));
+    arr.slice(0, 5 - referenceImages.length).forEach((file) => {
       const reader = new FileReader();
       reader.onload = () => addReferenceImage(reader.result as string);
       reader.readAsDataURL(file);
     });
+  }, [referenceImages.length, addReferenceImage]);
+
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files) handleFiles(e.target.files);
     e.target.value = '';
+  };
+
+  // Drag & drop
+  const handleDragOver = (e: React.DragEvent) => { e.preventDefault(); setDragging(true); };
+  const handleDragLeave = (e: React.DragEvent) => {
+    if (containerRef.current && !containerRef.current.contains(e.relatedTarget as Node)) setDragging(false);
+  };
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setDragging(false);
+    if (e.dataTransfer.files.length) handleFiles(e.dataTransfer.files);
   };
 
   const handleSubmit = () => {
@@ -33,134 +59,155 @@ export function PromptBar() {
   };
 
   return (
-    <div className="shrink-0 border-t border-border bg-popover">
+    <div className="shrink-0 flex justify-center px-4 pb-4 pt-2">
+      <div
+        ref={containerRef}
+        onDragOver={handleDragOver}
+        onDragLeave={handleDragLeave}
+        onDrop={handleDrop}
+        className={`w-full max-w-3xl bg-popover border border-border rounded-2xl shadow-2xl transition-all ${dragging ? 'ring-2 ring-primary border-primary' : ''}`}
+      >
+        {/* Drag overlay */}
+        {dragging && (
+          <div className="absolute inset-0 rounded-2xl bg-primary/10 flex items-center justify-center z-10 pointer-events-none">
+            <span className="text-sm font-medium text-primary">Drop images here</span>
+          </div>
+        )}
 
-      {/* Main prompt area */}
-      <div className="px-4 py-3">
-        {/* Reference images row */}
-        {referenceImages.length > 0 && (
-          <div className="flex items-center gap-2 mb-2">
-            {referenceImages.map((img, i) => (
-              <div key={i} className="relative group">
-                <img src={img} alt="" className="w-10 h-10 rounded-lg object-cover border border-border" />
+        <div className="relative px-4 pt-3 pb-2">
+          {/* Reference images row */}
+          {referenceImages.length > 0 && (
+            <div className="flex items-center gap-2 mb-2">
+              {referenceImages.map((img, i) => (
+                <div key={i} className="relative group">
+                  <img src={img} alt="" className="w-10 h-10 rounded-lg object-cover border border-border" />
+                  <button
+                    onClick={() => removeReferenceImage(i)}
+                    className="absolute -top-1 -right-1 w-4 h-4 bg-destructive rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                  >
+                    <X className="w-2.5 h-2.5 text-destructive-foreground" />
+                  </button>
+                </div>
+              ))}
+              {referenceImages.length < 5 && (
                 <button
-                  onClick={() => removeReferenceImage(i)}
-                  className="absolute -top-1 -right-1 w-4 h-4 bg-destructive rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                  onClick={() => fileInputRef.current?.click()}
+                  className="w-10 h-10 rounded-lg border border-dashed border-border flex items-center justify-center text-muted-foreground hover:border-foreground/30 hover:text-foreground/50 transition-colors"
                 >
-                  <X className="w-2.5 h-2.5 text-destructive-foreground" />
+                  <ImagePlus className="w-4 h-4" />
                 </button>
-              </div>
-            ))}
-            {referenceImages.length < 5 && (
+              )}
+            </div>
+          )}
+
+          {/* Prompt row */}
+          <div className="flex items-end gap-3">
+            {referenceImages.length === 0 && (
               <button
                 onClick={() => fileInputRef.current?.click()}
-                className="w-10 h-10 rounded-lg border border-dashed border-border flex items-center justify-center text-muted-foreground hover:border-foreground/30 hover:text-foreground/50 transition-colors"
+                className="shrink-0 w-9 h-9 rounded-lg border border-border flex items-center justify-center text-muted-foreground hover:text-foreground hover:border-foreground/30 transition-colors"
               >
                 <ImagePlus className="w-4 h-4" />
               </button>
             )}
-          </div>
-        )}
 
-        <div className="flex items-end gap-3">
-          {/* Upload button when no refs */}
-          {referenceImages.length === 0 && (
-            <button
-              onClick={() => fileInputRef.current?.click()}
-              className="shrink-0 w-9 h-9 rounded-lg border border-border flex items-center justify-center text-muted-foreground hover:text-foreground hover:border-foreground/30 transition-colors"
-            >
-              <ImagePlus className="w-4 h-4" />
-            </button>
-          )}
+            <input ref={fileInputRef} type="file" accept="image/*" multiple className="hidden" onChange={handleFileUpload} />
 
-          <input ref={fileInputRef} type="file" accept="image/*" multiple className="hidden" onChange={handleFileUpload} />
-
-          {/* Prompt textarea */}
-          <div className="flex-1">
             <textarea
+              ref={textareaRef}
               value={prompt}
               onChange={(e) => setPrompt(e.target.value)}
               onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSubmit(); } }}
               placeholder="Describe what you want to generate..."
-              rows={2}
-              className="w-full bg-transparent text-sm text-foreground placeholder:text-muted-foreground/50 resize-none border-0 focus:outline-none"
+              rows={1}
+              className="flex-1 bg-transparent text-sm text-foreground placeholder:text-muted-foreground/50 resize-none border-0 focus:outline-none py-2 leading-5"
             />
-          </div>
 
-          {/* Generate button */}
-          <button
-            onClick={handleSubmit}
-            disabled={!prompt.trim()}
-            className="shrink-0 flex items-center gap-1.5 bg-primary text-primary-foreground font-semibold text-sm px-5 py-2.5 rounded-xl hover:opacity-90 transition-opacity disabled:opacity-40 disabled:cursor-not-allowed"
-          >
-            Generate
-            <span className="text-xs opacity-70">+ {quantity}</span>
-          </button>
-        </div>
-
-        {/* Bottom controls */}
-        <div className="flex items-center gap-1 mt-2">
-          {/* Model selector */}
-          <div className="relative">
+            {/* Generate button — lime/chartreuse like Higgsfield */}
             <button
-              onClick={() => { setModelOpen(!modelOpen); setQualityOpen(false); setAspectOpen(false); }}
-              className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground px-2 py-1.5 rounded-lg hover:bg-muted transition-colors"
+              onClick={handleSubmit}
+              disabled={!prompt.trim()}
+              className="shrink-0 flex items-center gap-1.5 font-semibold text-sm px-5 py-2.5 rounded-xl transition-opacity disabled:opacity-40 disabled:cursor-not-allowed"
+              style={{ backgroundColor: 'hsl(var(--primary))', color: 'hsl(var(--primary-foreground))' }}
             >
-              <span className="w-4 h-4 rounded bg-primary/20 flex items-center justify-center text-[8px] font-bold text-primary">G</span>
-              {selectedModel?.name || model}
-              <ChevronDown className="w-3 h-3" />
-            </button>
-
-            {modelOpen && <ModelDropdown model={model} setModel={(m) => { setModel(m); setModelOpen(false); }} search={modelSearch} setSearch={setModelSearch} onClose={() => setModelOpen(false)} />}
-          </div>
-
-          {/* Aspect ratio */}
-          <div className="relative">
-            <button
-              onClick={() => { setAspectOpen(!aspectOpen); setModelOpen(false); setQualityOpen(false); }}
-              className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground px-2 py-1.5 rounded-lg hover:bg-muted transition-colors"
-            >
-              <span className="w-3 h-4 border border-muted-foreground/50 rounded-sm" />
-              {aspectRatio}
-            </button>
-            {aspectOpen && <AspectDropdown aspectRatio={aspectRatio} setAspectRatio={(ar) => { setAspectRatio(ar); setAspectOpen(false); }} onClose={() => setAspectOpen(false)} />}
-          </div>
-
-          {/* Quality */}
-          <div className="relative">
-            <button
-              onClick={() => { setQualityOpen(!qualityOpen); setModelOpen(false); setAspectOpen(false); }}
-              className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground px-2 py-1.5 rounded-lg hover:bg-muted transition-colors"
-            >
-              ♡ {quality}
-            </button>
-            {qualityOpen && <QualityDropdown quality={quality} setQuality={(q) => { setQuality(q); setQualityOpen(false); }} onClose={() => setQualityOpen(false)} />}
-          </div>
-
-          {/* Quantity */}
-          <div className="flex items-center gap-0.5 text-xs text-muted-foreground ml-1">
-            <button onClick={() => setQuantity(quantity - 1)} className="w-6 h-6 flex items-center justify-center rounded hover:bg-muted transition-colors">
-              <Minus className="w-3 h-3" />
-            </button>
-            <span className="w-5 text-center text-foreground">{quantity}</span>
-            <button onClick={() => setQuantity(quantity + 1)} className="w-6 h-6 flex items-center justify-center rounded hover:bg-muted transition-colors">
-              <Plus className="w-3 h-3" />
+              Generate
+              <span className="text-xs opacity-70">✦ {quantity}</span>
             </button>
           </div>
 
-          <div className="flex-1" />
-
-          {/* Extra toggles */}
-          <label className="flex items-center gap-1.5 text-xs text-muted-foreground cursor-pointer">
-            Extra free gens
-            <div className="w-8 h-4 rounded-full bg-muted relative">
-              <div className="w-3 h-3 rounded-full bg-muted-foreground/50 absolute left-0.5 top-0.5" />
+          {/* Bottom controls bar */}
+          <div className="flex items-center gap-1 mt-1.5 border-t border-border/50 pt-2">
+            {/* Model */}
+            <div className="relative">
+              <button
+                onClick={() => { setModelOpen(!modelOpen); setQualityOpen(false); setAspectOpen(false); }}
+                className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground px-2.5 py-1.5 rounded-full hover:bg-muted transition-colors border border-border/50"
+              >
+                <span className="w-4 h-4 rounded bg-primary/20 flex items-center justify-center text-[8px] font-bold text-primary">G</span>
+                {selectedModel?.name || model}
+                <ChevronDown className="w-3 h-3" />
+              </button>
+              {modelOpen && <ModelDropdown model={model} setModel={(m) => { setModel(m); setModelOpen(false); }} search={modelSearch} setSearch={setModelSearch} onClose={() => setModelOpen(false)} />}
             </div>
-          </label>
 
-          <button className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground px-2 py-1.5 rounded-lg hover:bg-muted transition-colors">
-            ✏️ Draw
-          </button>
+            {/* Aspect ratio */}
+            <div className="relative">
+              <button
+                onClick={() => { setAspectOpen(!aspectOpen); setModelOpen(false); setQualityOpen(false); }}
+                className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground px-2.5 py-1.5 rounded-full hover:bg-muted transition-colors border border-border/50"
+              >
+                <span className="w-3 h-4 border border-muted-foreground/50 rounded-sm" />
+                {aspectRatio}
+              </button>
+              {aspectOpen && <AspectDropdown aspectRatio={aspectRatio} setAspectRatio={(ar) => { setAspectRatio(ar); setAspectOpen(false); }} onClose={() => setAspectOpen(false)} />}
+            </div>
+
+            {/* Quality */}
+            <div className="relative">
+              <button
+                onClick={() => { setQualityOpen(!qualityOpen); setModelOpen(false); setAspectOpen(false); }}
+                className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground px-2.5 py-1.5 rounded-full hover:bg-muted transition-colors border border-border/50"
+              >
+                ♡ {quality}
+              </button>
+              {qualityOpen && <QualityDropdown quality={quality} setQuality={(q) => { setQuality(q); setQualityOpen(false); }} onClose={() => setQualityOpen(false)} />}
+            </div>
+
+            {/* Quantity */}
+            <div className="flex items-center gap-0.5 text-xs text-muted-foreground border border-border/50 rounded-full px-1.5 py-0.5">
+              <button onClick={() => setQuantity(quantity - 1)} className="w-5 h-5 flex items-center justify-center rounded-full hover:bg-muted transition-colors">
+                <Minus className="w-3 h-3" />
+              </button>
+              <span className="w-6 text-center text-foreground text-xs">{quantity}/4</span>
+              <button onClick={() => setQuantity(quantity + 1)} className="w-5 h-5 flex items-center justify-center rounded-full hover:bg-muted transition-colors">
+                <Plus className="w-3 h-3" />
+              </button>
+            </div>
+
+            {/* @ mention */}
+            <button className="flex items-center justify-center w-7 h-7 text-muted-foreground hover:text-foreground rounded-full hover:bg-muted transition-colors">
+              <AtSign className="w-3.5 h-3.5" />
+            </button>
+
+            <div className="flex-1" />
+
+            {/* Extra free gens toggle */}
+            <button
+              onClick={() => setFreeGens(!freeGens)}
+              className="flex items-center gap-1.5 text-xs text-muted-foreground px-2.5 py-1.5 rounded-full hover:bg-muted transition-colors border border-border/50"
+            >
+              Extra free gens
+              <div className={`w-8 h-4 rounded-full relative transition-colors ${freeGens ? 'bg-primary' : 'bg-muted'}`}>
+                <div className={`w-3 h-3 rounded-full absolute top-0.5 transition-all ${freeGens ? 'right-0.5 bg-primary-foreground' : 'left-0.5 bg-muted-foreground/50'}`} />
+              </div>
+            </button>
+
+            {/* Draw */}
+            <button className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground px-2.5 py-1.5 rounded-full hover:bg-muted transition-colors border border-border/50">
+              <PenLine className="w-3 h-3" />
+              Draw
+            </button>
+          </div>
         </div>
       </div>
     </div>
