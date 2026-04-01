@@ -52,6 +52,7 @@ function ImageCard({ image }: {
   const [showMenu, setShowMenu] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const [naturalAspect, setNaturalAspect] = useState<number | null>(null);
+  const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
     if (!showMenu) return;
