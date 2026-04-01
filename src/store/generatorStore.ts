@@ -64,7 +64,7 @@ async function callGenerateAPI(params: {
   model: string;
   quality: string;
   aspectRatio: string;
-}): Promise<{ imageUrl?: string; imageBase64?: string; error?: string }> {
+}): Promise<{ imageUrl?: string; imageBase64?: string; error?: string; nsfw?: boolean }> {
   const { data, error } = await supabase.functions.invoke('generate-image', {
     body: {
       prompt: params.prompt,
@@ -77,6 +77,17 @@ async function callGenerateAPI(params: {
 
   if (error) {
     console.error('Edge function error:', error);
+    // Try to parse the error body for a better message
+    try {
+      const ctx = (error as any).context;
+      if (ctx && typeof ctx.json === 'function') {
+        const body = await ctx.json();
+        if (body?.error) {
+          const isNsfw = body.error.includes('policy') || body.error.includes('filtered') || body.error.includes('Prohibited');
+          return { error: body.error, nsfw: isNsfw };
+        }
+      }
+    } catch { /* ignore parse errors */ }
     return { error: error.message || 'Generation failed' };
   }
 
@@ -284,9 +295,10 @@ export const useGeneratorStore = create<GeneratorState>()((set, get) => ({
         const result = await callGenerateAPI({ prompt, referenceImages, model, quality, aspectRatio });
 
         if (result.error) {
+          const status = result.nsfw ? 'nsfw' as const : 'failed' as const;
           set({
             images: get().images.map((i) =>
-              i.id === img.id ? { ...i, status: 'failed' as const, error: result.error } : i
+              i.id === img.id ? { ...i, status, error: result.error } : i
             ),
           });
         } else {
