@@ -226,8 +226,7 @@ serve(async (req) => {
 
       // Add LoRA if configured
       if (modelConfig.lora) {
-        const loraPath = modelConfig.lora.includes("://") ? modelConfig.lora : `hf://${modelConfig.lora}`;
-        reqBody.loras = [{ path: loraPath, scale: 1.0 }];
+        reqBody.loras = [{ path: modelConfig.lora, scale: 1.0 }];
       }
       if (ar !== "Auto") reqBody.aspect_ratio = ar;
 
