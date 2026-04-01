@@ -61,7 +61,11 @@ export function MotionControlPanel({
         <DropZone onFiles={handleMotionDrop} accept="image/*,video/*" className="flex-1">
           {referenceImages[0] ? (
             <div className="relative rounded-xl overflow-hidden border border-border aspect-[3/4]">
-              <img src={referenceImages[0]} alt="" className="w-full h-full object-cover" />
+              {referenceImages[0].startsWith('data:video') || referenceImages[0].includes('.mp4') || referenceImages[0].includes('.webm') || referenceImages[0].includes('.mov') ? (
+                <video src={referenceImages[0]} muted playsInline autoPlay loop className="w-full h-full object-cover" />
+              ) : (
+                <img src={referenceImages[0]} alt="" className="w-full h-full object-cover" />
+              )}
               <button
                 onClick={() => removeReferenceImage(0)}
                 className="absolute top-1 right-1 w-5 h-5 rounded-full bg-black/60 text-white text-xs flex items-center justify-center"
