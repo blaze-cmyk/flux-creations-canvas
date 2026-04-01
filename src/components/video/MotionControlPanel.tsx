@@ -73,7 +73,7 @@ export function MotionControlPanel({
             </div>
           ) : (
             <button
-              onClick={() => fileInputRef.current?.click()}
+              onClick={() => uploadFileAt(0, 'image/*,video/*')}
               className="w-full aspect-[3/4] border border-dashed border-border rounded-xl flex flex-col items-center justify-center gap-1 text-muted-foreground hover:border-foreground/30 transition-colors"
             >
               <ImageIcon className="w-5 h-5" />
