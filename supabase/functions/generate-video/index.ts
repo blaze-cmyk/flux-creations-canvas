@@ -193,9 +193,11 @@ serve(async (req) => {
   try {
     const body = await req.json();
     const prompt = typeof body?.prompt === "string" ? body.prompt : "";
-    const referenceImages = Array.isArray(body?.referenceImages)
+    const rawRefs = Array.isArray(body?.referenceImages)
       ? body.referenceImages.filter((img: unknown): img is string => typeof img === "string" && img.length > 0)
       : [];
+    // Resolve any base64 data URIs to hosted URLs
+    const referenceImages = await Promise.all(rawRefs.map((ref: string) => resolveFileUrl(ref)));
     const model = typeof body?.model === "string" ? body.model : "kling-v2.5-turbo-pro";
     const mode = typeof body?.mode === "string" ? body.mode : "text-to-video";
     const aspectRatio = typeof body?.aspectRatio === "string" ? body.aspectRatio : "16:9";
