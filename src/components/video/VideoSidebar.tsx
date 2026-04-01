@@ -168,27 +168,6 @@ export function VideoSidebar() {
   );
 }
 
-function FrameUpload({ label, image, onUpload, onRemove }: { label: string; image?: string; onUpload: () => void; onRemove: () => void }) {
-  return (
-    <div className="flex-1">
-      {image ? (
-        <div className="relative rounded-xl overflow-hidden border border-border aspect-video">
-          <img src={image} alt="" className="w-full h-full object-cover" />
-          <button onClick={onRemove} className="absolute top-1 right-1 w-4 h-4 rounded-full bg-black/60 text-white text-[10px] flex items-center justify-center">×</button>
-        </div>
-      ) : (
-        <button
-          onClick={onUpload}
-          className="w-full aspect-video border border-dashed border-border rounded-xl flex flex-col items-center justify-center gap-1 text-muted-foreground hover:border-foreground/30 transition-colors"
-        >
-          <ImagePlus className="w-4 h-4" />
-          <span className="text-[10px]">{label}</span>
-          <span className="text-[9px] text-muted-foreground/50">Optional</span>
-        </button>
-      )}
-    </div>
-  );
-}
 
 function SidebarModelDropdown({ model, setModel, search, setSearch, onClose, mode }: {
   model: string; setModel: (m: string) => void; search: string; setSearch: (s: string) => void; onClose: () => void; mode: string;
