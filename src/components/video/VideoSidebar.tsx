@@ -1,5 +1,6 @@
 import { useVideoStore, VIDEO_MODELS, VIDEO_ASPECT_RATIOS, VIDEO_DURATIONS } from '@/store/videoStore';
 import { ImagePlus, ChevronRight, Check, Search, Play, Video, Film, Wand2, Volume2, Sparkles, Plus, Image as ImageIcon } from 'lucide-react';
+import { MotionControlPanel } from './MotionControlPanel';
 import { useRef, useState, useEffect, useCallback } from 'react';
 
 export function VideoSidebar() {
