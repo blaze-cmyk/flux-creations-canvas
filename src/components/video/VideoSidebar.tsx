@@ -11,6 +11,7 @@ export function VideoSidebar() {
     prompt, setPrompt, referenceImages, addReferenceImage, setReferenceImageAt, removeReferenceImage,
     model, setModel, mode, setMode, aspectRatio, setAspectRatio,
     duration, setDuration, generate,
+    motionPrompt, setMotionPrompt, characterOrientation, setCharacterOrientation,
   } = useVideoStore();
 
   const fileInputRef = useRef<HTMLInputElement>(null);
