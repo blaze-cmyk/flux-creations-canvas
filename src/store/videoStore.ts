@@ -84,7 +84,7 @@ type VideoState = {
 
 async function saveVideoToDb(video: GeneratedVideo) {
   try {
-    await supabase.from('video_generations').upsert({
+    await (supabase as any).from('video_generations').upsert({
       id: video.id,
       prompt: video.prompt,
       model: video.model,
