@@ -52,6 +52,7 @@ function ImageCard({ image }: {
   const [showMenu, setShowMenu] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const [naturalAspect, setNaturalAspect] = useState<number | null>(null);
+  const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
     if (!showMenu) return;
@@ -68,10 +69,12 @@ function ImageCard({ image }: {
     try {
       const res = await fetch(image.imageUrl);
       const blob = await res.blob();
+      const ext = blob.type.includes('jpeg') || blob.type.includes('jpg') ? 'jpg' : 'png';
+      const slug = image.prompt.slice(0, 40).replace(/[^a-zA-Z0-9]+/g, '-').replace(/-+$/, '');
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `generation-${image.id}.png`;
+      a.download = `${slug}-${image.id.slice(0, 8)}.${ext}`;
       a.click();
       URL.revokeObjectURL(url);
     } catch {
@@ -139,13 +142,19 @@ function ImageCard({ image }: {
       style={style}
       onClick={() => setSelectedImageId(image.id)}
     >
+      {/* Loading skeleton */}
+      {!loaded && (
+        <div className="absolute inset-0 bg-muted animate-pulse" />
+      )}
       <img
         src={image.imageUrl}
         alt=""
-        className="absolute inset-0 w-full h-full object-cover"
+        className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-300 ${loaded ? 'opacity-100' : 'opacity-0'}`}
         loading="lazy"
+        decoding="async"
         draggable={false}
         onLoad={(e) => {
+          setLoaded(true);
           const img = e.currentTarget;
           if (img.naturalWidth && img.naturalHeight) {
             setNaturalAspect(img.naturalWidth / img.naturalHeight);
