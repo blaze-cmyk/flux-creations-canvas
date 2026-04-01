@@ -369,12 +369,40 @@ serve(async (req) => {
       }
 
       const resData = await response.json();
-      const videoResult = resData?.data?.find((d: any) => d.taskType === "videoInference");
+      let videoResult = resData?.data?.find((d: any) => d.taskType === "videoInference");
       videoUrl = videoResult?.videoURL || videoResult?.outputURL;
 
+      // Runware is async — if no videoURL yet, poll the task
+      if (!videoUrl && videoResult?.taskUUID) {
+        const taskUUID = videoResult.taskUUID;
+        console.log(`Runware task queued: ${taskUUID}, polling...`);
+        const start = Date.now();
+        const maxWaitMs = 300000;
+        while (Date.now() - start < maxWaitMs) {
+          await new Promise(r => setTimeout(r, 5000));
+          const pollResp = await fetch(RUNWARE_BASE, {
+            method: "POST",
+            headers: { Authorization: `Bearer ${RUNWARE_API_KEY}`, "Content-Type": "application/json" },
+            body: JSON.stringify([{ taskType: "videoInference", taskUUID }]),
+          });
+          if (pollResp.ok) {
+            const pollData = await pollResp.json();
+            const result = pollData?.data?.find((d: any) => d.videoURL);
+            if (result?.videoURL) {
+              videoUrl = result.videoURL;
+              break;
+            }
+            console.log(`Runware still processing ${taskUUID}...`);
+          } else {
+            const errText = await pollResp.text();
+            console.log(`Runware poll ${pollResp.status}: ${errText.substring(0, 200)}`);
+          }
+        }
+      }
+
       if (!videoUrl) {
-        console.log("Runware response:", JSON.stringify(resData).substring(0, 500));
-        return new Response(JSON.stringify({ error: "No video in Runware response" }), {
+        console.log("Runware final response:", JSON.stringify(resData).substring(0, 500));
+        return new Response(JSON.stringify({ error: "No video in Runware response (timed out)" }), {
           status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
