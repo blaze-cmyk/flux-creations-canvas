@@ -265,9 +265,18 @@ serve(async (req) => {
         }
 
         const data = await response.json();
-        imageUrl = data?.data?.[0]?.url;
+        const rawUrl = data?.data?.[0]?.url;
 
-        if (!imageUrl) {
+        if (rawUrl) {
+          const imgResp = await fetch(rawUrl);
+          if (imgResp.ok) {
+            const buf = await imgResp.arrayBuffer();
+            const bytes = new Uint8Array(buf);
+            imageBase64 = toBase64DataUri(bytes, imgResp.headers.get("content-type") || "image/png");
+          } else {
+            imageUrl = rawUrl;
+          }
+        } else {
           console.error("No URL in Flux response:", JSON.stringify(data).substring(0, 500));
           return new Response(JSON.stringify({ error: "No image URL in response" }), {
             status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" },
