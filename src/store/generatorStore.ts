@@ -40,11 +40,13 @@ type GeneratorState = {
 };
 
 export const MODELS = [
-  { id: 'nano-banana-2', name: 'Nano Banana 2', desc: 'Pro quality at Flash speed, supports image editing', featured: true, badge: 'NEW' as const },
-  { id: 'nano-banana-pro', name: 'Nano Banana Pro', desc: '4K, best text rendering, local editing', featured: true },
-  { id: 'nano-banana', name: 'Nano Banana', desc: 'Fast & stable, great value', featured: true, badge: 'UNLIMITED' as const },
-  { id: 'flux-kontext-pro', name: 'Flux Kontext Pro', desc: 'High quality, flexible aspect ratios', featured: true },
-  { id: 'flux-kontext-max', name: 'Flux Kontext Max', desc: 'Maximum quality, professional grade', featured: true },
+  { id: 'gemini-3.1-flash-image', name: 'Gemini 3.1 Flash Image', desc: 'Fast image gen & editing, pro-level quality', featured: true, badge: 'NEW' as const },
+  { id: 'gemini-3-pro-image', name: 'Gemini 3 Pro Image', desc: 'Next-gen image generation, highest quality', featured: true },
+  { id: 'gemini-2.5-flash-image', name: 'Gemini 2.5 Flash Image', desc: 'Fast & stable, great value', featured: true },
+  { id: 'flux-kontext-pro', name: 'Flux Kontext Pro', desc: 'High quality, flexible aspect ratios, uncensored', featured: true },
+  { id: 'flux-kontext-max', name: 'Flux Kontext Max', desc: 'Maximum quality, professional grade, uncensored', featured: true },
+  { id: 'flux-dev', name: 'Flux Dev', desc: 'Development model, fast iterations', featured: false },
+  { id: 'flux-pro', name: 'Flux Pro', desc: 'Production quality flux model', featured: false },
 ];
 
 export const ASPECT_RATIOS = [
@@ -85,7 +87,7 @@ async function callGenerateAPI(params: {
 export const useGeneratorStore = create<GeneratorState>((set, get) => ({
   prompt: '',
   referenceImages: [],
-  model: 'nano-banana-pro',
+  model: 'gemini-3.1-flash-image',
   quality: '2K',
   aspectRatio: '1:1',
   quantity: 4,

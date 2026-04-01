@@ -10,11 +10,13 @@ const APIYI_BASE = "https://api.apiyi.com";
 
 // Model ID → APIYI model mapping and API type
 const MODEL_MAP: Record<string, { apiModel: string; type: "gemini" | "flux" }> = {
-  "nano-banana-2": { apiModel: "gemini-3.1-flash-image-preview", type: "gemini" },
-  "nano-banana-pro": { apiModel: "gemini-3-pro-image-preview", type: "gemini" },
-  "nano-banana": { apiModel: "gemini-2.5-flash-image", type: "gemini" },
+  "gemini-3.1-flash-image": { apiModel: "gemini-3.1-flash-image-preview", type: "gemini" },
+  "gemini-3-pro-image": { apiModel: "gemini-3-pro-image-preview", type: "gemini" },
+  "gemini-2.5-flash-image": { apiModel: "gemini-2.5-flash-image", type: "gemini" },
   "flux-kontext-pro": { apiModel: "flux-kontext-pro", type: "flux" },
   "flux-kontext-max": { apiModel: "flux-kontext-max", type: "flux" },
+  "flux-dev": { apiModel: "flux-dev", type: "flux" },
+  "flux-pro": { apiModel: "flux-pro", type: "flux" },
 };
 
 // Quality → imageSize for Gemini models
