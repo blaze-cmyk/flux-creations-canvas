@@ -273,7 +273,7 @@ serve(async (req) => {
         reqBody.loras = [{ path: modelConfig.lora, scale: 1.0 }];
         reqBody.enable_safety_checker = false;
       }
-      if (model !== "flux-uncensored-v2" && ar !== "Auto") reqBody.aspect_ratio = ar;
+      if (activeModel !== "flux-uncensored-v2" && ar !== "Auto") reqBody.aspect_ratio = ar;
 
       if (hasReferenceInput) {
         if (falModel.includes("image-to-image")) {
