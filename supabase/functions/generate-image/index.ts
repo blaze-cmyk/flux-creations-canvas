@@ -186,7 +186,14 @@ serve(async (req) => {
         });
       }
 
-      const falModel = modelConfig.falModel!;
+      // If model requires image_url but none provided, fallback to text-to-image model
+      let falModel = modelConfig.falModel!;
+      if (modelConfig.requiresImage && referenceImages.length === 0) {
+        if (modelConfig.textFallback) {
+          falModel = modelConfig.textFallback;
+          console.log(`No reference images for editing model, falling back to: ${falModel}`);
+        }
+      }
 
       // Build request body — prompt is ALWAYS raw, never modified
       const reqBody: Record<string, unknown> = {
@@ -201,14 +208,12 @@ serve(async (req) => {
         reqBody.aspect_ratio = ar;
       }
 
-      // Add reference images if model supports them
+      // Add reference images if model supports them and images are provided
       if (modelConfig.supportsImageInput && referenceImages.length > 0) {
         if (modelConfig.isMultiRef && referenceImages.length > 1) {
-          // Multi-ref models: pass array of URLs
           reqBody.image_url = referenceImages;
           console.log(`Fal multi-ref: passing ${referenceImages.length} images`);
         } else {
-          // Single-ref: pass first image only
           reqBody.image_url = referenceImages[0];
           console.log(`Fal single-ref: passing 1 image`);
         }
