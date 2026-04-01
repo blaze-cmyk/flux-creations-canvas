@@ -106,7 +106,15 @@ type SortableThumbnailProps = {
   onRemove: () => void;
 };
 
-function SortableThumbnail({ id, src, onPreview, onRemove }: SortableThumbnailProps) {
+type SortableThumbnailProps = {
+  id: string;
+  src: string;
+  index: number;
+  onPreview: () => void;
+  onRemove: () => void;
+};
+
+function SortableThumbnail({ id, src, index, onPreview, onRemove }: SortableThumbnailProps) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id });
 
   return (
