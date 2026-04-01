@@ -41,7 +41,7 @@ const MODEL_MAP: Record<string, ModelConfig> = {
 
   // Flux 1 (via fal.ai) — text-to-image
   "flux-schnell": { falModel: "fal-ai/flux/schnell", type: "fal", supportsImageInput: false },
-  "flux-uncensored-v2": { falModel: "fal-ai/flux-lora", type: "fal", supportsImageInput: false, lora: "enhanceaiteam/Flux-Uncensored-V2" },
+  "flux-uncensored-v2": { falModel: "fal-ai/flux-lora", type: "fal", supportsImageInput: false, lora: "https://huggingface.co/enhanceaiteam/Flux-Uncensored-V2/resolve/main/lora.safetensors" },
   "flux-dev": { falModel: "fal-ai/flux/dev", type: "fal", supportsImageInput: false },
   "flux-pro-v1.1": { falModel: "fal-ai/flux-pro/v1.1", type: "fal", supportsImageInput: false },
 
@@ -224,10 +224,10 @@ serve(async (req) => {
         prompt, num_images: 1, output_format: "png", safety_tolerance: "6",
       };
 
-      // Add LoRA if configured
+      // Add LoRA if configured + disable safety checker for LoRA models
       if (modelConfig.lora) {
-        const loraPath = modelConfig.lora.includes("://") ? modelConfig.lora : `hf://${modelConfig.lora}`;
-        reqBody.loras = [{ path: loraPath, scale: 1.0 }];
+        reqBody.loras = [{ path: modelConfig.lora, scale: 1.0 }];
+        reqBody.enable_safety_checker = false;
       }
       if (ar !== "Auto") reqBody.aspect_ratio = ar;
 
