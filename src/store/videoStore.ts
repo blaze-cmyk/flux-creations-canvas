@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { supabase } from '@/integrations/supabase/client';
+import { resolveAllToUrls } from '@/lib/uploadToStorage';
 
 export type GeneratedVideo = {
   id: string;
@@ -20,6 +21,8 @@ export const VIDEO_MODELS = [
   // Kling (via fal.ai)
   { id: 'kling-v3-pro', name: 'Kling 3.0 Pro', desc: 'Top-tier cinematic visuals, fluid motion, audio', featured: true, badge: 'NEW' as const, provider: 'fal', modes: ['text-to-video', 'image-to-video'] as const },
   { id: 'kling-v3-motion', name: 'Kling 3.0 Motion Control', desc: 'Transfer motion from video to image', featured: true, badge: 'NEW' as const, provider: 'fal', modes: ['motion-control'] as const },
+  // Evolink motion control (cheaper)
+  { id: 'ev-kling-v3-motion', name: 'EV Kling 3.0 Motion', desc: 'Kling V3 motion control via Evolink (cheaper)', featured: true, badge: 'NEW' as const, provider: 'evolink', modes: ['motion-control'] as const },
   { id: 'kling-o3-pro', name: 'Kling O3 Pro', desc: 'Start+end frame animation with style guidance', featured: true, badge: 'NEW' as const, provider: 'fal', modes: ['image-to-video'] as const },
   { id: 'kling-v2.5-turbo-pro', name: 'Kling 2.5 Turbo Pro', desc: 'Fast cinematic video, great prompt precision', featured: true, provider: 'fal', modes: ['text-to-video', 'image-to-video'] as const },
   { id: 'kling-v2.6-pro', name: 'Kling 2.6 Pro', desc: 'High-quality image-to-video with audio', featured: false, provider: 'fal', modes: ['image-to-video'] as const },
@@ -76,6 +79,46 @@ type VideoState = {
   deleteVideo: (id: string) => void;
 };
 
+async function callGenerate(payload: Record<string, unknown>, videoId: string, get: () => VideoState, set: (s: Partial<VideoState>) => void) {
+  // Upload base64 files client-side BEFORE calling edge function
+  const refs = payload.referenceImages as string[] | undefined;
+  if (refs && refs.length > 0) {
+    try {
+      payload.referenceImages = await resolveAllToUrls(refs);
+    } catch (e: any) {
+      set({ videos: get().videos.map(v => v.id === videoId ? { ...v, status: 'failed', error: `Upload failed: ${e.message}` } : v) });
+      return;
+    }
+  }
+
+  try {
+    const { data, error } = await supabase.functions.invoke('generate-video', { body: payload });
+
+    if (error) {
+      let errMsg = error.message;
+      try {
+        const ctx = (error as any).context;
+        if (ctx && typeof ctx.json === 'function') {
+          const body = await ctx.json();
+          if (body?.error) errMsg = body.error;
+        }
+      } catch {}
+      set({ videos: get().videos.map(v => v.id === videoId ? { ...v, status: 'failed', error: errMsg } : v) });
+      return;
+    }
+
+    if (data?.error) {
+      const isNsfw = data.filtered;
+      set({ videos: get().videos.map(v => v.id === videoId ? { ...v, status: isNsfw ? 'nsfw' : 'failed', error: data.error } : v) });
+      return;
+    }
+
+    set({ videos: get().videos.map(v => v.id === videoId ? { ...v, status: 'complete', videoUrl: data?.videoUrl } : v) });
+  } catch (e: any) {
+    set({ videos: get().videos.map(v => v.id === videoId ? { ...v, status: 'failed', error: e.message } : v) });
+  }
+}
+
 export const useVideoStore = create<VideoState>()((set, get) => ({
   prompt: '',
   referenceImages: [],
@@ -94,7 +137,6 @@ export const useVideoStore = create<VideoState>()((set, get) => ({
   },
   setReferenceImageAt: (idx, img) => {
     const refs = [...get().referenceImages];
-    // Pad with empty strings if needed
     while (refs.length <= idx) refs.push('');
     refs[idx] = img;
     set({ referenceImages: refs });
@@ -102,7 +144,6 @@ export const useVideoStore = create<VideoState>()((set, get) => ({
   removeReferenceImage: (idx) => {
     const refs = [...get().referenceImages];
     refs[idx] = '';
-    // Trim trailing empty strings
     while (refs.length > 0 && refs[refs.length - 1] === '') refs.pop();
     set({ referenceImages: refs });
   },
@@ -113,12 +154,10 @@ export const useVideoStore = create<VideoState>()((set, get) => ({
     if (currentModel && (currentModel.modes as readonly string[]).includes(mode)) {
       return { mode };
     }
-
     const fallbackModel =
       VIDEO_MODELS.find(m => m.featured && (m.modes as readonly string[]).includes(mode))?.id ??
       VIDEO_MODELS.find(m => (m.modes as readonly string[]).includes(mode))?.id ??
       state.model;
-
     return { mode, model: fallbackModel };
   }),
   setAspectRatio: (ar) => set({ aspectRatio: ar }),
@@ -143,51 +182,21 @@ export const useVideoStore = create<VideoState>()((set, get) => ({
     };
 
     set({ videos: [newVideo, ...get().videos] });
-
-    supabase.functions.invoke('generate-video', {
-      body: { prompt, referenceImages, model, mode, aspectRatio, duration },
-    }).then(async ({ data, error }) => {
-      if (error) {
-        try {
-          const ctx = (error as any).context;
-          if (ctx && typeof ctx.json === 'function') {
-            const body = await ctx.json();
-            if (body?.error) {
-              set({ videos: get().videos.map(v => v.id === newVideo.id ? { ...v, status: 'failed', error: body.error } : v) });
-              return;
-            }
-          }
-        } catch {}
-        set({ videos: get().videos.map(v => v.id === newVideo.id ? { ...v, status: 'failed', error: error.message } : v) });
-        return;
-      }
-
-      if (data?.error) {
-        const isNsfw = data.filtered;
-        set({ videos: get().videos.map(v => v.id === newVideo.id ? { ...v, status: isNsfw ? 'nsfw' : 'failed', error: data.error } : v) });
-        return;
-      }
-
-      set({ videos: get().videos.map(v => v.id === newVideo.id ? { ...v, status: 'complete', videoUrl: data?.videoUrl } : v) });
-    }).catch((e) => {
-      set({ videos: get().videos.map(v => v.id === newVideo.id ? { ...v, status: 'failed', error: e.message } : v) });
-    });
+    callGenerate({ prompt, referenceImages: [...referenceImages], model, mode, aspectRatio, duration }, newVideo.id, get, set);
   },
 
   retryVideo: (id) => {
     const video = get().videos.find(v => v.id === id);
     if (!video) return;
     set({ videos: get().videos.map(v => v.id === id ? { ...v, status: 'generating', error: undefined } : v) });
-
-    supabase.functions.invoke('generate-video', {
-      body: { prompt: video.prompt, referenceImages: video.referenceImages, model: video.model, mode: video.mode, aspectRatio: video.aspectRatio, duration: video.duration },
-    }).then(async ({ data, error }) => {
-      if (error || data?.error) {
-        set({ videos: get().videos.map(v => v.id === id ? { ...v, status: 'failed', error: data?.error || error?.message || 'Failed' } : v) });
-        return;
-      }
-      set({ videos: get().videos.map(v => v.id === id ? { ...v, status: 'complete', videoUrl: data?.videoUrl } : v) });
-    });
+    callGenerate({
+      prompt: video.prompt,
+      referenceImages: [...video.referenceImages],
+      model: video.model,
+      mode: video.mode,
+      aspectRatio: video.aspectRatio,
+      duration: video.duration,
+    }, id, get, set);
   },
 
   deleteVideo: (id) => {
