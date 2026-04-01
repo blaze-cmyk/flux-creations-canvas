@@ -111,29 +111,26 @@ const VIDEO_MODEL_MAP: Record<string, VideoModelConfig> = {
   },
 };
 
-async function pollFalResult(requestId: string, endpoint: string, falKey: string, maxWaitMs = 300000): Promise<any> {
-  const statusUrl = `https://queue.fal.run/${endpoint}/requests/${requestId}/status`;
-  const resultUrl = `https://queue.fal.run/${endpoint}/requests/${requestId}`;
+async function pollFalResult(responseUrl: string, statusUrl: string, falKey: string, maxWaitMs = 300000): Promise<any> {
   const headers: Record<string, string> = { Authorization: `Key ${falKey}`, Accept: "application/json" };
 
   const start = Date.now();
   while (Date.now() - start < maxWaitMs) {
-    // Try status endpoint first with explicit GET
-    let statusData: any;
+    // Check status
     const resp = await fetch(statusUrl, { method: "GET", headers });
     
     if (resp.status === 405 || resp.status === 404) {
-      // Some fal endpoints don't have a /status route — try fetching the result directly
-      console.log(`Status endpoint returned ${resp.status}, trying result URL directly`);
-      await resp.text(); // consume body
-      const resultResp = await fetch(resultUrl, { method: "GET", headers });
+      // No status endpoint — use response_url directly (blocks until ready)
+      console.log(`Status endpoint returned ${resp.status}, using response_url`);
+      await resp.text();
+      const resultResp = await fetch(responseUrl, { method: "GET", headers });
+      if (resultResp.status === 202) {
+        await resultResp.text();
+        await new Promise(r => setTimeout(r, 5000));
+        continue;
+      }
       if (!resultResp.ok) {
         const body = await resultResp.text();
-        // If 202/pending, wait and retry
-        if (resultResp.status === 202) {
-          await new Promise(r => setTimeout(r, 5000));
-          continue;
-        }
         throw new Error(`Result fetch failed: ${resultResp.status} ${body}`);
       }
       return await resultResp.json();
@@ -143,10 +140,10 @@ async function pollFalResult(requestId: string, endpoint: string, falKey: string
       const errBody = await resp.text();
       throw new Error(`Status check failed: ${resp.status} ${errBody}`);
     }
-    statusData = await resp.json();
+    const statusData = await resp.json();
 
     if (statusData.status === "COMPLETED") {
-      const resultResp = await fetch(resultUrl, { method: "GET", headers });
+      const resultResp = await fetch(responseUrl, { method: "GET", headers });
       if (!resultResp.ok) throw new Error(`Result fetch failed: ${resultResp.status}`);
       return await resultResp.json();
     }
@@ -262,17 +259,19 @@ serve(async (req) => {
 
       const submitData = await submitResp.json();
       const requestId = submitData.request_id;
+      const responseUrl = submitData.response_url;
+      const statusUrl = submitData.status_url;
 
-      if (!requestId) {
+      if (!requestId || !responseUrl) {
         // Direct response (some models return immediately)
         const vid = submitData?.video?.url || submitData?.video;
         if (vid) {
           videoUrl = typeof vid === "string" ? vid : vid.url;
         }
       } else {
-        // Poll for result
-        console.log(`Polling fal.ai request: ${requestId}`);
-        const result = await pollFalResult(requestId, endpoint, FAL_KEY);
+        // Poll for result using URLs from submit response
+        console.log(`Polling fal.ai request: ${requestId}, response_url: ${responseUrl}`);
+        const result = await pollFalResult(responseUrl, statusUrl || `https://queue.fal.run/${endpoint}/requests/${requestId}/status`, FAL_KEY);
         const vid = result?.video?.url || result?.video;
         if (vid) {
           videoUrl = typeof vid === "string" ? vid : vid.url;
