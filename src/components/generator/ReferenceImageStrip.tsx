@@ -100,12 +100,6 @@ export function ReferenceImageStrip({
   );
 }
 
-type SortableThumbnailProps = {
-  id: string;
-  src: string;
-  onPreview: () => void;
-  onRemove: () => void;
-};
 
 type SortableThumbnailProps = {
   id: string;
