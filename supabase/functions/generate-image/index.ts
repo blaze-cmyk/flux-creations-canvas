@@ -7,7 +7,7 @@ const corsHeaders = {
 };
 
 const APIYI_BASE = "https://api.apiyi.com";
-const FAL_BASE = "https://queue.fal.run";
+const FAL_BASE = "https://fal.run";
 
 type ModelConfig = {
   type: "gemini" | "fal";
@@ -69,43 +69,7 @@ function toBase64DataUri(bytes: Uint8Array, mimeType: string): string {
   return `data:${mimeType};base64,${bytesToBase64(bytes)}`;
 }
 
-// Poll fal.ai queue until complete
-async function pollFalResult(requestId: string, falModel: string, falKey: string): Promise<any> {
-  const statusUrl = `https://queue.fal.run/${falModel}/requests/${requestId}/status`;
-  const resultUrl = `https://queue.fal.run/${falModel}/requests/${requestId}`;
-
-  for (let i = 0; i < 120; i++) {
-    await new Promise((r) => setTimeout(r, 2000));
-
-    const statusResp = await fetch(statusUrl, {
-      headers: { Authorization: `Key ${falKey}` },
-    });
-
-    if (!statusResp.ok) {
-      console.error("Fal status check error:", statusResp.status);
-      continue;
-    }
-
-    const statusData = await statusResp.json();
-    console.log(`Fal status (${i}):`, statusData.status);
-
-    if (statusData.status === "COMPLETED") {
-      const resultResp = await fetch(resultUrl, {
-        headers: { Authorization: `Key ${falKey}` },
-      });
-      if (!resultResp.ok) {
-        throw new Error(`Failed to fetch fal result: ${resultResp.status}`);
-      }
-      return await resultResp.json();
-    }
-
-    if (statusData.status === "FAILED") {
-      throw new Error(statusData.error || "Fal generation failed");
-    }
-  }
-
-  throw new Error("Fal generation timed out");
-}
+// fal.run is synchronous — no polling needed
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -270,24 +234,8 @@ serve(async (req) => {
         });
       }
 
-      const submitData = await submitResp.json();
-      console.log("Fal submit response:", JSON.stringify(submitData).substring(0, 300));
-
-      let resultData: any;
-
-      // Check if we got an immediate result or need to poll
-      if (submitData.images && submitData.images.length > 0) {
-        resultData = submitData;
-      } else if (submitData.request_id) {
-        console.log(`Fal queued, request_id: ${submitData.request_id}`);
-        resultData = await pollFalResult(submitData.request_id, falModel, FAL_KEY);
-      } else {
-        console.error("Unexpected fal response:", JSON.stringify(submitData).substring(0, 500));
-        return new Response(JSON.stringify({ error: "Unexpected fal.ai response" }), {
-          status: 502,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
+      const resultData = await submitResp.json();
+      console.log("Fal result keys:", Object.keys(resultData || {}));
 
       // Check for NSFW
       if (resultData?.has_nsfw_concepts?.[0]) {
