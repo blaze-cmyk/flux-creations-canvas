@@ -184,7 +184,7 @@ function SidebarModelDropdown({ model, setModel, search, setSearch, onClose, mod
     .filter(m => m.name.toLowerCase().includes(search.toLowerCase()));
 
   return (
-    <div ref={ref} className="absolute left-0 right-0 top-full mt-1 bg-popover border border-border rounded-xl shadow-2xl overflow-hidden z-50">
+    <div ref={ref} className="fixed left-[280px] top-0 bottom-0 w-[280px] bg-popover border-l border-border shadow-2xl overflow-hidden z-50 flex flex-col">
       <div className="p-2">
         <div className="flex items-center gap-2 bg-muted rounded-lg px-3 py-2">
           <Search className="w-3.5 h-3.5 text-muted-foreground" />
