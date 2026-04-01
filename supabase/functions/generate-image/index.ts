@@ -50,7 +50,11 @@ const MODEL_MAP: Record<string, ModelConfig> = {
   // Runware Flux models (uncensored)
   "rw-flux-1-dev": { runwareModel: "runware:100@1", type: "runware", supportsImageInput: true },
   "rw-flux-1-schnell": { runwareModel: "runware:100@1", type: "runware", supportsImageInput: false },
+  "rw-flux-2-pro": { runwareModel: "bfl:5@1", type: "runware", supportsImageInput: true },
+  "rw-flux-2-flex": { runwareModel: "bfl:6@1", type: "runware", supportsImageInput: true },
   "rw-flux-2-dev": { runwareModel: "runware:400@1", type: "runware", supportsImageInput: true },
+  "rw-flux-1.1-pro": { runwareModel: "bfl:2@1", type: "runware", supportsImageInput: false },
+  "rw-flux-1.1-pro-ultra": { runwareModel: "bfl:2@2", type: "runware", supportsImageInput: false },
   "rw-flux-kontext-dev": { runwareModel: "runware:101@1", type: "runware", supportsImageInput: true },
 };
 
