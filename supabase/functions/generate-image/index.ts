@@ -19,6 +19,7 @@ type ModelConfig = {
   isMultiRef?: boolean;
   requiresImage?: boolean;
   textFallback?: string;
+  lora?: string;
 };
 
 const MODEL_MAP: Record<string, ModelConfig> = {
