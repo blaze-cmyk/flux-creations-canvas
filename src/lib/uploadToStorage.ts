@@ -1,7 +1,8 @@
 import { supabase } from '@/integrations/supabase/client';
 
 const PROVIDER_IMAGE_LIMIT_BYTES = 9_500_000;
-const MIN_IMAGE_DIMENSION = 512;
+const MAX_PROVIDER_DIMENSION = 3500;
+const MIN_IMAGE_DIMENSION = 300;
 const INITIAL_JPEG_QUALITY = 0.86;
 const MIN_JPEG_QUALITY = 0.5;
 
@@ -39,11 +40,22 @@ export type CompressionResult = {
 
 async function compressImageToLimit(file: File, maxBytes = PROVIDER_IMAGE_LIMIT_BYTES): Promise<CompressionResult> {
   const originalSize = file.size;
-  if (!file.type.startsWith('image/') || file.size <= maxBytes) {
+
+  if (!file.type.startsWith('image/')) {
     return { file, wasCompressed: false, originalSize, finalSize: file.size };
   }
 
   const bitmap = await createImageBitmap(file);
+  const needsOptimization =
+    file.size > maxBytes ||
+    bitmap.width > MAX_PROVIDER_DIMENSION ||
+    bitmap.height > MAX_PROVIDER_DIMENSION;
+
+  if (!needsOptimization) {
+    bitmap.close();
+    return { file, wasCompressed: false, originalSize, finalSize: file.size };
+  }
+
   const canvas = document.createElement('canvas');
   const context = canvas.getContext('2d');
 
@@ -52,15 +64,16 @@ async function compressImageToLimit(file: File, maxBytes = PROVIDER_IMAGE_LIMIT_
     throw new Error('This browser could not process the reference image.');
   }
 
-  let width = bitmap.width;
-  let height = bitmap.height;
+  const initialScale = Math.min(1, MAX_PROVIDER_DIMENSION / bitmap.width, MAX_PROVIDER_DIMENSION / bitmap.height);
+  let width = Math.max(MIN_IMAGE_DIMENSION, Math.round(bitmap.width * initialScale));
+  let height = Math.max(MIN_IMAGE_DIMENSION, Math.round(bitmap.height * initialScale));
   let quality = INITIAL_JPEG_QUALITY;
   let output: Blob | null = null;
 
   try {
     for (let attempt = 0; attempt < 10; attempt += 1) {
-      canvas.width = Math.max(MIN_IMAGE_DIMENSION, Math.round(width));
-      canvas.height = Math.max(MIN_IMAGE_DIMENSION, Math.round(height));
+      canvas.width = width;
+      canvas.height = height;
 
       context.clearRect(0, 0, canvas.width, canvas.height);
       context.fillStyle = '#ffffff';
@@ -72,10 +85,10 @@ async function compressImageToLimit(file: File, maxBytes = PROVIDER_IMAGE_LIMIT_
       });
 
       if (!output) {
-        throw new Error('Failed to compress the reference image.');
+        throw new Error('Failed to optimize the reference image.');
       }
 
-      if (output.size <= maxBytes) {
+      if (output.size <= maxBytes && canvas.width <= MAX_PROVIDER_DIMENSION && canvas.height <= MAX_PROVIDER_DIMENSION) {
         break;
       }
 
@@ -88,18 +101,23 @@ async function compressImageToLimit(file: File, maxBytes = PROVIDER_IMAGE_LIMIT_
   }
 
   if (!output) {
-    throw new Error('Failed to compress the reference image.');
+    throw new Error('Failed to optimize the reference image.');
   }
 
-  if (output.size > maxBytes) {
-    throw new Error('Reference image is still above the provider size limit after compression. Please upload a smaller image.');
+  if (output.size > maxBytes || width > MAX_PROVIDER_DIMENSION || height > MAX_PROVIDER_DIMENSION) {
+    throw new Error('Reference image still exceeds provider limits after optimization. Please upload a smaller image.');
   }
 
-  const compressedFile = new File([output], replaceExtension(file.name || 'reference', 'jpg'), {
+  const optimizedFile = new File([output], replaceExtension(file.name || 'reference', 'jpg'), {
     type: 'image/jpeg',
   });
 
-  return { file: compressedFile, wasCompressed: true, originalSize, finalSize: compressedFile.size };
+  return {
+    file: optimizedFile,
+    wasCompressed: true,
+    originalSize,
+    finalSize: optimizedFile.size,
+  };
 }
 
 async function uploadFile(file: File): Promise<string> {
@@ -118,10 +136,6 @@ async function uploadFile(file: File): Promise<string> {
   return data.publicUrl;
 }
 
-/**
- * If the input is a base64 data URI, upload it to the video-inputs storage bucket
- * and return the public URL. If it's already a URL, return it as-is.
- */
 export type ResolveResult = {
   url: string;
   wasCompressed: boolean;
@@ -156,10 +170,6 @@ export async function resolveToUrlWithMeta(dataOrUrl: string): Promise<ResolveRe
   return { url, wasCompressed, originalSize, finalSize };
 }
 
-/**
- * Resolve an array of references (base64 or URLs) to all URLs.
- * Returns compression metadata via the callback for UI indicators.
- */
 export async function resolveAllToUrls(
   refs: string[],
   onCompressed?: (index: number, originalSize: number, finalSize: number) => void,
@@ -167,11 +177,11 @@ export async function resolveAllToUrls(
   const filtered = refs.filter((ref) => ref.length > 0);
   const results = await Promise.all(filtered.map((ref) => resolveToUrlWithMeta(ref)));
 
-  results.forEach((r, i) => {
-    if (r.wasCompressed && onCompressed) {
-      onCompressed(i, r.originalSize, r.finalSize);
+  results.forEach((result, index) => {
+    if (result.wasCompressed && onCompressed) {
+      onCompressed(index, result.originalSize, result.finalSize);
     }
   });
 
-  return results.map((r) => r.url);
+  return results.map((result) => result.url);
 }
