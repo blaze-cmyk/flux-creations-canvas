@@ -108,7 +108,19 @@ export const useVideoStore = create<VideoState>()((set, get) => ({
   },
   setMotionVideo: (v) => set({ motionVideo: v }),
   setModel: (model) => set({ model }),
-  setMode: (mode) => set({ mode }),
+  setMode: (mode) => set((state) => {
+    const currentModel = VIDEO_MODELS.find(m => m.id === state.model);
+    if (currentModel && (currentModel.modes as readonly string[]).includes(mode)) {
+      return { mode };
+    }
+
+    const fallbackModel =
+      VIDEO_MODELS.find(m => m.featured && (m.modes as readonly string[]).includes(mode))?.id ??
+      VIDEO_MODELS.find(m => (m.modes as readonly string[]).includes(mode))?.id ??
+      state.model;
+
+    return { mode, model: fallbackModel };
+  }),
   setAspectRatio: (ar) => set({ aspectRatio: ar }),
   setDuration: (d) => set({ duration: d }),
   setSelectedVideoId: (id) => set({ selectedVideoId: id }),
