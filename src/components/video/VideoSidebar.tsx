@@ -4,6 +4,7 @@ import { MotionControlPanel } from './MotionControlPanel';
 import { EditVideoPanel } from './EditVideoPanel';
 import { CreateVideoPanel } from './CreateVideoPanel';
 import { useRef, useState, useEffect, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 
 export function VideoSidebar() {
   const {
@@ -13,6 +14,7 @@ export function VideoSidebar() {
   } = useVideoStore();
 
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const modelBtnRef = useRef<HTMLButtonElement>(null);
   const [modelOpen, setModelOpen] = useState(false);
   const [modelSearch, setModelSearch] = useState('');
   const [enhance, setEnhance] = useState(true);
@@ -97,6 +99,7 @@ export function VideoSidebar() {
         {/* Model selector */}
         <div className="relative">
           <button
+            ref={modelBtnRef}
             onClick={() => setModelOpen(!modelOpen)}
             className="w-full flex items-center justify-between bg-card border border-border rounded-xl px-3 py-2.5 hover:bg-muted transition-colors"
           >
@@ -114,6 +117,7 @@ export function VideoSidebar() {
               setSearch={setModelSearch}
               onClose={() => setModelOpen(false)}
               mode={mode}
+              anchorRef={modelBtnRef}
             />
           )}
         </div>
@@ -169,10 +173,22 @@ export function VideoSidebar() {
 }
 
 
-function SidebarModelDropdown({ model, setModel, search, setSearch, onClose, mode }: {
-  model: string; setModel: (m: string) => void; search: string; setSearch: (s: string) => void; onClose: () => void; mode: string;
+function SidebarModelDropdown({ model, setModel, search, setSearch, onClose, mode, anchorRef }: {
+  model: string; setModel: (m: string) => void; search: string; setSearch: (s: string) => void; onClose: () => void; mode: string; anchorRef: React.RefObject<HTMLButtonElement>;
 }) {
   const ref = useRef<HTMLDivElement>(null);
+  const [pos, setPos] = useState({ top: 0, left: 0 });
+
+  useEffect(() => {
+    if (anchorRef.current) {
+      const rect = anchorRef.current.getBoundingClientRect();
+      setPos({
+        top: rect.top,
+        left: rect.right + 8,
+      });
+    }
+  }, [anchorRef]);
+
   useEffect(() => {
     const handler = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) onClose(); };
     document.addEventListener('mousedown', handler);
@@ -183,10 +199,14 @@ function SidebarModelDropdown({ model, setModel, search, setSearch, onClose, mod
     .filter(m => m.modes.includes(mode as any))
     .filter(m => m.name.toLowerCase().includes(search.toLowerCase()));
 
-  return (
+  return createPortal(
     <>
-      <div className="fixed inset-0 z-40" onClick={onClose} />
-      <div ref={ref} className="absolute left-full top-0 ml-2 w-[260px] max-h-[400px] bg-popover border border-border rounded-xl shadow-2xl overflow-hidden z-50 flex flex-col">
+      <div className="fixed inset-0 z-[60]" onClick={onClose} />
+      <div
+        ref={ref}
+        className="fixed w-[260px] max-h-[420px] bg-popover border border-border rounded-xl shadow-2xl overflow-hidden z-[70] flex flex-col"
+        style={{ top: pos.top, left: pos.left }}
+      >
         <div className="p-2 border-b border-border">
           <div className="flex items-center gap-2 bg-muted rounded-lg px-3 py-2">
             <Search className="w-3.5 h-3.5 text-muted-foreground" />
@@ -211,6 +231,7 @@ function SidebarModelDropdown({ model, setModel, search, setSearch, onClose, mod
           ))}
         </div>
       </div>
-    </>
+    </>,
+    document.body
   );
 }
