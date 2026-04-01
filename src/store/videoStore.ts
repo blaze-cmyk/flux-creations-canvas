@@ -80,13 +80,24 @@ type VideoState = {
 };
 
 async function callGenerate(payload: Record<string, unknown>, videoId: string, get: () => VideoState, set: (s: Partial<VideoState>) => void) {
-  // Upload base64 files client-side BEFORE calling edge function
   const refs = payload.referenceImages as string[] | undefined;
+
   if (refs && refs.length > 0) {
     try {
-      payload.referenceImages = await resolveAllToUrls(refs);
-    } catch (e: any) {
-      set({ videos: get().videos.map(v => v.id === videoId ? { ...v, status: 'failed', error: `Upload failed: ${e.message}` } : v) });
+      const resolvedRefs = await resolveAllToUrls(refs);
+      payload.referenceImages = resolvedRefs;
+      set({
+        videos: get().videos.map((video) =>
+          video.id === videoId ? { ...video, referenceImages: resolvedRefs } : video
+        ),
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown upload error';
+      set({
+        videos: get().videos.map((video) =>
+          video.id === videoId ? { ...video, status: 'failed', error: `Upload failed: ${message}` } : video
+        ),
+      });
       return;
     }
   }

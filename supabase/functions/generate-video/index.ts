@@ -109,6 +109,29 @@ async function pollEvolinkTask(taskId: string, apiKey: string, maxWaitMs = 30000
   throw new Error("Evolink task timed out");
 }
 
+function normalizeClientFacingError(error: unknown) {
+  const rawMessage = error instanceof Error ? error.message : "Internal server error";
+
+  if (rawMessage.includes("file_too_large")) {
+    return {
+      message: "Reference image exceeds the provider 10MB limit. Upload a smaller image.",
+      status: 400,
+    };
+  }
+
+  if (rawMessage.includes("Result fetch failed: 422")) {
+    return {
+      message: rawMessage,
+      status: 400,
+    };
+  }
+
+  return {
+    message: rawMessage,
+    status: 500,
+  };
+}
+
 // ---- Main handler ----
 
 serve(async (req) => {
@@ -356,9 +379,10 @@ serve(async (req) => {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (e) {
+    const { message, status } = normalizeClientFacingError(e);
     console.error("Video generation error:", e);
-    return new Response(JSON.stringify({ error: e.message || "Internal server error" }), {
-      status: 500,
+    return new Response(JSON.stringify({ error: message }), {
+      status,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
