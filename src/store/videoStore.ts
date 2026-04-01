@@ -270,6 +270,7 @@ export const useVideoStore = create<VideoState>()((set, get) => ({
     };
 
     set({ videos: [newVideo, ...get().videos] });
+    saveVideoToDb(newVideo);
     callGenerate({
       prompt: effectivePrompt,
       referenceImages: [...referenceImages],
