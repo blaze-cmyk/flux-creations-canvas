@@ -103,6 +103,12 @@ export const useGeneratorStore = create<GeneratorState>((set, get) => ({
   removeReferenceImage: (index) => {
     set({ referenceImages: get().referenceImages.filter((_, i) => i !== index) });
   },
+  reorderReferenceImages: (fromIndex, toIndex) => {
+    const imgs = [...get().referenceImages];
+    const [moved] = imgs.splice(fromIndex, 1);
+    imgs.splice(toIndex, 0, moved);
+    set({ referenceImages: imgs });
+  },
   setModel: (model) => set({ model }),
   setQuality: (quality) => set({ quality }),
   setAspectRatio: (aspectRatio) => set({ aspectRatio }),
