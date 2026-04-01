@@ -126,7 +126,7 @@ function SortableThumbnail({ id, src, index, onPreview, onRemove }: SortableThum
         {...listeners}
       >
         <img src={src} alt="" className="h-full w-full select-none object-cover" draggable={false} />
-        <span className="absolute bottom-1 left-1 flex h-5 w-5 items-center justify-center rounded-md bg-black/60 text-[10px] font-bold text-white backdrop-blur-sm">
+        <span className="absolute bottom-0.5 left-0.5 flex h-4 w-4 items-center justify-center rounded bg-black/60 text-[9px] font-bold text-white backdrop-blur-sm">
           {index + 1}
         </span>
       </button>
@@ -138,9 +138,9 @@ function SortableThumbnail({ id, src, index, onPreview, onRemove }: SortableThum
           event.stopPropagation();
           onRemove();
         }}
-        className="absolute -right-1.5 -top-1.5 flex h-5 w-5 items-center justify-center rounded-full border border-border/50 bg-background/80 text-foreground/75 opacity-0 shadow-sm backdrop-blur-sm transition-opacity group-hover:opacity-100 hover:text-foreground"
+        className="absolute -right-1 -top-1 flex h-4 w-4 items-center justify-center rounded-full border border-border/50 bg-background/80 text-foreground/75 opacity-0 shadow-sm backdrop-blur-sm transition-opacity group-hover:opacity-100 hover:text-foreground"
       >
-        <X className="h-3 w-3" />
+        <X className="h-2.5 w-2.5" />
       </button>
     </div>
   );
