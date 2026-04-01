@@ -197,33 +197,43 @@ serve(async (req) => {
       let endpoint: string | undefined;
       if (isMotionControl) {
         endpoint = config.motionControl;
+        if (!endpoint) {
+          return new Response(JSON.stringify({ error: `Model ${model} does not support motion control` }), {
+            status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
       } else if (isImageMode) {
         endpoint = config.imageToVideo;
+        if (!endpoint) {
+          return new Response(JSON.stringify({ error: `Model ${model} does not support image to video` }), {
+            status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
       } else {
         endpoint = config.textToVideo;
-      }
-
-      if (!endpoint) {
-        endpoint = config.textToVideo || config.imageToVideo || config.motionControl;
-      }
-      if (!endpoint) {
-        return new Response(JSON.stringify({ error: `Model ${model} does not support ${mode}` }), {
-          status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
+        if (!endpoint) {
+          return new Response(JSON.stringify({ error: `Model ${model} does not support text to video` }), {
+            status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
       }
 
       const reqBody: Record<string, unknown> = {};
 
       if (isMotionControl) {
-        // Motion control: slot 0 = motion video (video_url), slot 1 = character image (image_url)
-        if (referenceImages.length > 0) reqBody.video_url = referenceImages[0];
-        if (referenceImages.length > 1) reqBody.image_url = referenceImages[1];
+        const motionVideo = referenceImages[0];
+        const characterImage = referenceImages[1];
+
+        if (!motionVideo || !characterImage) {
+          return new Response(JSON.stringify({ error: "Motion control requires both a motion reference video and a character image" }), {
+            status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+
+        reqBody.video_url = motionVideo;
+        reqBody.image_url = characterImage;
         if (prompt) reqBody.prompt = prompt;
-        reqBody.duration = duration;
-        reqBody.aspect_ratio = aspectRatio;
-        // character_orientation and keep_original_sound
-        const charOrientation = body?.characterOrientation || "video";
-        reqBody.character_orientation = charOrientation;
+        reqBody.character_orientation = body?.characterOrientation === "image" ? "image" : "video";
         reqBody.keep_original_sound = body?.keepOriginalSound !== false;
       } else {
         reqBody.prompt = prompt;
@@ -231,7 +241,6 @@ serve(async (req) => {
         reqBody.aspect_ratio = aspectRatio;
         reqBody.negative_prompt = "blur, distort, and low quality";
 
-        // Image input
         if (isImageMode && referenceImages.length > 0) {
           reqBody.image_url = referenceImages[0];
           if (referenceImages.length > 1) {
@@ -240,9 +249,8 @@ serve(async (req) => {
         }
       }
 
-      console.log(`Calling fal.ai video: ${endpoint}, mode=${mode}, ar=${aspectRatio}, dur=${duration}s`);
+      console.log(`Calling fal.ai video: ${endpoint}, mode=${mode}, keys=${Object.keys(reqBody).join(",")}`);
 
-      // Use queue API for video (long-running)
       const submitResp = await fetch(`${FAL_QUEUE}/${endpoint}`, {
         method: "POST",
         headers: { Authorization: `Key ${FAL_KEY}`, "Content-Type": "application/json" },
@@ -261,18 +269,18 @@ serve(async (req) => {
       const requestId = submitData.request_id;
       const responseUrl = submitData.response_url;
       const statusUrl = submitData.status_url;
+      const submitPayload = submitData?.data ?? submitData;
 
       if (!requestId || !responseUrl) {
-        // Direct response (some models return immediately)
-        const vid = submitData?.video?.url || submitData?.video;
+        const vid = submitPayload?.video?.url || submitPayload?.video;
         if (vid) {
           videoUrl = typeof vid === "string" ? vid : vid.url;
         }
       } else {
-        // Poll for result using URLs from submit response
         console.log(`Polling fal.ai request: ${requestId}, response_url: ${responseUrl}`);
         const result = await pollFalResult(responseUrl, statusUrl || `https://queue.fal.run/${endpoint}/requests/${requestId}/status`, FAL_KEY);
-        const vid = result?.video?.url || result?.video;
+        const resultPayload = result?.data ?? result;
+        const vid = resultPayload?.video?.url || resultPayload?.video;
         if (vid) {
           videoUrl = typeof vid === "string" ? vid : vid.url;
         }
