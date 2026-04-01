@@ -89,9 +89,9 @@ export function ReferenceImageStrip({
               type="button"
               onClick={onAdd}
               title="Upload image"
-              className="flex h-20 w-20 shrink-0 items-center justify-center rounded-[1.35rem] border border-dashed border-border bg-muted/15 text-muted-foreground transition-all hover:border-foreground/20 hover:bg-muted/30 hover:text-foreground/70"
+              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-dashed border-border bg-muted/15 text-muted-foreground transition-all hover:border-foreground/20 hover:bg-muted/30 hover:text-foreground/70"
             >
-              <ImagePlus className="h-5 w-5" />
+              <ImagePlus className="h-4 w-4" />
             </button>
           )}
         </div>
@@ -121,12 +121,12 @@ function SortableThumbnail({ id, src, index, onPreview, onRemove }: SortableThum
       <button
         type="button"
         onClick={onPreview}
-        className={`relative block h-20 w-20 cursor-grab overflow-hidden rounded-[1.35rem] border border-border/80 bg-muted/20 transition-all duration-200 hover:-translate-y-0.5 hover:border-foreground/20 hover:shadow-lg active:cursor-grabbing focus:outline-none ${isDragging ? 'scale-105 shadow-xl' : ''}`}
+        className={`relative block h-10 w-10 cursor-grab overflow-hidden rounded-lg border border-border/80 bg-muted/20 transition-all duration-200 hover:-translate-y-0.5 hover:border-foreground/20 hover:shadow-lg active:cursor-grabbing focus:outline-none ${isDragging ? 'scale-105 shadow-xl' : ''}`}
         {...attributes}
         {...listeners}
       >
         <img src={src} alt="" className="h-full w-full select-none object-cover" draggable={false} />
-        <span className="absolute bottom-1 left-1 flex h-5 w-5 items-center justify-center rounded-md bg-black/60 text-[10px] font-bold text-white backdrop-blur-sm">
+        <span className="absolute bottom-0.5 left-0.5 flex h-4 w-4 items-center justify-center rounded bg-black/60 text-[9px] font-bold text-white backdrop-blur-sm">
           {index + 1}
         </span>
       </button>
@@ -138,9 +138,9 @@ function SortableThumbnail({ id, src, index, onPreview, onRemove }: SortableThum
           event.stopPropagation();
           onRemove();
         }}
-        className="absolute -right-1.5 -top-1.5 flex h-5 w-5 items-center justify-center rounded-full border border-border/50 bg-background/80 text-foreground/75 opacity-0 shadow-sm backdrop-blur-sm transition-opacity group-hover:opacity-100 hover:text-foreground"
+        className="absolute -right-1 -top-1 flex h-4 w-4 items-center justify-center rounded-full border border-border/50 bg-background/80 text-foreground/75 opacity-0 shadow-sm backdrop-blur-sm transition-opacity group-hover:opacity-100 hover:text-foreground"
       >
-        <X className="h-3 w-3" />
+        <X className="h-2.5 w-2.5" />
       </button>
     </div>
   );
