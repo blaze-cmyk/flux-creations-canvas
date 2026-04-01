@@ -115,7 +115,7 @@ function VideoCard({ video }: { video: GeneratedVideo }) {
         {/* Left: generating area */}
         <div className="flex-1 bg-background flex items-center justify-center relative">
           <span className="absolute top-3 left-3 flex items-center gap-1.5 text-xs font-semibold px-3 py-1 rounded-full" style={{ backgroundColor: 'hsl(var(--primary))', color: 'hsl(var(--primary-foreground))' }}>
-            <Loader2 className="w-3 h-3 animate-spin" /> Generating
+            <Loader2 className="w-3 h-3 animate-spin" /> Generating{video.progress ? ` ${video.progress}%` : ''}
           </span>
         </div>
         {/* Right: details */}
