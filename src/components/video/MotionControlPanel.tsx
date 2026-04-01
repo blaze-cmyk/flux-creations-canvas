@@ -35,11 +35,11 @@ export function MotionControlPanel({
   };
 
   const handleMotionDrop = async (files: File[]) => {
-    if (files[0]) { const url = await readFileAsDataURL(files[0]); addReferenceImage(url); }
+    if (files[0]) { const url = await readFileAsDataURL(files[0]); setReferenceImageAt(0, url); }
   };
 
   const handleCharacterDrop = async (files: File[]) => {
-    if (files[0]) { const url = await readFileAsDataURL(files[0]); addReferenceImage(url); }
+    if (files[0]) { const url = await readFileAsDataURL(files[0]); setReferenceImageAt(1, url); }
   };
 
   return (
