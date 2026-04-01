@@ -325,14 +325,8 @@ serve(async (req) => {
 
       const imgResult = resData?.data?.find((d: any) => d.taskType === "imageInference");
       if (imgResult?.imageURL) {
-        // Proxy image to base64
-        const imgResp = await fetch(imgResult.imageURL);
-        if (imgResp.ok) {
-          const buf = await imgResp.arrayBuffer();
-          imageBase64 = toBase64DataUri(new Uint8Array(buf), imgResp.headers.get("content-type") || "image/png");
-        } else {
-          imageUrl = imgResult.imageURL;
-        }
+        // Return URL directly — avoid proxying to base64 to prevent WORKER_LIMIT
+        imageUrl = imgResult.imageURL;
       } else {
         const errMsg = resData?.error || "No image in Runware response";
         console.error("Runware no image:", JSON.stringify(resData).substring(0, 500));
