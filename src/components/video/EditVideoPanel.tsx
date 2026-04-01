@@ -1,5 +1,6 @@
 import { useState, RefObject } from 'react';
 import { Plus, Video, Film } from 'lucide-react';
+import { DropZone, readFileAsDataURL } from './DropZone';
 
 interface EditVideoPanelProps {
   prompt: string;
@@ -19,15 +20,22 @@ export function EditVideoPanel({
     const input = document.createElement('input');
     input.type = 'file';
     input.accept = 'video/*';
-    input.onchange = (e) => {
+    input.onchange = async (e) => {
       const f = (e.target as HTMLInputElement).files?.[0];
-      if (f) {
-        const reader = new FileReader();
-        reader.onload = () => addReferenceImage(reader.result as string);
-        reader.readAsDataURL(f);
-      }
+      if (f) { const url = await readFileAsDataURL(f); addReferenceImage(url); }
     };
     input.click();
+  };
+
+  const handleVideoDrop = async (files: File[]) => {
+    if (files[0]) { const url = await readFileAsDataURL(files[0]); addReferenceImage(url); }
+  };
+
+  const handleImagesDrop = async (files: File[]) => {
+    for (const f of files.slice(0, 4 - referenceImages.length)) {
+      const url = await readFileAsDataURL(f);
+      addReferenceImage(url);
+    }
   };
 
   return (
@@ -45,36 +53,40 @@ export function EditVideoPanel({
         </div>
       </div>
 
-      {/* Upload video */}
-      {referenceImages[0] ? (
-        <div className="relative rounded-xl overflow-hidden border border-border aspect-video">
-          <img src={referenceImages[0]} alt="" className="w-full h-full object-cover" />
+      {/* Upload video - drag & drop */}
+      <DropZone onFiles={handleVideoDrop} accept="video/*">
+        {referenceImages[0] ? (
+          <div className="relative rounded-xl overflow-hidden border border-border aspect-video">
+            <img src={referenceImages[0]} alt="" className="w-full h-full object-cover" />
+            <button
+              onClick={() => removeReferenceImage(0)}
+              className="absolute top-1 right-1 w-5 h-5 rounded-full bg-black/60 text-white text-xs flex items-center justify-center"
+            >×</button>
+          </div>
+        ) : (
           <button
-            onClick={() => removeReferenceImage(0)}
-            className="absolute top-1 right-1 w-5 h-5 rounded-full bg-black/60 text-white text-xs flex items-center justify-center"
-          >×</button>
-        </div>
-      ) : (
-        <button
-          onClick={uploadVideo}
-          className="w-full border border-border rounded-xl p-5 flex flex-col items-center gap-1.5 text-muted-foreground hover:border-foreground/30 hover:text-foreground transition-colors bg-card"
-        >
-          <Video className="w-5 h-5" />
-          <span className="text-xs font-medium text-foreground">Upload a video to edit</span>
-          <span className="text-[10px] text-muted-foreground/60">Duration required: 3~10 secs</span>
-        </button>
-      )}
+            onClick={uploadVideo}
+            className="w-full border border-border rounded-xl p-5 flex flex-col items-center gap-1.5 text-muted-foreground hover:border-foreground/30 hover:text-foreground transition-colors bg-card"
+          >
+            <Video className="w-5 h-5" />
+            <span className="text-xs font-medium text-foreground">Upload a video to edit</span>
+            <span className="text-[10px] text-muted-foreground/60">Duration required: 3~10 secs • Drop or click</span>
+          </button>
+        )}
+      </DropZone>
 
-      {/* Upload images & elements */}
-      <button
-        onClick={() => fileInputRef.current?.click()}
-        className="w-full border border-dashed border-border rounded-xl p-4 flex flex-col items-center gap-1.5 text-muted-foreground hover:border-foreground/30 hover:text-foreground transition-colors relative"
-      >
-        <span className="absolute top-2 right-2 text-[9px] text-muted-foreground/50">Optional</span>
-        <Plus className="w-5 h-5" />
-        <span className="text-xs font-medium text-foreground">Upload images & elements</span>
-        <span className="text-[10px] text-muted-foreground/60">Up to 4 images or elements</span>
-      </button>
+      {/* Upload images & elements - drag & drop */}
+      <DropZone onFiles={handleImagesDrop} accept="image/*">
+        <button
+          onClick={() => fileInputRef.current?.click()}
+          className="w-full border border-dashed border-border rounded-xl p-4 flex flex-col items-center gap-1.5 text-muted-foreground hover:border-foreground/30 hover:text-foreground transition-colors relative"
+        >
+          <span className="absolute top-2 right-2 text-[9px] text-muted-foreground/50">Optional</span>
+          <Plus className="w-5 h-5" />
+          <span className="text-xs font-medium text-foreground">Upload images & elements</span>
+          <span className="text-[10px] text-muted-foreground/60">Up to 4 images or elements • Drop or click</span>
+        </button>
+      </DropZone>
 
       {/* Uploaded thumbnails */}
       {referenceImages.length > 1 && (

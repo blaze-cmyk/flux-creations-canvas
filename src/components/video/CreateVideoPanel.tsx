@@ -1,5 +1,6 @@
 import { useState, RefObject } from 'react';
-import { ImagePlus, Sparkles, Volume2, Film } from 'lucide-react';
+import { ImagePlus, Sparkles, Volume2 } from 'lucide-react';
+import { DropZone, readFileAsDataURL } from './DropZone';
 
 interface CreateVideoPanelProps {
   prompt: string;
@@ -21,17 +22,20 @@ export function CreateVideoPanel({
 }: CreateVideoPanelProps) {
   const [multiShot, setMultiShot] = useState(false);
 
+  const handleFrameDrop = async (files: File[]) => {
+    for (const f of files.slice(0, 2 - referenceImages.length)) {
+      const url = await readFileAsDataURL(f);
+      addReferenceImage(url);
+    }
+  };
+
   const uploadEndFrame = () => {
     const input = document.createElement('input');
     input.type = 'file';
     input.accept = 'image/*';
-    input.onchange = (e) => {
+    input.onchange = async (e) => {
       const f = (e.target as HTMLInputElement).files?.[0];
-      if (f) {
-        const reader = new FileReader();
-        reader.onload = () => addReferenceImage(reader.result as string);
-        reader.readAsDataURL(f);
-      }
+      if (f) { const url = await readFileAsDataURL(f); addReferenceImage(url); }
     };
     input.click();
   };
@@ -51,20 +55,24 @@ export function CreateVideoPanel({
         </div>
       </div>
 
-      {/* Start / End frame */}
+      {/* Start / End frame with drag & drop */}
       <div className="flex gap-2">
-        <FrameUpload
-          label="Start frame"
-          image={referenceImages[0]}
-          onUpload={() => fileInputRef.current?.click()}
-          onRemove={() => removeReferenceImage(0)}
-        />
-        <FrameUpload
-          label="End frame"
-          image={referenceImages[1]}
-          onUpload={uploadEndFrame}
-          onRemove={() => removeReferenceImage(1)}
-        />
+        <DropZone onFiles={(files) => handleFrameDrop(files)} accept="image/*" className="flex-1">
+          <FrameUpload
+            label="Start frame"
+            image={referenceImages[0]}
+            onUpload={() => fileInputRef.current?.click()}
+            onRemove={() => removeReferenceImage(0)}
+          />
+        </DropZone>
+        <DropZone onFiles={async (files) => { if (files[0]) { const url = await readFileAsDataURL(files[0]); addReferenceImage(url); } }} accept="image/*" className="flex-1">
+          <FrameUpload
+            label="End frame"
+            image={referenceImages[1]}
+            onUpload={uploadEndFrame}
+            onRemove={() => removeReferenceImage(1)}
+          />
+        </DropZone>
       </div>
 
       {/* Multi-shot toggle */}
@@ -115,7 +123,7 @@ export function CreateVideoPanel({
 
 function FrameUpload({ label, image, onUpload, onRemove }: { label: string; image?: string; onUpload: () => void; onRemove: () => void }) {
   return (
-    <div className="flex-1">
+    <>
       {image ? (
         <div className="relative rounded-xl overflow-hidden border border-border aspect-video">
           <img src={image} alt="" className="w-full h-full object-cover" />
@@ -131,6 +139,6 @@ function FrameUpload({ label, image, onUpload, onRemove }: { label: string; imag
           <span className="text-[10px]">{label}</span>
         </button>
       )}
-    </div>
+    </>
   );
 }

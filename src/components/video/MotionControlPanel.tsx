@@ -1,5 +1,6 @@
 import { useState, RefObject } from 'react';
 import { Plus, Image as ImageIcon, Video, ChevronDown, ChevronUp } from 'lucide-react';
+import { DropZone, readFileAsDataURL } from './DropZone';
 
 interface MotionControlPanelProps {
   referenceImages: string[];
@@ -9,10 +10,7 @@ interface MotionControlPanelProps {
 }
 
 export function MotionControlPanel({
-  referenceImages,
-  addReferenceImage,
-  removeReferenceImage,
-  fileInputRef,
+  referenceImages, addReferenceImage, removeReferenceImage, fileInputRef,
 }: MotionControlPanelProps) {
   const [sceneControl, setSceneControl] = useState(true);
   const [sceneSource, setSceneSource] = useState<'video' | 'image'>('image');
@@ -35,6 +33,14 @@ export function MotionControlPanel({
     input.click();
   };
 
+  const handleMotionDrop = async (files: File[]) => {
+    if (files[0]) { const url = await readFileAsDataURL(files[0]); addReferenceImage(url); }
+  };
+
+  const handleCharacterDrop = async (files: File[]) => {
+    if (files[0]) { const url = await readFileAsDataURL(files[0]); addReferenceImage(url); }
+  };
+
   return (
     <div className="space-y-3">
       {/* Hero banner */}
@@ -50,10 +56,9 @@ export function MotionControlPanel({
         </div>
       </div>
 
-      {/* Motion video + Character upload */}
+      {/* Motion video + Character upload with drag & drop */}
       <div className="flex gap-2">
-        {/* Motion video */}
-        <div className="flex-1">
+        <DropZone onFiles={handleMotionDrop} accept="image/*,video/*" className="flex-1">
           {referenceImages[0] ? (
             <div className="relative rounded-xl overflow-hidden border border-border aspect-[3/4]">
               <img src={referenceImages[0]} alt="" className="w-full h-full object-cover" />
@@ -72,12 +77,12 @@ export function MotionControlPanel({
             >
               <ImageIcon className="w-5 h-5" />
               <span className="text-[10px]">Motion video</span>
+              <span className="text-[9px] text-muted-foreground/50">Drop or click</span>
             </button>
           )}
-        </div>
+        </DropZone>
 
-        {/* Character */}
-        <div className="flex-1">
+        <DropZone onFiles={handleCharacterDrop} accept="image/*" className="flex-1">
           {referenceImages[1] ? (
             <div className="relative rounded-xl overflow-hidden border border-border aspect-[3/4]">
               <img src={referenceImages[1]} alt="" className="w-full h-full object-cover" />
@@ -93,10 +98,10 @@ export function MotionControlPanel({
             >
               <Plus className="w-5 h-5" />
               <span className="text-[10px] text-center leading-tight">Add your character</span>
-              <span className="text-[9px] text-muted-foreground/60 text-center px-1">Image with visible face and body</span>
+              <span className="text-[9px] text-muted-foreground/60 text-center px-1">Drop or click</span>
             </button>
           )}
-        </div>
+        </DropZone>
       </div>
 
       {/* Scene control mode */}
@@ -146,7 +151,6 @@ export function MotionControlPanel({
 
         {advancedOpen && (
           <div className="px-3 pb-3 space-y-3 border-t border-border pt-3">
-            {/* Prompt */}
             <div className="space-y-1">
               <span className="text-[11px] text-muted-foreground">Prompt</span>
               <textarea
@@ -159,7 +163,6 @@ export function MotionControlPanel({
               />
             </div>
 
-            {/* Orientation */}
             <div className="space-y-1.5">
               <span className="text-[11px] text-muted-foreground">Orientation</span>
               <div className="flex gap-1 bg-muted rounded-lg p-0.5">
