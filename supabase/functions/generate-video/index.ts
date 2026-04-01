@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.4";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -8,6 +9,35 @@ const corsHeaders = {
 
 const FAL_QUEUE = "https://queue.fal.run";
 const RUNWARE_BASE = "https://api.runware.ai/v1";
+
+// Upload base64 data URI to storage and return public URL
+async function resolveFileUrl(dataOrUrl: string): Promise<string> {
+  if (!dataOrUrl.startsWith("data:")) return dataOrUrl;
+
+  const match = dataOrUrl.match(/^data:(.*?);base64,(.*)$/);
+  if (!match) return dataOrUrl;
+
+  const contentType = match[1];
+  const base64Data = match[2];
+  const bytes = Uint8Array.from(atob(base64Data), c => c.charCodeAt(0));
+  const ext = contentType.includes("png") ? "png" : contentType.includes("webp") ? "webp" : contentType.includes("mp4") ? "mp4" : "jpg";
+  const path = `${crypto.randomUUID()}.${ext}`;
+
+  const supabase = createClient(
+    Deno.env.get("SUPABASE_URL")!,
+    Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
+  );
+
+  const { error } = await supabase.storage.from("video-inputs").upload(path, bytes, {
+    contentType,
+    upsert: false,
+  });
+  if (error) throw new Error(`Storage upload failed: ${error.message}`);
+
+  const { data } = supabase.storage.from("video-inputs").getPublicUrl(path);
+  console.log(`Uploaded base64 to storage: ${path} -> ${data.publicUrl}`);
+  return data.publicUrl;
+}
 
 type VideoModelConfig = {
   type: "fal" | "runware";
