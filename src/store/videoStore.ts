@@ -210,6 +210,7 @@ export const useVideoStore = create<VideoState>()((set, get) => ({
   characterOrientation: 'video',
   videos: [],
   selectedVideoId: null,
+  _historyLoaded: false,
 
   setPrompt: (prompt) => set({ prompt }),
   setMotionPrompt: (motionPrompt) => set({ motionPrompt }),
