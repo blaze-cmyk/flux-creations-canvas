@@ -10,6 +10,9 @@ const FAL_QUEUE = "https://queue.fal.run";
 const RUNWARE_BASE = "https://api.runware.ai/v1";
 const EVOLINK_BASE = "https://api.evolink.ai";
 
+type DurationFormat = "kling-str" | "veo-str" | "pixverse-int" | "minimax-none" | "ltx-frames";
+type ImageField = "image_url" | "start_image_url";
+
 type VideoModelConfig = {
   type: "fal" | "runware" | "evolink";
   textToVideo?: string;
@@ -17,23 +20,34 @@ type VideoModelConfig = {
   motionControl?: string;
   runwareModel?: string;
   evolinkModel?: string;
+  durationFormat?: DurationFormat;
+  imageField?: ImageField;
 };
 
 const VIDEO_MODEL_MAP: Record<string, VideoModelConfig> = {
-  "kling-v3-pro": { type: "fal", textToVideo: "fal-ai/kling-video/v3/pro/text-to-video", imageToVideo: "fal-ai/kling-video/v3/pro/image-to-video" },
-  "kling-v3-motion": { type: "fal", motionControl: "fal-ai/kling-video/v3/pro/motion-control" },
+  // Kling V3: duration "3"-"15" string, image = start_image_url
+  "kling-v3-pro": { type: "fal", textToVideo: "fal-ai/kling-video/v3/pro/text-to-video", imageToVideo: "fal-ai/kling-video/v3/pro/image-to-video", durationFormat: "kling-str", imageField: "start_image_url" },
+  "kling-v3-motion": { type: "fal", motionControl: "fal-ai/kling-video/v3/pro/motion-control", durationFormat: "kling-str" },
   "ev-kling-v3-motion": { type: "evolink", evolinkModel: "kling-v3-motion-control" },
-  "kling-o3-pro": { type: "fal", imageToVideo: "fal-ai/kling-video/o3/standard/image-to-video" },
-  "kling-v2.5-turbo-pro": { type: "fal", textToVideo: "fal-ai/kling-video/v2.5-turbo/pro/text-to-video", imageToVideo: "fal-ai/kling-video/v2.5-turbo/pro/image-to-video" },
-  "kling-v2.6-pro": { type: "fal", imageToVideo: "fal-ai/kling-video/v2.6/pro/image-to-video" },
-  "kling-v2.6-motion-std": { type: "fal", motionControl: "fal-ai/kling-video/v2.6/standard/motion-control" },
-  "kling-v2.6-motion-pro": { type: "fal", motionControl: "fal-ai/kling-video/v2.6/pro/motion-control" },
-  "veo-3.1": { type: "fal", textToVideo: "fal-ai/veo3.1", imageToVideo: "fal-ai/veo3.1/image-to-video" },
-  "veo-3.1-fast": { type: "fal", textToVideo: "fal-ai/veo3.1/fast", imageToVideo: "fal-ai/veo3.1/fast/image-to-video" },
-  "veo-3.1-lite": { type: "fal", textToVideo: "fal-ai/veo3.1/lite", imageToVideo: "fal-ai/veo3.1/lite/image-to-video" },
-  "minimax-video": { type: "fal", textToVideo: "fal-ai/minimax/video-01-live", imageToVideo: "fal-ai/minimax/video-01-live/image-to-video" },
-  "pixverse-v6": { type: "fal", textToVideo: "fal-ai/pixverse/v6/text-to-video", imageToVideo: "fal-ai/pixverse/v6/image-to-video" },
-  "ltx-2-19b": { type: "fal", textToVideo: "fal-ai/ltx-2-19b", imageToVideo: "fal-ai/ltx-2-19b/image-to-video" },
+  // Kling O3: image = start_image_url
+  "kling-o3-pro": { type: "fal", imageToVideo: "fal-ai/kling-video/o3/standard/image-to-video", durationFormat: "kling-str", imageField: "start_image_url" },
+  // Kling V2.5: duration "5" or "10", image = image_url
+  "kling-v2.5-turbo-pro": { type: "fal", textToVideo: "fal-ai/kling-video/v2.5-turbo/pro/text-to-video", imageToVideo: "fal-ai/kling-video/v2.5-turbo/pro/image-to-video", durationFormat: "kling-str", imageField: "image_url" },
+  // Kling V2.6: duration "3"-"15", image = start_image_url
+  "kling-v2.6-pro": { type: "fal", imageToVideo: "fal-ai/kling-video/v2.6/pro/image-to-video", durationFormat: "kling-str", imageField: "start_image_url" },
+  "kling-v2.6-motion-std": { type: "fal", motionControl: "fal-ai/kling-video/v2.6/standard/motion-control", durationFormat: "kling-str" },
+  "kling-v2.6-motion-pro": { type: "fal", motionControl: "fal-ai/kling-video/v2.6/pro/motion-control", durationFormat: "kling-str" },
+  // Veo 3.1: duration "4s"/"6s"/"8s", image = image_url
+  "veo-3.1": { type: "fal", textToVideo: "fal-ai/veo3.1", imageToVideo: "fal-ai/veo3.1/image-to-video", durationFormat: "veo-str", imageField: "image_url" },
+  "veo-3.1-fast": { type: "fal", textToVideo: "fal-ai/veo3.1/fast", imageToVideo: "fal-ai/veo3.1/fast/image-to-video", durationFormat: "veo-str", imageField: "image_url" },
+  "veo-3.1-lite": { type: "fal", textToVideo: "fal-ai/veo3.1/lite", imageToVideo: "fal-ai/veo3.1/lite/image-to-video", durationFormat: "veo-str", imageField: "image_url" },
+  // MiniMax: only prompt, no duration/aspect_ratio
+  "minimax-video": { type: "fal", textToVideo: "fal-ai/minimax/video-01-live", imageToVideo: "fal-ai/minimax/video-01-live/image-to-video", durationFormat: "minimax-none", imageField: "image_url" },
+  // PixVerse V6: duration = integer 1-15, aspect_ratio supported
+  "pixverse-v6": { type: "fal", textToVideo: "fal-ai/pixverse/v6/text-to-video", imageToVideo: "fal-ai/pixverse/v6/image-to-video", durationFormat: "pixverse-int", imageField: "image_url" },
+  // LTX-2: uses num_frames + video_size, no duration/aspect_ratio
+  "ltx-2-19b": { type: "fal", textToVideo: "fal-ai/ltx-2-19b/text-to-video", imageToVideo: "fal-ai/ltx-2-19b/image-to-video", durationFormat: "ltx-frames", imageField: "image_url" },
+  // Runware models
   "rw-seedance-1.5-pro": { type: "runware", runwareModel: "bytedance:seedance@1.5-pro" },
   "rw-runway-gen4.5": { type: "runware", runwareModel: "runwayml:gen@4.5" },
   "rw-sora-2": { type: "runware", runwareModel: "openai:3@1" },
