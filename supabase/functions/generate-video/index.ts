@@ -171,12 +171,20 @@ serve(async (req) => {
         });
       }
 
-      const isImageMode = (mode === "image-to-video" || mode === "motion-control") && referenceImages.length > 0;
-      let endpoint = isImageMode ? config.imageToVideo : config.textToVideo;
+      const isMotionControl = mode === "motion-control";
+      const isImageMode = (mode === "image-to-video") && referenceImages.length > 0;
+
+      let endpoint: string | undefined;
+      if (isMotionControl) {
+        endpoint = config.motionControl;
+      } else if (isImageMode) {
+        endpoint = config.imageToVideo;
+      } else {
+        endpoint = config.textToVideo;
+      }
 
       if (!endpoint) {
-        // Fallback: if no image-to-video endpoint, use text-to-video
-        endpoint = config.textToVideo || config.imageToVideo;
+        endpoint = config.textToVideo || config.imageToVideo || config.motionControl;
       }
       if (!endpoint) {
         return new Response(JSON.stringify({ error: `Model ${model} does not support ${mode}` }), {
