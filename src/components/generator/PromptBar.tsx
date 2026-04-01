@@ -57,6 +57,23 @@ export function PromptBar() {
     if (e.dataTransfer.files.length) handleFiles(e.dataTransfer.files);
   };
 
+  // Paste image support
+  const handlePaste = useCallback((e: React.ClipboardEvent) => {
+    const items = e.clipboardData?.items;
+    if (!items) return;
+    const imageFiles: File[] = [];
+    for (let i = 0; i < items.length; i++) {
+      if (items[i].type.startsWith('image/')) {
+        const file = items[i].getAsFile();
+        if (file) imageFiles.push(file);
+      }
+    }
+    if (imageFiles.length > 0) {
+      e.preventDefault();
+      handleFiles(imageFiles);
+    }
+  }, [handleFiles]);
+
   const handleSubmit = () => {
     if (prompt.trim()) generate();
   };
