@@ -94,7 +94,6 @@ async function uploadToStorage(imageData: string, id: string): Promise<string | 
     let ext = 'png';
 
     if (imageData.startsWith('data:')) {
-      // Base64 data URI → blob
       const match = imageData.match(/^data:(image\/(\w+));base64,(.+)$/);
       if (!match) return null;
       ext = match[2] === 'jpeg' ? 'jpg' : match[2];
@@ -103,7 +102,6 @@ async function uploadToStorage(imageData: string, id: string): Promise<string | 
       for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
       blob = new Blob([bytes], { type: match[1] });
     } else if (imageData.startsWith('http')) {
-      // URL → fetch and upload
       const resp = await fetch(imageData);
       if (!resp.ok) return null;
       blob = await resp.blob();
@@ -132,6 +130,30 @@ async function uploadToStorage(imageData: string, id: string): Promise<string | 
     console.error('Upload error:', e);
     return null;
   }
+}
+
+// Upload a reference image (base64) to storage and return a persistent URL
+async function uploadReferenceImage(dataUri: string): Promise<string> {
+  if (!dataUri.startsWith('data:')) return dataUri; // already a URL
+  const id = `ref-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  const url = await uploadToStorage(dataUri, id);
+  return url || dataUri; // fallback to dataUri if upload fails
+}
+
+function persistReferenceImages(imgs: string[]) {
+  try {
+    // Only persist URLs (not base64) to avoid quota issues
+    const urls = imgs.filter(i => i.startsWith('http'));
+    localStorage.setItem('gen-ref-images', JSON.stringify(urls));
+  } catch { /* ignore */ }
+}
+
+function loadPersistedReferenceImages(): string[] {
+  try {
+    const raw = localStorage.getItem('gen-ref-images');
+    if (raw) return JSON.parse(raw);
+  } catch { /* ignore */ }
+  return [];
 }
 
 // Save a completed generation to the database
