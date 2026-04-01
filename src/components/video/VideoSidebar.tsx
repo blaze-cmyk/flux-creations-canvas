@@ -184,27 +184,35 @@ function SidebarModelDropdown({ model, setModel, search, setSearch, onClose, mod
     .filter(m => m.name.toLowerCase().includes(search.toLowerCase()));
 
   return (
-    <div ref={ref} className="fixed left-[280px] top-0 bottom-0 w-[280px] bg-popover border-l border-border shadow-2xl overflow-hidden z-50 flex flex-col">
-      <div className="p-3 border-b border-border">
-        <div className="flex items-center gap-2 bg-muted rounded-lg px-3 py-2">
-          <Search className="w-3.5 h-3.5 text-muted-foreground" />
-          <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search models..." className="bg-transparent text-sm text-foreground placeholder:text-muted-foreground/50 border-0 focus:outline-none flex-1" autoFocus />
+    <>
+      {/* Backdrop */}
+      <div className="fixed inset-0 bg-black/50 z-50" onClick={onClose} />
+      {/* Modal */}
+      <div ref={ref} className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[320px] max-h-[480px] bg-popover border border-border rounded-xl shadow-2xl overflow-hidden z-50 flex flex-col">
+        <div className="p-3 border-b border-border">
+          <div className="flex items-center gap-2 bg-muted rounded-lg px-3 py-2">
+            <Search className="w-3.5 h-3.5 text-muted-foreground" />
+            <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search..." className="bg-transparent text-sm text-foreground placeholder:text-muted-foreground/50 border-0 focus:outline-none flex-1" autoFocus />
+          </div>
+        </div>
+        <div className="p-2 border-b border-border">
+          <span className="text-[10px] text-muted-foreground px-2">All models</span>
+        </div>
+        <div className="flex-1 overflow-y-auto px-1 py-1" style={{ scrollbarWidth: 'none' }}>
+          {filtered.map(m => (
+            <button key={m.id} onClick={() => setModel(m.id)} className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-left hover:bg-muted transition-colors ${model === m.id ? 'bg-muted' : ''}`}>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-1.5">
+                  <span className="text-xs text-foreground">{m.name}</span>
+                  {m.badge && <span className="text-[9px] font-bold px-1 py-0.5 rounded bg-primary/20 text-primary">{m.badge}</span>}
+                </div>
+                <span className="text-[10px] text-muted-foreground truncate block">{m.desc}</span>
+              </div>
+              {model === m.id && <Check className="w-3.5 h-3.5 text-primary shrink-0" />}
+            </button>
+          ))}
         </div>
       </div>
-      <div className="flex-1 overflow-y-auto px-1 py-1" style={{ scrollbarWidth: 'none' }}>
-        {filtered.map(m => (
-          <button key={m.id} onClick={() => setModel(m.id)} className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-left hover:bg-muted transition-colors ${model === m.id ? 'bg-muted' : ''}`}>
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-1.5">
-                <span className="text-xs text-foreground">{m.name}</span>
-                {m.badge && <span className="text-[9px] font-bold px-1 py-0.5 rounded bg-primary/20 text-primary">{m.badge}</span>}
-              </div>
-              <span className="text-[10px] text-muted-foreground truncate block">{m.desc}</span>
-            </div>
-            {model === m.id && <Check className="w-3.5 h-3.5 text-primary shrink-0" />}
-          </button>
-        ))}
-      </div>
-    </div>
+    </>
   );
 }
