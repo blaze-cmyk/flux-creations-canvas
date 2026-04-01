@@ -213,8 +213,26 @@ serve(async (req) => {
         let imageToSend: { bytes: Uint8Array; mimeType: string };
         let enhancedPrompt = prompt;
 
-        if (allImages.length >= 2) {
-          // Merge images side-by-side so the model can see ALL reference images
+        if (allImages.length === 2) {
+          const baseImage = allImages[0];
+          const sourceImage = allImages[1];
+          console.log("Preparing dual-image Flux edit: left=source(image 2), right=base(image 1)");
+          imageToSend = await mergeImagesSideBySide([sourceImage, baseImage]);
+
+          enhancedPrompt = [
+            "This is a side-by-side reference sheet.",
+            "The LEFT image is the source identity/reference from image 2.",
+            "The RIGHT image is the base/target composition from image 1.",
+            "Create ONE final image based on the RIGHT image only.",
+            "Replace only the person in the RIGHT image with the identity, face, and hair from the LEFT image.",
+            "Keep the RIGHT image's body, clothes, pose, hands, camera angle, framing, background, lighting, and expression unchanged unless the user explicitly asks otherwise.",
+            "Remove any visible text or captions from the final output.",
+            "Do not return a split-screen, collage, contact sheet, or two separate images.",
+            `User request: ${rewritePromptForMerged(prompt, 2)}`,
+          ].join(" ");
+
+          console.log(`Rewritten prompt: ${enhancedPrompt}`);
+        } else if (allImages.length >= 3) {
           console.log(`Merging ${allImages.length} images side-by-side for Flux edit`);
           imageToSend = await mergeImagesSideBySide(allImages);
           enhancedPrompt = rewritePromptForMerged(prompt, allImages.length);
@@ -223,7 +241,7 @@ serve(async (req) => {
           imageToSend = allImages[0];
         }
 
-        const editModel = modelConfig.apiModel.includes("kontext") ? modelConfig.apiModel : "flux-kontext-max";
+        const editModel = "flux-kontext-max";
         const endpoint = `${APIYI_BASE}/v1/images/edits`;
 
         const formData = new FormData();
