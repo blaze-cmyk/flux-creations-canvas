@@ -242,7 +242,16 @@ serve(async (req) => {
       }
 
       console.log(`Polling Evolink task: ${taskId}`);
-      const result = await pollEvolinkTask(taskId, EVOLINK_API_KEY);
+      let result: any;
+      try {
+        result = await pollEvolinkTask(taskId, EVOLINK_API_KEY);
+      } catch (evolinkErr) {
+        const msg = evolinkErr instanceof Error ? evolinkErr.message : "Evolink task failed";
+        console.error("Evolink task error:", msg);
+        return new Response(JSON.stringify({ error: msg }), {
+          status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
 
       // Extract video URL from results
       const results = result?.results;
