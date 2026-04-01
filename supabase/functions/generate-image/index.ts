@@ -13,8 +13,10 @@ type ModelConfig = {
   type: "gemini" | "fal";
   falModel?: string;
   apiModel?: string;
-  supportsImageInput?: boolean; // can accept reference images
-  isMultiRef?: boolean; // supports multiple reference images natively
+  supportsImageInput?: boolean;
+  isMultiRef?: boolean;
+  requiresImage?: boolean; // editing-only models that need image_url
+  textFallback?: string; // fal model to fallback to when no reference images
 };
 
 const MODEL_MAP: Record<string, ModelConfig> = {
@@ -22,16 +24,16 @@ const MODEL_MAP: Record<string, ModelConfig> = {
   "gemini-3.1-flash-image": { apiModel: "gemini-3.1-flash-image-preview", type: "gemini", supportsImageInput: true, isMultiRef: true },
   "gemini-3-pro-image": { apiModel: "gemini-3-pro-image-preview", type: "gemini", supportsImageInput: true, isMultiRef: true },
   "gemini-2.5-flash-image": { apiModel: "gemini-2.5-flash-image", type: "gemini", supportsImageInput: true, isMultiRef: true },
-  // Flux Kontext (via fal.ai)
-  "flux-kontext-pro": { falModel: "fal-ai/flux-pro/kontext", type: "fal", supportsImageInput: true },
-  "flux-kontext-max": { falModel: "fal-ai/flux-pro/kontext/max", type: "fal", supportsImageInput: true },
-  "flux-kontext-multi": { falModel: "fal-ai/flux-pro/kontext/multi", type: "fal", supportsImageInput: true, isMultiRef: true },
-  // Flux 2 (via fal.ai)
-  "flux-2-pro": { falModel: "fal-ai/flux-2-pro/edit", type: "fal", supportsImageInput: true },
-  "flux-2-max": { falModel: "fal-ai/flux-2-max/edit", type: "fal", supportsImageInput: true },
-  "flux-2-flex": { falModel: "fal-ai/flux-2-flex/edit", type: "fal", supportsImageInput: true, isMultiRef: true },
-  "flux-2-dev": { falModel: "fal-ai/flux-2/edit", type: "fal", supportsImageInput: true },
-  // Flux 1 (via fal.ai)
+  // Flux Kontext (via fal.ai) — editing models, require image_url
+  "flux-kontext-pro": { falModel: "fal-ai/flux-pro/kontext", type: "fal", supportsImageInput: true, requiresImage: true, textFallback: "fal-ai/flux-pro/v1.1" },
+  "flux-kontext-max": { falModel: "fal-ai/flux-pro/kontext/max", type: "fal", supportsImageInput: true, requiresImage: true, textFallback: "fal-ai/flux-pro/v1.1" },
+  "flux-kontext-multi": { falModel: "fal-ai/flux-pro/kontext/multi", type: "fal", supportsImageInput: true, isMultiRef: true, requiresImage: true, textFallback: "fal-ai/flux-pro/v1.1" },
+  // Flux 2 (via fal.ai) — editing models
+  "flux-2-pro": { falModel: "fal-ai/flux-2-pro/edit", type: "fal", supportsImageInput: true, requiresImage: true, textFallback: "fal-ai/flux-pro/v1.1" },
+  "flux-2-max": { falModel: "fal-ai/flux-2-max/edit", type: "fal", supportsImageInput: true, requiresImage: true, textFallback: "fal-ai/flux-pro/v1.1" },
+  "flux-2-flex": { falModel: "fal-ai/flux-2-flex/edit", type: "fal", supportsImageInput: true, isMultiRef: true, requiresImage: true, textFallback: "fal-ai/flux-pro/v1.1" },
+  "flux-2-dev": { falModel: "fal-ai/flux-2/edit", type: "fal", supportsImageInput: true, requiresImage: true, textFallback: "fal-ai/flux/dev" },
+  // Flux 1 (via fal.ai) — text-to-image models
   "flux-schnell": { falModel: "fal-ai/flux/schnell", type: "fal", supportsImageInput: false },
   "flux-dev": { falModel: "fal-ai/flux/dev", type: "fal", supportsImageInput: false },
   "flux-pro-v1.1": { falModel: "fal-ai/flux-pro/v1.1", type: "fal", supportsImageInput: false },
@@ -184,7 +186,14 @@ serve(async (req) => {
         });
       }
 
-      const falModel = modelConfig.falModel!;
+      // If model requires image_url but none provided, fallback to text-to-image model
+      let falModel = modelConfig.falModel!;
+      if (modelConfig.requiresImage && referenceImages.length === 0) {
+        if (modelConfig.textFallback) {
+          falModel = modelConfig.textFallback;
+          console.log(`No reference images for editing model, falling back to: ${falModel}`);
+        }
+      }
 
       // Build request body — prompt is ALWAYS raw, never modified
       const reqBody: Record<string, unknown> = {
@@ -199,14 +208,12 @@ serve(async (req) => {
         reqBody.aspect_ratio = ar;
       }
 
-      // Add reference images if model supports them
+      // Add reference images if model supports them and images are provided
       if (modelConfig.supportsImageInput && referenceImages.length > 0) {
         if (modelConfig.isMultiRef && referenceImages.length > 1) {
-          // Multi-ref models: pass array of URLs
           reqBody.image_url = referenceImages;
           console.log(`Fal multi-ref: passing ${referenceImages.length} images`);
         } else {
-          // Single-ref: pass first image only
           reqBody.image_url = referenceImages[0];
           console.log(`Fal single-ref: passing 1 image`);
         }
