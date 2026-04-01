@@ -95,6 +95,10 @@ export function VideoSidebar() {
             setReferenceImageAt={setReferenceImageAt}
             removeReferenceImage={removeReferenceImage}
             fileInputRef={fileInputRef}
+            motionPrompt={motionPrompt}
+            setMotionPrompt={setMotionPrompt}
+            characterOrientation={characterOrientation}
+            setCharacterOrientation={setCharacterOrientation}
           />
         )}
 
