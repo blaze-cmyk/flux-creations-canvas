@@ -166,57 +166,12 @@ export function VideoSidebar() {
 
         {/* === MOTION CONTROL === */}
         {mode === 'motion-control' && (
-          <>
-            <div className="relative rounded-xl overflow-hidden bg-gradient-to-br from-muted to-card h-28 flex items-end p-3">
-              <div>
-                <p className="text-xs font-bold text-foreground uppercase tracking-wider">MOTION CONTROL</p>
-                <p className="text-[10px] text-muted-foreground">Control motion with video references</p>
-              </div>
-            </div>
-
-            {/* Character upload */}
-            <div className="flex gap-2">
-              <div className="flex-1">
-                {referenceImages[0] ? (
-                  <div className="relative rounded-xl overflow-hidden border border-border aspect-[3/4]">
-                    <img src={referenceImages[0]} alt="" className="w-full h-full object-cover" />
-                    <button onClick={() => removeReferenceImage(0)} className="absolute top-1 right-1 w-5 h-5 rounded-full bg-black/60 text-white text-xs flex items-center justify-center">×</button>
-                  </div>
-                ) : (
-                  <button
-                    onClick={() => fileInputRef.current?.click()}
-                    className="w-full aspect-[3/4] border border-dashed border-border rounded-xl flex flex-col items-center justify-center gap-1 text-muted-foreground hover:border-foreground/30 transition-colors"
-                  >
-                    <ImageIcon className="w-5 h-5" />
-                    <span className="text-[10px]">Motion video</span>
-                  </button>
-                )}
-              </div>
-              <div className="flex-1">
-                <button
-                  onClick={() => {
-                    const input = document.createElement('input');
-                    input.type = 'file';
-                    input.accept = 'image/*';
-                    input.onchange = (e) => {
-                      const f = (e.target as HTMLInputElement).files?.[0];
-                      if (f) {
-                        const reader = new FileReader();
-                        reader.onload = () => addReferenceImage(reader.result as string);
-                        reader.readAsDataURL(f);
-                      }
-                    };
-                    input.click();
-                  }}
-                  className="w-full aspect-[3/4] border border-dashed border-border rounded-xl flex flex-col items-center justify-center gap-1 text-muted-foreground hover:border-foreground/30 transition-colors"
-                >
-                  <Plus className="w-5 h-5" />
-                  <span className="text-[10px] text-center leading-tight">Add your character</span>
-                  <span className="text-[9px] text-muted-foreground/60 text-center">Image with visible face and body</span>
-                </button>
-              </div>
-            </div>
-          </>
+          <MotionControlPanel
+            referenceImages={referenceImages}
+            addReferenceImage={addReferenceImage}
+            removeReferenceImage={removeReferenceImage}
+            fileInputRef={fileInputRef}
+          />
         )}
 
         {/* Model selector */}
