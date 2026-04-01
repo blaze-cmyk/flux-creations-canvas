@@ -69,10 +69,12 @@ function ImageCard({ image }: {
     try {
       const res = await fetch(image.imageUrl);
       const blob = await res.blob();
+      const ext = blob.type.includes('jpeg') || blob.type.includes('jpg') ? 'jpg' : 'png';
+      const slug = image.prompt.slice(0, 40).replace(/[^a-zA-Z0-9]+/g, '-').replace(/-+$/, '');
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `generation-${image.id}.png`;
+      a.download = `${slug}-${image.id.slice(0, 8)}.${ext}`;
       a.click();
       URL.revokeObjectURL(url);
     } catch {
