@@ -196,18 +196,19 @@ serve(async (req) => {
         });
       }
 
+      const evolinkQuality = body?.quality === "1080p" ? "1080p" : "720p";
       const evolinkBody: Record<string, unknown> = {
         model: config.evolinkModel,
         image_urls: [characterImage],
         video_urls: [motionVideo],
-        quality: "1080p",
+        quality: evolinkQuality,
         model_params: {
           character_orientation: body?.characterOrientation === "image" ? "image" : "video",
         },
       };
       if (prompt) evolinkBody.prompt = prompt;
 
-      console.log(`Submitting Evolink task: model=${config.evolinkModel}`);
+      console.log(`Submitting Evolink task: model=${config.evolinkModel}, quality=${evolinkQuality}, image=${characterImage.substring(0, 80)}, video=${motionVideo.substring(0, 80)}`);
 
       const submitResp = await fetch(`${EVOLINK_BASE}/v1/videos/generations`, {
         method: "POST",
