@@ -88,15 +88,20 @@ function toBase64DataUri(bytes: Uint8Array, mimeType: string): string {
 }
 
 // Map aspect ratio string to width/height for Runware
+// Clamp and snap to Runware's requirements: 256-1440, multiples of 32
+function norm32(n: number): number {
+  return Math.min(1440, Math.max(256, Math.round(n / 32) * 32));
+}
+
 function arToSize(ar: string, quality: string): { width: number; height: number } {
-  const base = quality === "4K" ? 2048 : quality === "1K" ? 512 : 1024;
+  const base = quality === "4K" ? 1440 : quality === "1K" ? 512 : 1024;
   const ratios: Record<string, [number, number]> = {
     "1:1": [1, 1], "3:4": [3, 4], "4:3": [4, 3], "2:3": [2, 3], "3:2": [3, 2],
     "9:16": [9, 16], "16:9": [16, 9], "5:4": [5, 4], "4:5": [4, 5], "21:9": [21, 9],
   };
   const [w, h] = ratios[ar] || [1, 1];
   const max = Math.max(w, h);
-  return { width: Math.round((w / max) * base), height: Math.round((h / max) * base) };
+  return { width: norm32((w / max) * base), height: norm32((h / max) * base) };
 }
 
 serve(async (req) => {
