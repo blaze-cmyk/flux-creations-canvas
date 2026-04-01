@@ -303,7 +303,7 @@ export const useVideoStore = create<VideoState>()((set, get) => ({
       videos: get().videos.filter(v => v.id !== id),
       selectedVideoId: get().selectedVideoId === id ? null : get().selectedVideoId,
     });
-    supabase.from('video_generations').delete().eq('id', id).then(() => {});
+    (supabase as any).from('video_generations').delete().eq('id', id).then(() => {});
   },
 
   loadHistory: async () => {
