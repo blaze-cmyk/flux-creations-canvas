@@ -232,7 +232,7 @@ serve(async (req) => {
 
       if (modelConfig.supportsImageInput && referenceImages.length > 0) {
         if (modelConfig.isMultiRef && referenceImages.length > 1) {
-          reqBody.image_url = referenceImages;
+          reqBody.image_urls = referenceImages;
         } else {
           reqBody.image_url = referenceImages[0];
         }
