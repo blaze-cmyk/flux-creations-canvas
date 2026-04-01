@@ -168,9 +168,10 @@ serve(async (req) => {
         imageBase64 = `data:${imgPart.inlineData.mimeType || "image/png"};base64,${imgPart.inlineData.data}`;
       } else {
         const errorMsg = candidate?.finishMessage || "Image generation failed. Try rephrasing your prompt.";
+        const isFiltered = candidate?.finishReason === 'SAFETY' || candidate?.finishReason === 'PROHIBITED_CONTENT';
         console.error("Gemini no image:", candidate?.finishReason, errorMsg);
-        return new Response(JSON.stringify({ error: errorMsg }), {
-          status: 422,
+        return new Response(JSON.stringify({ error: errorMsg, filtered: isFiltered }), {
+          status: 200,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
