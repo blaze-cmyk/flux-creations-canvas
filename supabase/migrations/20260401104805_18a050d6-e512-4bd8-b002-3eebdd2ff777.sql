@@ -1,0 +1,1 @@
+CREATE POLICY "Allow public update on generated-images" ON storage.objects FOR UPDATE USING (bucket_id = 'generated-images') WITH CHECK (bucket_id = 'generated-images');
