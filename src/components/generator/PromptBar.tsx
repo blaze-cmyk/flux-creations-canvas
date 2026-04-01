@@ -82,7 +82,7 @@ export function PromptBar() {
             <div className="flex items-center gap-2 mb-2">
               {referenceImages.map((img, i) => (
                 <div key={i} className="relative group">
-                  <img src={img} alt="" className="w-10 h-10 rounded-lg object-cover border border-border" />
+                  <img src={img} alt="" className="w-10 h-10 rounded-lg object-cover border border-border cursor-pointer" onClick={() => setPreviewImg(img)} />
                   <button
                     onClick={() => removeReferenceImage(i)}
                     className="absolute -top-1 -right-1 w-4 h-4 bg-destructive rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
