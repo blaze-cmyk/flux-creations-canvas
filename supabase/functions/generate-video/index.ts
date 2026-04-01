@@ -14,6 +14,7 @@ type VideoModelConfig = {
   type: "fal" | "runware";
   textToVideo?: string;
   imageToVideo?: string;
+  motionControl?: string;
   runwareModel?: string;
 };
 
@@ -23,6 +24,10 @@ const VIDEO_MODEL_MAP: Record<string, VideoModelConfig> = {
     type: "fal",
     textToVideo: "fal-ai/kling-video/v3/pro/text-to-video",
     imageToVideo: "fal-ai/kling-video/v3/pro/image-to-video",
+  },
+  "kling-v3-motion": {
+    type: "fal",
+    motionControl: "fal-ai/kling-video/v3/pro/motion-control",
   },
   "kling-o3-pro": {
     type: "fal",
@@ -36,6 +41,14 @@ const VIDEO_MODEL_MAP: Record<string, VideoModelConfig> = {
   "kling-v2.6-pro": {
     type: "fal",
     imageToVideo: "fal-ai/kling-video/v2.6/pro/image-to-video",
+  },
+  "kling-v2.6-motion-std": {
+    type: "fal",
+    motionControl: "fal-ai/kling-video/v2.6/standard/motion-control",
+  },
+  "kling-v2.6-motion-pro": {
+    type: "fal",
+    motionControl: "fal-ai/kling-video/v2.6/pro/motion-control",
   },
   // Veo (fal.ai)
   "veo-3.1": {
