@@ -116,7 +116,10 @@ async function pollEvolinkTask(taskId: string, apiKey: string, maxWaitMs = 30000
     }
     const data = await resp.json();
     if (data.status === "completed") return data;
-    if (data.status === "failed") throw new Error(data.error?.message || "Evolink task failed");
+    if (data.status === "failed") {
+      console.error("Evolink task failed:", JSON.stringify(data));
+      throw new Error(data.error?.message || JSON.stringify(data.error) || "Evolink task failed");
+    }
     console.log(`Evolink task ${taskId}: ${data.status} (${data.progress || 0}%)`);
     await new Promise(r => setTimeout(r, 5000));
   }
@@ -193,18 +196,31 @@ serve(async (req) => {
         });
       }
 
+      // Validate image size — Evolink limit is 10MB
+      try {
+        const headResp = await fetch(characterImage, { method: "HEAD" });
+        const contentLength = parseInt(headResp.headers.get("content-length") || "0");
+        if (contentLength > 10 * 1024 * 1024) {
+          return new Response(JSON.stringify({ error: `Character image is ${(contentLength / 1048576).toFixed(1)}MB — Evolink limit is 10MB. Please upload a smaller image.` }), {
+            status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+      } catch (e) {
+        console.log("Could not check image size, proceeding:", e);
+      }
+
       const evolinkBody: Record<string, unknown> = {
         model: config.evolinkModel,
         image_urls: [characterImage],
         video_urls: [motionVideo],
-        quality: "1080p",
+        quality: evolinkQuality,
         model_params: {
           character_orientation: body?.characterOrientation === "image" ? "image" : "video",
         },
       };
       if (prompt) evolinkBody.prompt = prompt;
 
-      console.log(`Submitting Evolink task: model=${config.evolinkModel}`);
+      console.log(`Submitting Evolink task: model=${config.evolinkModel}, quality=${evolinkQuality}, image=${characterImage.substring(0, 80)}, video=${motionVideo.substring(0, 80)}`);
 
       const submitResp = await fetch(`${EVOLINK_BASE}/v1/videos/generations`, {
         method: "POST",
@@ -218,6 +234,11 @@ serve(async (req) => {
       if (!submitResp.ok) {
         const errText = await submitResp.text();
         console.error("Evolink submit error:", submitResp.status, errText);
+        if (submitResp.status === 402) {
+          return new Response(JSON.stringify({ error: "Insufficient Evolink credits. Please top up your Evolink account.", details: errText }), {
+            status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
         return new Response(JSON.stringify({ error: `Evolink API error: ${submitResp.status}`, details: errText }), {
           status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
@@ -233,7 +254,16 @@ serve(async (req) => {
       }
 
       console.log(`Polling Evolink task: ${taskId}`);
-      const result = await pollEvolinkTask(taskId, EVOLINK_API_KEY);
+      let result: any;
+      try {
+        result = await pollEvolinkTask(taskId, EVOLINK_API_KEY);
+      } catch (evolinkErr) {
+        const msg = evolinkErr instanceof Error ? evolinkErr.message : "Evolink task failed";
+        console.error("Evolink task error:", msg);
+        return new Response(JSON.stringify({ error: msg }), {
+          status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
 
       // Extract video URL from results
       const results = result?.results;
