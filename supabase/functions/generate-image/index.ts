@@ -1,5 +1,4 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { Image, decode } from "https://deno.land/x/imagescript@1.3.0/mod.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -21,21 +20,29 @@ const MODEL_MAP: Record<string, { apiModel: string; type: "gemini" | "flux" }> =
 
 const QUALITY_MAP: Record<string, string> = { "1K": "1K", "2K": "2K", "4K": "4K" };
 
-async function fetchImageBytes(src: string): Promise<{ bytes: Uint8Array; mimeType: string } | null> {
+function aspectRatioToSize(ratio: string): string {
+  const map: Record<string, string> = {
+    "9:16": "576x1024",
+    "16:9": "1024x576",
+    "1:1": "1024x1024",
+    "4:3": "1024x768",
+    "3:4": "768x1024",
+  };
+  return map[ratio] || "1024x1024";
+}
+
+async function fetchImageAsDataUri(src: string): Promise<string | null> {
   try {
-    if (src.startsWith("data:")) {
-      const match = src.match(/^data:(image\/\w+);base64,(.+)$/);
-      if (!match) return null;
-      const binary = atob(match[2]);
-      const bytes = new Uint8Array(binary.length);
-      for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-      return { bytes, mimeType: match[1] };
-    }
+    if (src.startsWith("data:")) return src;
     if (src.startsWith("http")) {
       const resp = await fetch(src);
       if (!resp.ok) return null;
       const buf = await resp.arrayBuffer();
-      return { bytes: new Uint8Array(buf), mimeType: resp.headers.get("content-type") || "image/jpeg" };
+      const bytes = new Uint8Array(buf);
+      const mimeType = resp.headers.get("content-type") || "image/jpeg";
+      let binary = "";
+      for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
+      return `data:${mimeType};base64,${btoa(binary)}`;
     }
     return null;
   } catch { return null; }
@@ -46,41 +53,6 @@ function toBase64DataUri(bytes: Uint8Array, mimeType: string): string {
   for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
   return `data:${mimeType};base64,${btoa(binary)}`;
 }
-
-// Merge multiple images side-by-side into a single image
-async function mergeImagesSideBySide(imageDataList: { bytes: Uint8Array; mimeType: string }[]): Promise<{ bytes: Uint8Array; mimeType: string }> {
-  const decoded: Image[] = [];
-  for (const img of imageDataList) {
-    const d = await decode(img.bytes);
-    decoded.push(d as Image);
-  }
-
-  // Normalize heights to the tallest image
-  const maxH = Math.max(...decoded.map(d => d.height));
-  const resized: Image[] = [];
-  for (const d of decoded) {
-    if (d.height < maxH) {
-      const scale = maxH / d.height;
-      const newW = Math.round(d.width * scale);
-      resized.push(d.resize(newW, maxH));
-    } else {
-      resized.push(d);
-    }
-  }
-
-  const totalW = resized.reduce((s, d) => s + d.width, 0);
-  const canvas = new Image(totalW, maxH);
-
-  let x = 0;
-  for (const img of resized) {
-    canvas.composite(img, x, 0);
-    x += img.width;
-  }
-
-  const pngBytes = await canvas.encode(1); // PNG format
-  return { bytes: new Uint8Array(pngBytes), mimeType: "image/png" };
-}
-
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -116,18 +88,20 @@ serve(async (req) => {
     const ar = aspectRatio === "Auto" ? "1:1" : aspectRatio;
 
     if (modelConfig.type === "gemini") {
-      // Gemini: inline images in parts
+      // Gemini: inline images in parts — pass each image separately, no merging
       const parts: any[] = [];
-      
+
       for (const refImg of referenceImages) {
-        const img = await fetchImageBytes(refImg);
-        if (img) {
-          let binary = "";
-          for (let i = 0; i < img.bytes.length; i++) binary += String.fromCharCode(img.bytes[i]);
-          parts.push({ inlineData: { mimeType: img.mimeType, data: btoa(binary) } });
+        const dataUri = await fetchImageAsDataUri(refImg);
+        if (dataUri) {
+          const match = dataUri.match(/^data:(image\/\w+);base64,(.+)$/);
+          if (match) {
+            parts.push({ inlineData: { mimeType: match[1], data: match[2] } });
+          }
         }
       }
-      
+
+      // User prompt passed EXACTLY as typed — no modifications
       parts.push({ text: prompt });
 
       const imageSize = QUALITY_MAP[quality] || "2K";
@@ -168,134 +142,71 @@ serve(async (req) => {
       }
 
     } else if (modelConfig.type === "flux") {
-      const hasRefs = referenceImages.length > 0;
+      // FLUX: Use /v1/images/generations for ALL cases
+      // Pass image_url as string (1 ref) or array (2+ refs) — NEVER merge images
+      const endpoint = `${APIYI_BASE}/v1/images/generations`;
 
-      if (hasRefs) {
-        // Fetch all reference images
-        const allImages: { bytes: Uint8Array; mimeType: string }[] = [];
-        for (const ref of referenceImages) {
-          const img = await fetchImageBytes(ref);
-          if (img) allImages.push(img);
-        }
+      // Convert reference images to data URIs for inline passing
+      const refDataUris: string[] = [];
+      for (const ref of referenceImages) {
+        const dataUri = await fetchImageAsDataUri(ref);
+        if (dataUri) refDataUris.push(dataUri);
+      }
 
-        if (allImages.length === 0) {
-          return new Response(JSON.stringify({ error: "Could not load reference images" }), {
-            status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
-          });
-        }
+      // Build request body — prompt is NEVER modified
+      const reqBody: Record<string, unknown> = {
+        model: modelConfig.apiModel,
+        prompt, // raw user prompt, zero modifications
+        n: 1,
+        size: aspectRatioToSize(ar),
+      };
 
-        let imageToSend: { bytes: Uint8Array; mimeType: string };
-        let enhancedPrompt = prompt;
+      // Add images only if present — as native array, NEVER merged/stitched
+      if (refDataUris.length === 1) {
+        reqBody.image_url = refDataUris[0]; // single string for 1 image
+      } else if (refDataUris.length > 1) {
+        reqBody.image_url = refDataUris; // array for 2+ images
+      }
 
-        if (allImages.length >= 2) {
-          // Merge all reference images side-by-side, numbered left to right
-          console.log(`Merging ${allImages.length} images side-by-side for Flux edit`);
-          imageToSend = await mergeImagesSideBySide(allImages);
-          // Minimal context — let the user's prompt do the work
-          const labels = allImages.map((_, i) => `image ${i + 1}`).join(", ");
-          enhancedPrompt = `This image contains ${allImages.length} reference images placed side by side (left to right: ${labels}). Output a single final image, not a collage. ${prompt}`;
-          console.log(`Enhanced prompt: ${enhancedPrompt}`);
-        } else {
-          imageToSend = allImages[0];
-        }
+      console.log(`Calling Flux: ${endpoint}, model=${modelConfig.apiModel}, ar=${ar}, refs=${refDataUris.length}, prompt="${prompt.substring(0, 80)}..."`);
 
-        const editModel = "flux-kontext-max";
-        const endpoint = `${APIYI_BASE}/v1/images/edits`;
+      const response = await fetch(endpoint, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${APIYI_API_KEY}`, "Content-Type": "application/json" },
+        body: JSON.stringify(reqBody),
+      });
 
-        const formData = new FormData();
-        const blob = new Blob([imageToSend.bytes], { type: imageToSend.mimeType });
-        const ext = imageToSend.mimeType.includes("png") ? "png" : "jpg";
-        formData.append("image", blob, `image.${ext}`);
-        formData.append("model", editModel);
-        formData.append("prompt", enhancedPrompt);
-        formData.append("aspect_ratio", ar);
-        formData.append("safety_tolerance", "6");
-        formData.append("output_format", "png");
-
-        console.log(`Calling Flux Edit: ${endpoint}, model=${editModel}, ar=${ar}, refs=${allImages.length}`);
-
-        const response = await fetch(endpoint, {
-          method: "POST",
-          headers: { Authorization: `Bearer ${APIYI_API_KEY}` },
-          body: formData,
+      if (!response.ok) {
+        const errText = await response.text();
+        console.error("Flux error:", response.status, errText);
+        return new Response(JSON.stringify({ error: `API error: ${response.status}`, details: errText }), {
+          status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
+      }
 
-        if (!response.ok) {
-          const errText = await response.text();
-          console.error("Flux Edit error:", response.status, errText);
-          return new Response(JSON.stringify({ error: `API error: ${response.status}`, details: errText }), {
-            status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" },
-          });
-        }
+      const data = await response.json();
+      console.log("Flux response keys:", Object.keys(data));
 
-        const data = await response.json();
-        const rawUrl = data?.data?.[0]?.url;
+      const rawUrl = data?.data?.[0]?.url;
+      const b64 = data?.data?.[0]?.b64_json;
 
-        if (rawUrl) {
-          const imgResp = await fetch(rawUrl);
-          if (imgResp.ok) {
-            const buf = await imgResp.arrayBuffer();
-            const bytes = new Uint8Array(buf);
-            imageBase64 = toBase64DataUri(bytes, imgResp.headers.get("content-type") || "image/png");
-          } else {
-            imageUrl = rawUrl;
-          }
+      if (rawUrl) {
+        // Download server-side to avoid CORS issues
+        const imgResp = await fetch(rawUrl);
+        if (imgResp.ok) {
+          const buf = await imgResp.arrayBuffer();
+          const bytes = new Uint8Array(buf);
+          imageBase64 = toBase64DataUri(bytes, imgResp.headers.get("content-type") || "image/png");
         } else {
-          const b64 = data?.data?.[0]?.b64_json;
-          if (b64) {
-            imageBase64 = `data:image/png;base64,${b64}`;
-          } else {
-            console.error("No URL in Flux edit response:", JSON.stringify(data).substring(0, 500));
-            return new Response(JSON.stringify({ error: "No image in response" }), {
-              status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" },
-            });
-          }
+          imageUrl = rawUrl;
         }
-
+      } else if (b64) {
+        imageBase64 = `data:image/png;base64,${b64}`;
       } else {
-        // Flux text-to-image (no reference images)
-        const endpoint = `${APIYI_BASE}/v1/images/generations`;
-
-        console.log(`Calling Flux Gen: ${endpoint}, model=${modelConfig.apiModel}, ar=${ar}`);
-
-        const response = await fetch(endpoint, {
-          method: "POST",
-          headers: { Authorization: `Bearer ${APIYI_API_KEY}`, "Content-Type": "application/json" },
-          body: JSON.stringify({
-            model: modelConfig.apiModel,
-            prompt,
-            aspect_ratio: ar,
-            safety_tolerance: 6,
-            output_format: "png",
-          }),
+        console.error("Unexpected Flux response:", JSON.stringify(data).substring(0, 500));
+        return new Response(JSON.stringify({ error: "No image in response" }), {
+          status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
-
-        if (!response.ok) {
-          const errText = await response.text();
-          console.error("Flux Gen error:", response.status, errText);
-          return new Response(JSON.stringify({ error: `API error: ${response.status}`, details: errText }), {
-            status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" },
-          });
-        }
-
-        const data = await response.json();
-        const rawUrl = data?.data?.[0]?.url;
-
-        if (rawUrl) {
-          const imgResp = await fetch(rawUrl);
-          if (imgResp.ok) {
-            const buf = await imgResp.arrayBuffer();
-            const bytes = new Uint8Array(buf);
-            imageBase64 = toBase64DataUri(bytes, imgResp.headers.get("content-type") || "image/png");
-          } else {
-            imageUrl = rawUrl;
-          }
-        } else {
-          console.error("No URL in Flux response:", JSON.stringify(data).substring(0, 500));
-          return new Response(JSON.stringify({ error: "No image URL in response" }), {
-            status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" },
-          });
-        }
       }
     }
 
