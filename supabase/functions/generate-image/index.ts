@@ -128,17 +128,19 @@ serve(async (req) => {
       const data = await response.json();
       console.log("Gemini response keys:", Object.keys(data));
 
-      // Extract base64 image
+      // Extract base64 image from parts
       const candidate = data?.candidates?.[0];
-      const part = candidate?.content?.parts?.[0];
+      const parts = candidate?.content?.parts ?? [];
+      const imgPart = parts.find((p: any) => p.inlineData?.data);
 
-      if (part?.inlineData?.data) {
-        imageBase64 = `data:${part.inlineData.mimeType || "image/png"};base64,${part.inlineData.data}`;
+      if (imgPart?.inlineData?.data) {
+        imageBase64 = `data:${imgPart.inlineData.mimeType || "image/png"};base64,${imgPart.inlineData.data}`;
       } else {
-        console.error("Unexpected Gemini response:", JSON.stringify(data).substring(0, 500));
+        const errorMsg = candidate?.finishMessage || "Image generation failed. Try rephrasing your prompt.";
+        console.error("Gemini did not return image:", candidate?.finishReason, errorMsg);
         return new Response(
-          JSON.stringify({ error: "No image in response", details: JSON.stringify(data).substring(0, 500) }),
-          { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          JSON.stringify({ error: errorMsg }),
+          { status: 422, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
     } else if (modelConfig.type === "flux") {
