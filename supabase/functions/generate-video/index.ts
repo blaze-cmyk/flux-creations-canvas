@@ -104,17 +104,22 @@ const VIDEO_MODEL_MAP: Record<string, VideoModelConfig> = {
   },
 };
 
-// Poll fal.ai queue: use response_url (blocks until ready or returns 202)
-async function pollFalResult(responseUrl: string, falKey: string, maxWaitMs = 300000): Promise<any> {
+// Poll fal.ai queue using status_url then fetch result from response_url
+async function pollFalResult(responseUrl: string, statusUrl: string | null, falKey: string, maxWaitMs = 300000): Promise<any> {
   const headers = { Authorization: `Key ${falKey}`, Accept: "application/json" };
   const start = Date.now();
+  const pollUrl = statusUrl || responseUrl;
 
   while (Date.now() - start < maxWaitMs) {
-    const resp = await fetch(responseUrl, { method: "GET", headers });
+    const resp = await fetch(pollUrl, { method: "GET", headers });
 
-    if (resp.status === 202) {
-      // Still processing
-      await resp.text(); // consume body
+    if (resp.status === 202 || resp.status === 400) {
+      // Still in progress (fal returns 400 with "still in progress" for some models)
+      const body = await resp.text();
+      if (resp.status === 400 && !body.includes("in progress")) {
+        throw new Error(`Poll error: ${resp.status} ${body}`);
+      }
+      console.log(`Still processing, waiting 5s...`);
       await new Promise(r => setTimeout(r, 5000));
       continue;
     }
