@@ -246,8 +246,8 @@ serve(async (req) => {
 
       // Check for NSFW
       if (resultData?.has_nsfw_concepts?.[0]) {
-        return new Response(JSON.stringify({ error: "Image was filtered due to content policy." }), {
-          status: 422,
+        return new Response(JSON.stringify({ error: "Image was filtered due to content policy.", filtered: true }), {
+          status: 200,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
