@@ -8,15 +8,17 @@ const corsHeaders = {
 
 const APIYI_BASE = "https://api.apiyi.com";
 const FAL_BASE = "https://fal.run";
+const RUNWARE_BASE = "https://api.runware.ai/v1";
 
 type ModelConfig = {
-  type: "gemini" | "fal";
+  type: "gemini" | "fal" | "runware";
   falModel?: string;
   apiModel?: string;
+  runwareModel?: string;
   supportsImageInput?: boolean;
   isMultiRef?: boolean;
-  requiresImage?: boolean; // editing-only models that need image_url
-  textFallback?: string; // fal model to fallback to when no reference images
+  requiresImage?: boolean;
+  textFallback?: string;
 };
 
 const MODEL_MAP: Record<string, ModelConfig> = {
@@ -24,22 +26,36 @@ const MODEL_MAP: Record<string, ModelConfig> = {
   "gemini-3.1-flash-image": { apiModel: "gemini-3.1-flash-image-preview", type: "gemini", supportsImageInput: true, isMultiRef: true },
   "gemini-3-pro-image": { apiModel: "gemini-3-pro-image-preview", type: "gemini", supportsImageInput: true, isMultiRef: true },
   "gemini-2.5-flash-image": { apiModel: "gemini-2.5-flash-image", type: "gemini", supportsImageInput: true, isMultiRef: true },
-  // Flux Kontext (via fal.ai) — editing models, require image_url
+
+  // Flux Kontext (via fal.ai) — editing models
   "flux-kontext-pro": { falModel: "fal-ai/flux-pro/kontext", type: "fal", supportsImageInput: true, requiresImage: true, textFallback: "fal-ai/flux-pro/v1.1" },
   "flux-kontext-max": { falModel: "fal-ai/flux-pro/kontext/max", type: "fal", supportsImageInput: true, requiresImage: true, textFallback: "fal-ai/flux-pro/v1.1" },
   "flux-kontext-multi": { falModel: "fal-ai/flux-pro/kontext/multi", type: "fal", supportsImageInput: true, isMultiRef: true, requiresImage: true, textFallback: "fal-ai/flux-pro/v1.1" },
-  // Flux 2 (via fal.ai) — editing models
+
+  // Flux 2 (via fal.ai)
   "flux-2-pro": { falModel: "fal-ai/flux-2-pro/edit", type: "fal", supportsImageInput: true, requiresImage: true, textFallback: "fal-ai/flux-pro/v1.1" },
   "flux-2-max": { falModel: "fal-ai/flux-2-max/edit", type: "fal", supportsImageInput: true, requiresImage: true, textFallback: "fal-ai/flux-pro/v1.1" },
   "flux-2-flex": { falModel: "fal-ai/flux-2-flex/edit", type: "fal", supportsImageInput: true, isMultiRef: true, requiresImage: true, textFallback: "fal-ai/flux-pro/v1.1" },
   "flux-2-dev": { falModel: "fal-ai/flux-2/edit", type: "fal", supportsImageInput: true, requiresImage: true, textFallback: "fal-ai/flux/dev" },
-  // Flux 1 (via fal.ai) — text-to-image models
+
+  // Flux 1 (via fal.ai) — text-to-image
   "flux-schnell": { falModel: "fal-ai/flux/schnell", type: "fal", supportsImageInput: false },
   "flux-dev": { falModel: "fal-ai/flux/dev", type: "fal", supportsImageInput: false },
   "flux-pro-v1.1": { falModel: "fal-ai/flux-pro/v1.1", type: "fal", supportsImageInput: false },
+
   // Other fal.ai models
   "recraft-v3": { falModel: "fal-ai/recraft-v3", type: "fal", supportsImageInput: false },
   "ideogram-v3": { falModel: "fal-ai/ideogram/v3", type: "fal", supportsImageInput: false },
+
+  // Runware Flux models (uncensored)
+  "rw-flux-1-dev": { runwareModel: "runware:100@1", type: "runware", supportsImageInput: true },
+  "rw-flux-1-schnell": { runwareModel: "runware:100@1", type: "runware", supportsImageInput: false },
+  "rw-flux-2-pro": { runwareModel: "bfl:5@1", type: "runware", supportsImageInput: true },
+  "rw-flux-2-flex": { runwareModel: "bfl:6@1", type: "runware", supportsImageInput: true },
+  "rw-flux-2-dev": { runwareModel: "runware:400@1", type: "runware", supportsImageInput: true },
+  "rw-flux-1.1-pro": { runwareModel: "bfl:2@1", type: "runware", supportsImageInput: false },
+  "rw-flux-1.1-pro-ultra": { runwareModel: "bfl:2@2", type: "runware", supportsImageInput: false },
+  "rw-flux-kontext-dev": { runwareModel: "runware:101@1", type: "runware", supportsImageInput: true },
 };
 
 const QUALITY_MAP: Record<string, string> = { "1K": "1K", "2K": "2K", "4K": "4K" };
@@ -71,7 +87,17 @@ function toBase64DataUri(bytes: Uint8Array, mimeType: string): string {
   return `data:${mimeType};base64,${bytesToBase64(bytes)}`;
 }
 
-// fal.run is synchronous — no polling needed
+// Map aspect ratio string to width/height for Runware
+function arToSize(ar: string, quality: string): { width: number; height: number } {
+  const base = quality === "4K" ? 2048 : quality === "1K" ? 512 : 1024;
+  const ratios: Record<string, [number, number]> = {
+    "1:1": [1, 1], "3:4": [3, 4], "4:3": [4, 3], "2:3": [2, 3], "3:2": [3, 2],
+    "9:16": [9, 16], "16:9": [16, 9], "5:4": [5, 4], "4:5": [4, 5], "21:9": [21, 9],
+  };
+  const [w, h] = ratios[ar] || [1, 1];
+  const max = Math.max(w, h);
+  return { width: Math.round((w / max) * base), height: Math.round((h / max) * base) };
+}
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -90,16 +116,14 @@ serve(async (req) => {
 
     if (!prompt.trim()) {
       return new Response(JSON.stringify({ error: "prompt is required" }), {
-        status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
     const modelConfig = MODEL_MAP[model];
     if (!modelConfig) {
       return new Response(JSON.stringify({ error: `Unknown model: ${model}` }), {
-        status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
@@ -112,13 +136,11 @@ serve(async (req) => {
       const APIYI_API_KEY = Deno.env.get("APIYI_API_KEY");
       if (!APIYI_API_KEY) {
         return new Response(JSON.stringify({ error: "APIYI_API_KEY not configured" }), {
-          status: 500,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
 
       const parts: any[] = [];
-
       for (const refImg of referenceImages) {
         const dataUri = await fetchImageAsDataUri(refImg);
         if (!dataUri) continue;
@@ -126,27 +148,18 @@ serve(async (req) => {
         if (!match) continue;
         parts.push({ inlineData: { mimeType: match[1], data: match[2] } });
       }
-
-      // Prompt passed exactly as user typed
       parts.push({ text: prompt });
 
       const imageSize = QUALITY_MAP[quality] || "2K";
       const endpoint = `${APIYI_BASE}/v1beta/models/${modelConfig.apiModel}:generateContent`;
-
       console.log(`Calling Gemini: ${endpoint}, ar=${ar}, size=${imageSize}, refs=${referenceImages.length}`);
 
       const response = await fetch(endpoint, {
         method: "POST",
-        headers: {
-          Authorization: `Bearer ${APIYI_API_KEY}`,
-          "Content-Type": "application/json",
-        },
+        headers: { Authorization: `Bearer ${APIYI_API_KEY}`, "Content-Type": "application/json" },
         body: JSON.stringify({
           contents: [{ parts }],
-          generationConfig: {
-            responseModalities: ["IMAGE"],
-            imageConfig: { aspectRatio: ar, imageSize },
-          },
+          generationConfig: { responseModalities: ["IMAGE"], imageConfig: { aspectRatio: ar, imageSize } },
         }),
       });
 
@@ -154,8 +167,7 @@ serve(async (req) => {
         const errText = await response.text();
         console.error("Gemini error:", response.status, errText);
         return new Response(JSON.stringify({ error: `API error: ${response.status}`, details: errText }), {
-          status: 502,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
 
@@ -168,11 +180,9 @@ serve(async (req) => {
         imageBase64 = `data:${imgPart.inlineData.mimeType || "image/png"};base64,${imgPart.inlineData.data}`;
       } else {
         const errorMsg = candidate?.finishMessage || "Image generation failed. Try rephrasing your prompt.";
-        const isFiltered = candidate?.finishReason === 'SAFETY' || candidate?.finishReason === 'PROHIBITED_CONTENT';
-        console.error("Gemini no image:", candidate?.finishReason, errorMsg);
+        const isFiltered = candidate?.finishReason === "SAFETY" || candidate?.finishReason === "PROHIBITED_CONTENT";
         return new Response(JSON.stringify({ error: errorMsg, filtered: isFiltered }), {
-          status: 200,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
     }
@@ -182,107 +192,149 @@ serve(async (req) => {
       const FAL_KEY = Deno.env.get("FAL_KEY");
       if (!FAL_KEY) {
         return new Response(JSON.stringify({ error: "FAL_KEY not configured" }), {
-          status: 500,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
 
-      // If model requires image_url but none provided, fallback to text-to-image model
       let falModel = modelConfig.falModel!;
-      if (modelConfig.requiresImage && referenceImages.length === 0) {
-        if (modelConfig.textFallback) {
-          falModel = modelConfig.textFallback;
-          console.log(`No reference images for editing model, falling back to: ${falModel}`);
-        }
+      if (modelConfig.requiresImage && referenceImages.length === 0 && modelConfig.textFallback) {
+        falModel = modelConfig.textFallback;
+        console.log(`No reference images for editing model, falling back to: ${falModel}`);
       }
 
-      // Build request body — prompt is ALWAYS raw, never modified
       const reqBody: Record<string, unknown> = {
-        prompt,
-        num_images: 1,
-        output_format: "png",
-        safety_tolerance: "6",
+        prompt, num_images: 1, output_format: "png", safety_tolerance: "6",
       };
+      if (ar !== "Auto") reqBody.aspect_ratio = ar;
 
-      // Add aspect ratio
-      if (ar !== "Auto") {
-        reqBody.aspect_ratio = ar;
-      }
-
-      // Add reference images if model supports them and images are provided
       if (modelConfig.supportsImageInput && referenceImages.length > 0) {
         if (modelConfig.isMultiRef && referenceImages.length > 1) {
           reqBody.image_url = referenceImages;
-          console.log(`Fal multi-ref: passing ${referenceImages.length} images`);
         } else {
           reqBody.image_url = referenceImages[0];
-          console.log(`Fal single-ref: passing 1 image`);
         }
       }
 
       const endpoint = `${FAL_BASE}/${falModel}`;
-      console.log(`Calling fal.ai: ${endpoint}, ar=${ar}, refs=${referenceImages.length}, prompt="${prompt.substring(0, 80)}..."`);
+      console.log(`Calling fal.ai: ${endpoint}, ar=${ar}, refs=${referenceImages.length}`);
 
-      // Submit to fal.ai queue
       const submitResp = await fetch(endpoint, {
         method: "POST",
-        headers: {
-          Authorization: `Key ${FAL_KEY}`,
-          "Content-Type": "application/json",
-        },
+        headers: { Authorization: `Key ${FAL_KEY}`, "Content-Type": "application/json" },
         body: JSON.stringify(reqBody),
       });
 
       if (!submitResp.ok) {
         const errText = await submitResp.text();
-        console.error("Fal submit error:", submitResp.status, errText);
+        console.error("Fal error:", submitResp.status, errText);
         return new Response(JSON.stringify({ error: `Fal API error: ${submitResp.status}`, details: errText }), {
-          status: 502,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
 
       const resultData = await submitResp.json();
-      console.log("Fal result keys:", Object.keys(resultData || {}));
 
-      // Check for NSFW
       if (resultData?.has_nsfw_concepts?.[0]) {
         return new Response(JSON.stringify({ error: "Image was filtered due to content policy.", filtered: true }), {
-          status: 200,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
 
-      // Extract image from result
       const outputImage = resultData?.images?.[0];
       if (outputImage?.url) {
-        // Proxy the image to base64 to avoid CORS
         const imgResp = await fetch(outputImage.url);
         if (imgResp.ok) {
           const buf = await imgResp.arrayBuffer();
-          const bytes = new Uint8Array(buf);
-          imageBase64 = toBase64DataUri(bytes, imgResp.headers.get("content-type") || "image/png");
+          imageBase64 = toBase64DataUri(new Uint8Array(buf), imgResp.headers.get("content-type") || "image/png");
         } else {
           imageUrl = outputImage.url;
         }
       } else {
-        console.error("No image in fal result:", JSON.stringify(resultData).substring(0, 500));
         return new Response(JSON.stringify({ error: "No image in fal.ai response" }), {
-          status: 502,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+    }
+
+    // ========== RUNWARE MODELS ==========
+    if (modelConfig.type === "runware") {
+      const RUNWARE_API_KEY = Deno.env.get("RUNWARE_API_KEY");
+      if (!RUNWARE_API_KEY) {
+        return new Response(JSON.stringify({ error: "RUNWARE_API_KEY not configured" }), {
+          status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      const size = arToSize(ar, quality);
+      const taskUUID = crypto.randomUUID();
+
+      const task: Record<string, unknown> = {
+        taskType: "imageInference",
+        taskUUID,
+        model: modelConfig.runwareModel,
+        positivePrompt: prompt,
+        width: size.width,
+        height: size.height,
+        numberResults: 1,
+        outputFormat: "PNG",
+        outputType: "URL",
+        safety: { checkContent: false, mode: "none" },
+      };
+
+      // Add seed image if reference images provided and model supports it
+      if (modelConfig.supportsImageInput && referenceImages.length > 0) {
+        task.inputs = { seedImage: referenceImages[0] };
+        task.strength = 0.75;
+      }
+
+      console.log(`Calling Runware: model=${modelConfig.runwareModel}, size=${size.width}x${size.height}, refs=${referenceImages.length}`);
+
+      const response = await fetch(RUNWARE_BASE, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${RUNWARE_API_KEY}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify([task]),
+      });
+
+      if (!response.ok) {
+        const errText = await response.text();
+        console.error("Runware error:", response.status, errText);
+        return new Response(JSON.stringify({ error: `Runware API error: ${response.status}`, details: errText }), {
+          status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      const resData = await response.json();
+      console.log("Runware response keys:", JSON.stringify(resData).substring(0, 500));
+
+      const imgResult = resData?.data?.find((d: any) => d.taskType === "imageInference");
+      if (imgResult?.imageURL) {
+        // Proxy image to base64
+        const imgResp = await fetch(imgResult.imageURL);
+        if (imgResp.ok) {
+          const buf = await imgResp.arrayBuffer();
+          imageBase64 = toBase64DataUri(new Uint8Array(buf), imgResp.headers.get("content-type") || "image/png");
+        } else {
+          imageUrl = imgResult.imageURL;
+        }
+      } else {
+        const errMsg = resData?.error || "No image in Runware response";
+        console.error("Runware no image:", JSON.stringify(resData).substring(0, 500));
+        return new Response(JSON.stringify({ error: errMsg }), {
+          status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
     }
 
     return new Response(JSON.stringify({ imageUrl, imageBase64 }), {
-      status: 200,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
+      status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (e) {
     console.error("generate-image error:", e);
     return new Response(JSON.stringify({ error: e instanceof Error ? e.message : "Unknown error" }), {
-      status: 500,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
+      status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
 });
