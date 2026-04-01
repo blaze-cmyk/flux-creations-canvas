@@ -213,7 +213,7 @@ function ImageCard({ image }: {
           title="Delete"
         >
           <Trash2 className="w-3.5 h-3.5" />
-        </div>
+        </button>
       )}
 
       {/* Bottom info on hover */}
