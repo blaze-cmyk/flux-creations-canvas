@@ -274,6 +274,9 @@ serve(async (req) => {
       }
 
       const input: Record<string, unknown> = {};
+      const durNum = parseInt(duration) || 5;
+      const durFormat = config.durationFormat || "kling-str";
+      const imgField = config.imageField || "image_url";
 
       if (isMotionControl) {
         const motionVideo = referenceImages[0];
@@ -289,15 +292,43 @@ serve(async (req) => {
         input.keep_original_sound = body?.keepOriginalSound !== false;
         if (prompt) input.prompt = prompt;
       } else {
-        const durNum = parseInt(duration) || 5;
-        const falDuration = durNum <= 4 ? "4s" : durNum <= 6 ? "6s" : "8s";
         input.prompt = prompt;
-        input.duration = falDuration;
-        input.aspect_ratio = aspectRatio;
-        input.negative_prompt = "blur, distort, and low quality";
+
+        // Duration: per-model format
+        if (durFormat === "veo-str") {
+          input.duration = durNum <= 4 ? "4s" : durNum <= 6 ? "6s" : "8s";
+        } else if (durFormat === "pixverse-int") {
+          input.duration = Math.max(1, Math.min(15, durNum));
+        } else if (durFormat === "ltx-frames") {
+          // LTX uses num_frames at 25fps; 5s=121, 10s=241
+          input.num_frames = durNum <= 5 ? 121 : 241;
+          // LTX uses video_size enum instead of aspect_ratio
+          input.video_size = aspectRatio === "9:16" ? "portrait_16_9" : aspectRatio === "1:1" ? "square" : "landscape_16_9";
+        } else if (durFormat === "minimax-none") {
+          // MiniMax: no duration or aspect_ratio params, only prompt + prompt_optimizer
+          input.prompt_optimizer = true;
+        } else {
+          // kling-str: plain string number
+          input.duration = String(durNum);
+        }
+
+        // Aspect ratio (skip for LTX and MiniMax which don't support it)
+        if (durFormat !== "ltx-frames" && durFormat !== "minimax-none") {
+          input.aspect_ratio = aspectRatio;
+        }
+
+        // Negative prompt (skip for MiniMax and LTX)
+        if (durFormat !== "minimax-none" && durFormat !== "ltx-frames") {
+          input.negative_prompt = "blur, distort, and low quality";
+        }
+
         if (isImageMode) {
-          input.image_url = referenceImages[0];
-          if (referenceImages.length > 1) input.tail_image_url = referenceImages[1];
+          input[imgField] = referenceImages[0];
+          if (referenceImages.length > 1) {
+            // Kling V3/O3 use end_image_url, others use tail_image_url
+            const endField = imgField === "start_image_url" ? "end_image_url" : "tail_image_url";
+            input[endField] = referenceImages[1];
+          }
         }
       }
 
