@@ -105,7 +105,8 @@ async function callGenerateAPI(params: {
   }
 
   if (data?.error) {
-    return { error: data.error };
+    const isNsfw = data.filtered || data.error.includes('policy') || data.error.includes('filtered') || data.error.includes('Prohibited');
+    return { error: data.error, nsfw: isNsfw };
   }
 
   return { imageUrl: data?.imageUrl, imageBase64: data?.imageBase64 };
