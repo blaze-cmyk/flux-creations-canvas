@@ -379,9 +379,10 @@ serve(async (req) => {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (e) {
+    const { message, status } = normalizeClientFacingError(e);
     console.error("Video generation error:", e);
-    return new Response(JSON.stringify({ error: e.message || "Internal server error" }), {
-      status: 500,
+    return new Response(JSON.stringify({ error: message }), {
+      status,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
