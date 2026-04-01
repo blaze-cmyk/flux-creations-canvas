@@ -4,6 +4,7 @@ import { MotionControlPanel } from './MotionControlPanel';
 import { EditVideoPanel } from './EditVideoPanel';
 import { CreateVideoPanel } from './CreateVideoPanel';
 import { useRef, useState, useEffect, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 
 export function VideoSidebar() {
   const {
