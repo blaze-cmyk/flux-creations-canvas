@@ -19,16 +19,15 @@ export function MotionControlPanel({
   const [advancedOpen, setAdvancedOpen] = useState(false);
   const [motionPrompt, setMotionPrompt] = useState('');
 
-  const uploadFile = (onLoad: (result: string) => void) => {
+  const uploadFileAt = (targetIdx: number, accept: string) => {
     const input = document.createElement('input');
     input.type = 'file';
-    input.accept = 'image/*,video/*';
-    input.onchange = (e) => {
+    input.accept = accept;
+    input.onchange = async (e) => {
       const f = (e.target as HTMLInputElement).files?.[0];
       if (f) {
-        const reader = new FileReader();
-        reader.onload = () => onLoad(reader.result as string);
-        reader.readAsDataURL(f);
+        const url = await readFileAsDataURL(f);
+        setReferenceImageAt(targetIdx, url);
       }
     };
     input.click();
