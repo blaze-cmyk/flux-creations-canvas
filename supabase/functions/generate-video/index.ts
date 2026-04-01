@@ -275,8 +275,10 @@ serve(async (req) => {
         input.keep_original_sound = body?.keepOriginalSound !== false;
         if (prompt) input.prompt = prompt;
       } else {
+        const durNum = parseInt(duration) || 5;
+        const falDuration = durNum <= 4 ? "4s" : durNum <= 6 ? "6s" : "8s";
         input.prompt = prompt;
-        input.duration = duration;
+        input.duration = falDuration;
         input.aspect_ratio = aspectRatio;
         input.negative_prompt = "blur, distort, and low quality";
         if (isImageMode) {
