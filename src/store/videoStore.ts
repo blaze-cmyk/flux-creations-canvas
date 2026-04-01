@@ -78,7 +78,36 @@ type VideoState = {
   generate: () => void;
   retryVideo: (id: string) => void;
   deleteVideo: (id: string) => void;
+  loadHistory: () => Promise<void>;
+  _historyLoaded: boolean;
 };
+
+async function saveVideoToDb(video: GeneratedVideo) {
+  try {
+    await supabase.from('video_generations').upsert({
+      id: video.id,
+      prompt: video.prompt,
+      model: video.model,
+      mode: video.mode,
+      aspect_ratio: video.aspectRatio,
+      duration: video.duration,
+      status: video.status === 'generating' ? 'processing' : video.status,
+      video_url: video.videoUrl || null,
+      thumbnail_url: video.thumbnailUrl || null,
+      reference_images: video.referenceImages.filter(Boolean),
+      error: video.error || null,
+    }, { onConflict: 'id' });
+  } catch (e) {
+    console.error('Failed to save video to DB:', e);
+  }
+}
+
+function updateVideoAndSave(videoId: string, updates: Partial<GeneratedVideo>, get: () => VideoState, set: (s: Partial<VideoState>) => void) {
+  const videos = get().videos.map(v => v.id === videoId ? { ...v, ...updates } : v);
+  set({ videos });
+  const updated = videos.find(v => v.id === videoId);
+  if (updated) saveVideoToDb(updated);
+}
 
 async function callGenerate(payload: Record<string, unknown>, videoId: string, get: () => VideoState, set: (s: Partial<VideoState>) => void) {
   const refs = payload.referenceImages as string[] | undefined;
