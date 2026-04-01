@@ -34,18 +34,6 @@ export function PromptBar() {
 
   return (
     <div className="shrink-0 border-t border-border bg-popover">
-      {/* Boost banner */}
-      <div className="flex items-center justify-between px-4 py-1.5 bg-muted/30 text-xs">
-        <div className="flex items-center gap-2">
-          <span className="bg-primary text-primary-foreground px-1.5 py-0.5 rounded text-[10px] font-bold">NEW</span>
-          <span className="text-destructive font-medium">🔥 42% OFF</span>
-          <span className="text-muted-foreground">More generations with <span className="text-foreground font-medium">Boost Credits</span> Run up to 24 generations in parallel</span>
-        </div>
-        <button className="flex items-center gap-1 bg-muted text-foreground px-3 py-1 rounded-full text-xs hover:bg-muted/80 transition-colors">
-          <Sparkles className="w-3 h-3" />
-          Boost speed
-        </button>
-      </div>
 
       {/* Main prompt area */}
       <div className="px-4 py-3">
