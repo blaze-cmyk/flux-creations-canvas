@@ -8,25 +8,35 @@ interface MotionControlPanelProps {
   setReferenceImageAt: (idx: number, url: string) => void;
   removeReferenceImage: (index: number) => void;
   fileInputRef: RefObject<HTMLInputElement>;
+  motionPrompt: string;
+  setMotionPrompt: (value: string) => void;
+  characterOrientation: 'video' | 'image';
+  setCharacterOrientation: (value: 'video' | 'image') => void;
 }
 
 export function MotionControlPanel({
-  referenceImages, addReferenceImage, setReferenceImageAt, removeReferenceImage, fileInputRef,
+  referenceImages,
+  addReferenceImage,
+  setReferenceImageAt,
+  removeReferenceImage,
+  fileInputRef,
+  motionPrompt,
+  setMotionPrompt,
+  characterOrientation,
+  setCharacterOrientation,
 }: MotionControlPanelProps) {
   const [sceneControl, setSceneControl] = useState(true);
   const [sceneSource, setSceneSource] = useState<'video' | 'image'>('image');
-  const [orientation, setOrientation] = useState<'video' | 'image'>('video');
   const [advancedOpen, setAdvancedOpen] = useState(false);
-  const [motionPrompt, setMotionPrompt] = useState('');
 
   const uploadFileAt = (targetIdx: number, accept: string) => {
     const input = document.createElement('input');
     input.type = 'file';
     input.accept = accept;
     input.onchange = async (e) => {
-      const f = (e.target as HTMLInputElement).files?.[0];
-      if (f) {
-        const url = await readFileAsDataURL(f);
+      const file = (e.target as HTMLInputElement).files?.[0];
+      if (file) {
+        const url = await readFileAsDataURL(file);
         setReferenceImageAt(targetIdx, url);
       }
     };
@@ -34,16 +44,21 @@ export function MotionControlPanel({
   };
 
   const handleMotionDrop = async (files: File[]) => {
-    if (files[0]) { const url = await readFileAsDataURL(files[0]); setReferenceImageAt(0, url); }
+    if (files[0]) {
+      const url = await readFileAsDataURL(files[0]);
+      setReferenceImageAt(0, url);
+    }
   };
 
   const handleCharacterDrop = async (files: File[]) => {
-    if (files[0]) { const url = await readFileAsDataURL(files[0]); setReferenceImageAt(1, url); }
+    if (files[0]) {
+      const url = await readFileAsDataURL(files[0]);
+      setReferenceImageAt(1, url);
+    }
   };
 
   return (
     <div className="space-y-3">
-      {/* Hero banner */}
       <div className="relative rounded-xl overflow-hidden bg-gradient-to-br from-violet-900/40 to-card h-28 flex flex-col justify-between p-3">
         <div className="flex justify-end">
           <span className="text-[9px] bg-muted/60 backdrop-blur px-2 py-0.5 rounded-md text-muted-foreground flex items-center gap-1">
@@ -56,7 +71,6 @@ export function MotionControlPanel({
         </div>
       </div>
 
-      {/* Motion video + Character upload with drag & drop */}
       <div className="flex gap-2">
         <DropZone onFiles={handleMotionDrop} accept="image/*,video/*" className="flex-1">
           {referenceImages[0] ? (
@@ -64,7 +78,7 @@ export function MotionControlPanel({
               {referenceImages[0].startsWith('data:video') || referenceImages[0].includes('.mp4') || referenceImages[0].includes('.webm') || referenceImages[0].includes('.mov') ? (
                 <video src={referenceImages[0]} muted playsInline autoPlay loop className="w-full h-full object-cover" />
               ) : (
-                <img src={referenceImages[0]} alt="" className="w-full h-full object-cover" />
+                <img src={referenceImages[0]} alt="Motion reference" className="w-full h-full object-cover" />
               )}
               <button
                 onClick={() => removeReferenceImage(0)}
@@ -89,7 +103,7 @@ export function MotionControlPanel({
         <DropZone onFiles={handleCharacterDrop} accept="image/*" className="flex-1">
           {referenceImages[1] ? (
             <div className="relative rounded-xl overflow-hidden border border-border aspect-[3/4]">
-              <img src={referenceImages[1]} alt="" className="w-full h-full object-cover" />
+              <img src={referenceImages[1]} alt="Character reference" className="w-full h-full object-cover" />
               <button
                 onClick={() => removeReferenceImage(1)}
                 className="absolute top-1 right-1 w-5 h-5 rounded-full bg-black/60 text-white text-xs flex items-center justify-center"
@@ -108,7 +122,6 @@ export function MotionControlPanel({
         </DropZone>
       </div>
 
-      {/* Scene control mode */}
       <div className="bg-card border border-border rounded-xl px-3 py-2.5 space-y-2">
         <div className="flex items-center justify-between">
           <span className="text-xs text-foreground">Scene control mode</span>
@@ -143,7 +156,6 @@ export function MotionControlPanel({
         )}
       </div>
 
-      {/* Advanced settings */}
       <div className="bg-card border border-border rounded-xl overflow-hidden">
         <button
           onClick={() => setAdvancedOpen(!advancedOpen)}
@@ -171,20 +183,20 @@ export function MotionControlPanel({
               <span className="text-[11px] text-muted-foreground">Orientation</span>
               <div className="flex gap-1 bg-muted rounded-lg p-0.5">
                 <button
-                  onClick={() => setOrientation('video')}
-                  className={`flex-1 flex items-center justify-center gap-1 text-xs py-1.5 rounded-md transition-colors ${orientation === 'video' ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground'}`}
+                  onClick={() => setCharacterOrientation('video')}
+                  className={`flex-1 flex items-center justify-center gap-1 text-xs py-1.5 rounded-md transition-colors ${characterOrientation === 'video' ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground'}`}
                 >
                   <Video className="w-3 h-3" /> Video
                 </button>
                 <button
-                  onClick={() => setOrientation('image')}
-                  className={`flex-1 flex items-center justify-center gap-1 text-xs py-1.5 rounded-md transition-colors ${orientation === 'image' ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground'}`}
+                  onClick={() => setCharacterOrientation('image')}
+                  className={`flex-1 flex items-center justify-center gap-1 text-xs py-1.5 rounded-md transition-colors ${characterOrientation === 'image' ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground'}`}
                 >
                   <ImageIcon className="w-3 h-3" /> Image
                 </button>
               </div>
               <p className="text-[10px] text-muted-foreground leading-snug">
-                When Character Orientation matches the video, complex motions perform better; when it matches the Image, camera movements are better supported.
+                When Character Orientation matches the video, complex motions perform better; when it matches the image, camera moves stay more stable.
               </p>
             </div>
           </div>
