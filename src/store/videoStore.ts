@@ -63,6 +63,7 @@ type VideoState = {
   selectedVideoId: string | null;
   setPrompt: (p: string) => void;
   addReferenceImage: (img: string) => void;
+  setReferenceImageAt: (idx: number, img: string) => void;
   removeReferenceImage: (idx: number) => void;
   setMotionVideo: (v: string | null) => void;
   setModel: (m: string) => void;
