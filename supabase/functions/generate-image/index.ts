@@ -215,11 +215,17 @@ serve(async (req) => {
         });
       }
 
-      const hasReferenceInput = modelConfig.supportsImageInput && referenceImages.length > 0;
+      const routedReferenceImages = model === "flux-uncensored-v2"
+        ? referenceImages.slice(0, 1)
+        : referenceImages;
+      const hasReferenceInput = modelConfig.supportsImageInput && routedReferenceImages.length > 0;
+      if (model === "flux-uncensored-v2" && referenceImages.length > 1) {
+        console.log(`Flux Uncensored V2 supports a single fal.ai reference image; using the first of ${referenceImages.length}.`);
+      }
       let falModel = hasReferenceInput && modelConfig.falImageModel
         ? modelConfig.falImageModel
         : modelConfig.falModel!;
-      if (modelConfig.requiresImage && referenceImages.length === 0 && modelConfig.textFallback) {
+      if (modelConfig.requiresImage && routedReferenceImages.length === 0 && modelConfig.textFallback) {
         falModel = modelConfig.textFallback;
         console.log(`No reference images for editing model, falling back to: ${falModel}`);
       }
@@ -234,27 +240,28 @@ serve(async (req) => {
       reqBody.image_size = imageSize;
       reqBody.num_inference_steps = 28;
       reqBody.guidance_scale = 3.5;
+      if (model === "flux-uncensored-v2") reqBody.acceleration = "regular";
 
       // Add LoRA if configured + disable safety checker for LoRA models
       if (modelConfig.lora) {
         reqBody.loras = [{ path: modelConfig.lora, scale: 1.0 }];
         reqBody.enable_safety_checker = false;
       }
-      if (ar !== "Auto") reqBody.aspect_ratio = ar;
+      if (model !== "flux-uncensored-v2" && ar !== "Auto") reqBody.aspect_ratio = ar;
 
       if (hasReferenceInput) {
         if (falModel.includes("image-to-image")) {
-          reqBody.image_url = referenceImages[0];
+          reqBody.image_url = routedReferenceImages[0];
           reqBody.strength = 0.85;
-        } else if (modelConfig.isMultiRef && referenceImages.length > 1) {
-          reqBody.image_urls = referenceImages;
+        } else if (modelConfig.isMultiRef && routedReferenceImages.length > 1) {
+          reqBody.image_urls = routedReferenceImages;
         } else {
-          reqBody.image_url = referenceImages[0];
+          reqBody.image_url = routedReferenceImages[0];
         }
       }
 
       const endpoint = `${FAL_BASE}/${falModel}`;
-      console.log(`Calling fal.ai: ${endpoint}, ar=${ar}, refs=${referenceImages.length}`);
+      console.log(`Calling fal.ai: ${endpoint}, ar=${ar}, refs=${routedReferenceImages.length}`);
 
       const submitResp = await fetch(endpoint, {
         method: "POST",
