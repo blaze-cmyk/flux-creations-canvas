@@ -98,6 +98,7 @@ export function VideoSidebar() {
         {/* Model selector */}
         <div className="relative">
           <button
+            ref={modelBtnRef}
             onClick={() => setModelOpen(!modelOpen)}
             className="w-full flex items-center justify-between bg-card border border-border rounded-xl px-3 py-2.5 hover:bg-muted transition-colors"
           >
@@ -115,6 +116,7 @@ export function VideoSidebar() {
               setSearch={setModelSearch}
               onClose={() => setModelOpen(false)}
               mode={mode}
+              anchorRef={modelBtnRef}
             />
           )}
         </div>
