@@ -182,7 +182,7 @@ function VideoModelDropdown({ model, setModel, search, setSearch, onClose, mode 
   }, [onClose]);
 
   const filtered = VIDEO_MODELS
-    .filter(m => m.modes.includes(mode as any))
+    .filter(m => (m.modes as readonly string[]).includes(mode))
     .filter(m => m.name.toLowerCase().includes(search.toLowerCase()));
   const featured = filtered.filter(m => m.featured);
   const all = filtered.filter(m => !m.featured);
