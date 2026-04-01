@@ -192,18 +192,31 @@ serve(async (req) => {
         });
       }
 
-      const reqBody: Record<string, unknown> = { prompt };
+      const reqBody: Record<string, unknown> = {};
 
-      // Duration & aspect ratio
-      reqBody.duration = duration;
-      reqBody.aspect_ratio = aspectRatio;
-      reqBody.negative_prompt = "blur, distort, and low quality";
+      if (isMotionControl) {
+        // Motion control: image_url (character), video_url (motion reference), optional prompt
+        if (referenceImages.length > 0) reqBody.image_url = referenceImages[0];
+        if (referenceImages.length > 1) reqBody.video_url = referenceImages[1];
+        if (prompt) reqBody.prompt = prompt;
+        reqBody.duration = duration;
+        reqBody.aspect_ratio = aspectRatio;
+        // character_orientation and keep_original_sound
+        const charOrientation = body?.characterOrientation || "video";
+        reqBody.character_orientation = charOrientation;
+        reqBody.keep_original_sound = body?.keepOriginalSound !== false;
+      } else {
+        reqBody.prompt = prompt;
+        reqBody.duration = duration;
+        reqBody.aspect_ratio = aspectRatio;
+        reqBody.negative_prompt = "blur, distort, and low quality";
 
-      // Image input
-      if (isImageMode && referenceImages.length > 0) {
-        reqBody.image_url = referenceImages[0];
-        if (referenceImages.length > 1) {
-          reqBody.tail_image_url = referenceImages[1];
+        // Image input
+        if (isImageMode && referenceImages.length > 0) {
+          reqBody.image_url = referenceImages[0];
+          if (referenceImages.length > 1) {
+            reqBody.tail_image_url = referenceImages[1];
+          }
         }
       }
 
