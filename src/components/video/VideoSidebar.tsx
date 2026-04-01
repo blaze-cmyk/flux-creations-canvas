@@ -52,7 +52,7 @@ export function VideoSidebar() {
         ))}
       </div>
 
-      <div className="flex-1 overflow-y-auto px-3 pb-3 space-y-3">
+      <div className="flex-1 overflow-y-auto px-3 pb-3 space-y-3 scrollbar-hide" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
         {/* === CREATE VIDEO === */}
         {mode === 'text-to-video' && (
           <>
