@@ -241,11 +241,11 @@ serve(async (req) => {
         });
       }
 
-      const routedReferenceImages = model === "flux-uncensored-v2"
+      const routedReferenceImages = activeModel === "flux-uncensored-v2"
         ? referenceImages.slice(0, 1)
         : referenceImages;
       const hasReferenceInput = modelConfig.supportsImageInput && routedReferenceImages.length > 0;
-      if (model === "flux-uncensored-v2" && referenceImages.length > 1) {
+      if (activeModel === "flux-uncensored-v2" && referenceImages.length > 1) {
         console.log(`Flux Uncensored V2 supports a single fal.ai reference image; using the first of ${referenceImages.length}.`);
       }
       let falModel = hasReferenceInput && modelConfig.falImageModel
