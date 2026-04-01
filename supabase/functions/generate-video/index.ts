@@ -275,8 +275,10 @@ serve(async (req) => {
         input.keep_original_sound = body?.keepOriginalSound !== false;
         if (prompt) input.prompt = prompt;
       } else {
+        const durNum = parseInt(duration) || 5;
+        const falDuration = durNum <= 4 ? "4s" : durNum <= 6 ? "6s" : "8s";
         input.prompt = prompt;
-        input.duration = duration;
+        input.duration = falDuration;
         input.aspect_ratio = aspectRatio;
         input.negative_prompt = "blur, distort, and low quality";
         if (isImageMode) {
@@ -332,18 +334,22 @@ serve(async (req) => {
         });
       }
 
+      const { width: rwWidth, height: rwHeight } = aspectRatio === "9:16" ? { width: 720, height: 1280 } : aspectRatio === "1:1" ? { width: 1024, height: 1024 } : { width: 1280, height: 720 };
+
       const task: Record<string, unknown> = {
         taskType: "videoInference",
         taskUUID: crypto.randomUUID(),
         model: config.runwareModel,
         positivePrompt: prompt,
-        duration: parseInt(duration),
-        aspectRatio,
+        duration: parseInt(duration) || 5,
+        width: rwWidth,
+        height: rwHeight,
         outputFormat: "MP4",
+        outputType: "URL",
       };
 
-      if (referenceImages.length > 0 && (mode === "image-to-video" || mode === "motion-control")) {
-        task.seedImage = referenceImages[0];
+      if (referenceImages.length > 0 && (mode === "image-to-video")) {
+        task.frameImages = referenceImages.map((url: string) => ({ imageURL: url }));
       }
 
       console.log(`Calling Runware video: model=${config.runwareModel}`);
@@ -363,12 +369,40 @@ serve(async (req) => {
       }
 
       const resData = await response.json();
-      const videoResult = resData?.data?.find((d: any) => d.taskType === "videoInference");
+      let videoResult = resData?.data?.find((d: any) => d.taskType === "videoInference");
       videoUrl = videoResult?.videoURL || videoResult?.outputURL;
 
+      // Runware is async — if no videoURL yet, poll the task
+      if (!videoUrl && videoResult?.taskUUID) {
+        const taskUUID = videoResult.taskUUID;
+        console.log(`Runware task queued: ${taskUUID}, polling...`);
+        const start = Date.now();
+        const maxWaitMs = 300000;
+        while (Date.now() - start < maxWaitMs) {
+          await new Promise(r => setTimeout(r, 5000));
+          const pollResp = await fetch(RUNWARE_BASE, {
+            method: "POST",
+            headers: { Authorization: `Bearer ${RUNWARE_API_KEY}`, "Content-Type": "application/json" },
+            body: JSON.stringify([{ taskType: "videoInference", taskUUID }]),
+          });
+          if (pollResp.ok) {
+            const pollData = await pollResp.json();
+            const result = pollData?.data?.find((d: any) => d.videoURL);
+            if (result?.videoURL) {
+              videoUrl = result.videoURL;
+              break;
+            }
+            console.log(`Runware still processing ${taskUUID}...`);
+          } else {
+            const errText = await pollResp.text();
+            console.log(`Runware poll ${pollResp.status}: ${errText.substring(0, 200)}`);
+          }
+        }
+      }
+
       if (!videoUrl) {
-        console.log("Runware response:", JSON.stringify(resData).substring(0, 500));
-        return new Response(JSON.stringify({ error: "No video in Runware response" }), {
+        console.log("Runware final response:", JSON.stringify(resData).substring(0, 500));
+        return new Response(JSON.stringify({ error: "No video in Runware response (timed out)" }), {
           status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
