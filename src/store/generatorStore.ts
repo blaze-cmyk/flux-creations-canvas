@@ -150,23 +150,29 @@ async function saveToDb(img: GeneratedImage, storageUrl: string) {
 }
 
 export const useGeneratorStore = create<GeneratorState>()((set, get) => ({
-  prompt: '',
-  referenceImages: [],
-  model: 'gemini-3.1-flash-image',
-  quality: '2K',
-  aspectRatio: '1:1',
+  prompt: localStorage.getItem('gen-last-prompt') || '',
+  referenceImages: JSON.parse(localStorage.getItem('gen-last-refs') || '[]'),
+  model: (localStorage.getItem('gen-last-model') as string) || 'gemini-3.1-flash-image',
+  quality: (localStorage.getItem('gen-last-quality') as string) || '2K',
+  aspectRatio: (localStorage.getItem('gen-last-ar') as string) || '1:1',
   quantity: 4,
   images: [],
   selectedImageId: null,
   historyLoaded: false,
 
-  setPrompt: (prompt) => set({ prompt }),
+  setPrompt: (prompt) => { set({ prompt }); localStorage.setItem('gen-last-prompt', prompt); },
   addReferenceImage: (img) => {
     const refs = get().referenceImages;
-    if (refs.length < 5) set({ referenceImages: [...refs, img] });
+    if (refs.length < 5) {
+      const next = [...refs, img];
+      set({ referenceImages: next });
+      localStorage.setItem('gen-last-refs', JSON.stringify(next));
+    }
   },
   removeReferenceImage: (index) => {
-    set({ referenceImages: get().referenceImages.filter((_, i) => i !== index) });
+    const next = get().referenceImages.filter((_, i) => i !== index);
+    set({ referenceImages: next });
+    localStorage.setItem('gen-last-refs', JSON.stringify(next));
   },
   reorderReferenceImages: (fromIndex, toIndex) => {
     const imgs = [...get().referenceImages];
@@ -174,9 +180,9 @@ export const useGeneratorStore = create<GeneratorState>()((set, get) => ({
     imgs.splice(toIndex, 0, moved);
     set({ referenceImages: imgs });
   },
-  setModel: (model) => set({ model }),
-  setQuality: (quality) => set({ quality }),
-  setAspectRatio: (aspectRatio) => set({ aspectRatio }),
+  setModel: (model) => { set({ model }); localStorage.setItem('gen-last-model', model); },
+  setQuality: (quality) => { set({ quality }); localStorage.setItem('gen-last-quality', quality); },
+  setAspectRatio: (aspectRatio) => { set({ aspectRatio }); localStorage.setItem('gen-last-ar', aspectRatio); },
   setQuantity: (qty) => set({ quantity: Math.max(1, Math.min(4, qty)) }),
   setSelectedImageId: (id) => set({ selectedImageId: id }),
 
