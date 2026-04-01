@@ -97,7 +97,7 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
   paletteOpen: false,
   projectName: 'Dynamic Video Creation Studio',
 
-  onNodesChange: (changes) => set({ nodes: applyNodeChanges(changes, get().nodes) }),
+  onNodesChange: (changes) => set({ nodes: applyNodeChanges(changes, get().nodes) as Node<SpaceNodeData>[] }),
   onEdgesChange: (changes) => set({ edges: applyEdgeChanges(changes, get().edges) }),
   onConnect: (connection) => set({ edges: addEdge(connection, get().edges) }),
 
