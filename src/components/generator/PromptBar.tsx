@@ -1,7 +1,8 @@
 import { useGeneratorStore, MODELS, QUALITIES, ASPECT_RATIOS } from '@/store/generatorStore';
-import { ImagePlus, Minus, Plus, X, ChevronDown, Check, Search, AtSign, PenLine } from 'lucide-react';
+import { ImagePlus, Minus, Plus, ChevronDown, Check, Search, AtSign, PenLine } from 'lucide-react';
 import { useRef, useState, useEffect, useCallback } from 'react';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
+import { ReferenceImageStrip } from '@/components/generator/ReferenceImageStrip';
 
 export function PromptBar() {
   const {
@@ -18,8 +19,6 @@ export function PromptBar() {
   const [aspectOpen, setAspectOpen] = useState(false);
   const [modelSearch, setModelSearch] = useState('');
   const [dragging, setDragging] = useState(false);
-  const [dragRefIdx, setDragRefIdx] = useState<number | null>(null);
-  const [dragOverIdx, setDragOverIdx] = useState<number | null>(null);
   const [freeGens, setFreeGens] = useState(false);
   const [previewImg, setPreviewImg] = useState<string | null>(null);
 
@@ -81,41 +80,13 @@ export function PromptBar() {
         <div className="relative px-4 pt-3 pb-2">
           {/* Reference images row */}
           {referenceImages.length > 0 && (
-            <div className="flex items-center gap-3 mb-2">
-              {referenceImages.map((img, i) => (
-                <div
-                  key={i}
-                  draggable
-                  onDragStart={(e) => { e.dataTransfer.effectAllowed = 'move'; setDragRefIdx(i); }}
-                  onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; setDragOverIdx(i); }}
-                  onDragLeave={() => setDragOverIdx(null)}
-                  onDrop={(e) => {
-                    e.preventDefault(); e.stopPropagation();
-                    if (dragRefIdx !== null && dragRefIdx !== i) reorderReferenceImages(dragRefIdx, i);
-                    setDragRefIdx(null); setDragOverIdx(null);
-                  }}
-                  onDragEnd={() => { setDragRefIdx(null); setDragOverIdx(null); }}
-                  className={`relative group cursor-grab active:cursor-grabbing transition-all duration-200 ${dragRefIdx === i ? 'opacity-40 scale-90' : ''} ${dragOverIdx === i && dragRefIdx !== i ? 'ring-2 ring-primary rounded-xl scale-105' : ''}`}
-                >
-                  <img src={img} alt="" className="w-20 h-20 rounded-xl object-cover border border-border" onClick={() => setPreviewImg(img)} />
-                  <button
-                    onClick={(e) => { e.stopPropagation(); removeReferenceImage(i); }}
-                    className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-destructive rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity shadow-md"
-                  >
-                    <X className="w-3 h-3 text-destructive-foreground" />
-                  </button>
-                </div>
-              ))}
-              {referenceImages.length < 5 && (
-                <button
-                  onClick={() => fileInputRef.current?.click()}
-                  className="w-20 h-20 rounded-xl border border-dashed border-border flex items-center justify-center text-muted-foreground hover:border-foreground/30 hover:text-foreground/50 transition-colors"
-                  title="Upload image"
-                >
-                  <ImagePlus className="w-5 h-5" />
-                </button>
-              )}
-            </div>
+            <ReferenceImageStrip
+              images={referenceImages}
+              onAdd={() => fileInputRef.current?.click()}
+              onPreview={setPreviewImg}
+              onRemove={removeReferenceImage}
+              onReorder={reorderReferenceImages}
+            />
           )}
 
           {/* Prompt row */}
