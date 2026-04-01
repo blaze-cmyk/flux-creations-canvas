@@ -91,6 +91,7 @@ export function VideoSidebar() {
           <MotionControlPanel
             referenceImages={referenceImages}
             addReferenceImage={addReferenceImage}
+            setReferenceImageAt={setReferenceImageAt}
             removeReferenceImage={removeReferenceImage}
             fileInputRef={fileInputRef}
           />
