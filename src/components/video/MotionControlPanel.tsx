@@ -5,12 +5,13 @@ import { DropZone, readFileAsDataURL } from './DropZone';
 interface MotionControlPanelProps {
   referenceImages: string[];
   addReferenceImage: (url: string) => void;
+  setReferenceImageAt: (idx: number, url: string) => void;
   removeReferenceImage: (index: number) => void;
   fileInputRef: RefObject<HTMLInputElement>;
 }
 
 export function MotionControlPanel({
-  referenceImages, addReferenceImage, removeReferenceImage, fileInputRef,
+  referenceImages, addReferenceImage, setReferenceImageAt, removeReferenceImage, fileInputRef,
 }: MotionControlPanelProps) {
   const [sceneControl, setSceneControl] = useState(true);
   const [sceneSource, setSceneSource] = useState<'video' | 'image'>('image');
@@ -18,27 +19,26 @@ export function MotionControlPanel({
   const [advancedOpen, setAdvancedOpen] = useState(false);
   const [motionPrompt, setMotionPrompt] = useState('');
 
-  const uploadFile = (onLoad: (result: string) => void) => {
+  const uploadFileAt = (targetIdx: number, accept: string) => {
     const input = document.createElement('input');
     input.type = 'file';
-    input.accept = 'image/*,video/*';
-    input.onchange = (e) => {
+    input.accept = accept;
+    input.onchange = async (e) => {
       const f = (e.target as HTMLInputElement).files?.[0];
       if (f) {
-        const reader = new FileReader();
-        reader.onload = () => onLoad(reader.result as string);
-        reader.readAsDataURL(f);
+        const url = await readFileAsDataURL(f);
+        setReferenceImageAt(targetIdx, url);
       }
     };
     input.click();
   };
 
   const handleMotionDrop = async (files: File[]) => {
-    if (files[0]) { const url = await readFileAsDataURL(files[0]); addReferenceImage(url); }
+    if (files[0]) { const url = await readFileAsDataURL(files[0]); setReferenceImageAt(0, url); }
   };
 
   const handleCharacterDrop = async (files: File[]) => {
-    if (files[0]) { const url = await readFileAsDataURL(files[0]); addReferenceImage(url); }
+    if (files[0]) { const url = await readFileAsDataURL(files[0]); setReferenceImageAt(1, url); }
   };
 
   return (
@@ -72,7 +72,7 @@ export function MotionControlPanel({
             </div>
           ) : (
             <button
-              onClick={() => fileInputRef.current?.click()}
+              onClick={() => uploadFileAt(0, 'image/*,video/*')}
               className="w-full aspect-[3/4] border border-dashed border-border rounded-xl flex flex-col items-center justify-center gap-1 text-muted-foreground hover:border-foreground/30 transition-colors"
             >
               <ImageIcon className="w-5 h-5" />
@@ -93,7 +93,7 @@ export function MotionControlPanel({
             </div>
           ) : (
             <button
-              onClick={() => uploadFile((result) => addReferenceImage(result))}
+              onClick={() => uploadFileAt(1, 'image/*')}
               className="w-full aspect-[3/4] border border-dashed border-border rounded-xl flex flex-col items-center justify-center gap-1.5 text-muted-foreground hover:border-foreground/30 transition-colors"
             >
               <Plus className="w-5 h-5" />

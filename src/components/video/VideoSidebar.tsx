@@ -8,7 +8,7 @@ import { createPortal } from 'react-dom';
 
 export function VideoSidebar() {
   const {
-    prompt, setPrompt, referenceImages, addReferenceImage, removeReferenceImage,
+    prompt, setPrompt, referenceImages, addReferenceImage, setReferenceImageAt, removeReferenceImage,
     model, setModel, mode, setMode, aspectRatio, setAspectRatio,
     duration, setDuration, generate,
   } = useVideoStore();
@@ -91,6 +91,7 @@ export function VideoSidebar() {
           <MotionControlPanel
             referenceImages={referenceImages}
             addReferenceImage={addReferenceImage}
+            setReferenceImageAt={setReferenceImageAt}
             removeReferenceImage={removeReferenceImage}
             fileInputRef={fileInputRef}
           />
