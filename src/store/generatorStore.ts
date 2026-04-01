@@ -222,4 +222,10 @@ export const useGeneratorStore = create<GeneratorState>()(
       set({ referenceImages: [...refs, imageUrl], selectedImageId: null });
     }
   },
-}));
+}),
+    {
+      name: 'generator-storage',
+      partialize: (state) => ({ images: state.images }),
+    }
+  )
+);
