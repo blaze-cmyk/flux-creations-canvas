@@ -223,6 +223,11 @@ serve(async (req) => {
       const reqBody: Record<string, unknown> = {
         prompt, num_images: 1, output_format: "png", safety_tolerance: "6",
       };
+
+      // Add LoRA if configured
+      if (modelConfig.lora) {
+        reqBody.loras = [{ path: `https://huggingface.co/${modelConfig.lora}`, scale: 1.0 }];
+      }
       if (ar !== "Auto") reqBody.aspect_ratio = ar;
 
       if (modelConfig.supportsImageInput && referenceImages.length > 0) {

@@ -58,6 +58,7 @@ export const MODELS = [
   { id: 'flux-2-dev', name: 'Flux 2 Dev', desc: 'Fast Flux 2 editing, dev-friendly', featured: false },
   // Flux 1 (via fal.ai) — text-to-image
   { id: 'flux-schnell', name: 'Flux Schnell', desc: 'Ultra-fast generation, open source', featured: false },
+  { id: 'flux-uncensored-v2', name: 'Flux Uncensored V2', desc: 'Unrestricted Flux Dev with uncensored LoRA', featured: true, badge: 'NEW' as const },
   { id: 'flux-dev', name: 'Flux 1 Dev', desc: 'High quality open source, 12B params', featured: false },
   { id: 'flux-pro-v1.1', name: 'Flux Pro 1.1', desc: 'Production quality, top Elo score', featured: false },
   // Other fal.ai models
