@@ -14,6 +14,7 @@ type VideoModelConfig = {
   type: "fal" | "runware";
   textToVideo?: string;
   imageToVideo?: string;
+  motionControl?: string;
   runwareModel?: string;
 };
 
@@ -23,6 +24,10 @@ const VIDEO_MODEL_MAP: Record<string, VideoModelConfig> = {
     type: "fal",
     textToVideo: "fal-ai/kling-video/v3/pro/text-to-video",
     imageToVideo: "fal-ai/kling-video/v3/pro/image-to-video",
+  },
+  "kling-v3-motion": {
+    type: "fal",
+    motionControl: "fal-ai/kling-video/v3/pro/motion-control",
   },
   "kling-o3-pro": {
     type: "fal",
@@ -36,6 +41,14 @@ const VIDEO_MODEL_MAP: Record<string, VideoModelConfig> = {
   "kling-v2.6-pro": {
     type: "fal",
     imageToVideo: "fal-ai/kling-video/v2.6/pro/image-to-video",
+  },
+  "kling-v2.6-motion-std": {
+    type: "fal",
+    motionControl: "fal-ai/kling-video/v2.6/standard/motion-control",
+  },
+  "kling-v2.6-motion-pro": {
+    type: "fal",
+    motionControl: "fal-ai/kling-video/v2.6/pro/motion-control",
   },
   // Veo (fal.ai)
   "veo-3.1": {
@@ -158,12 +171,20 @@ serve(async (req) => {
         });
       }
 
-      const isImageMode = (mode === "image-to-video" || mode === "motion-control") && referenceImages.length > 0;
-      let endpoint = isImageMode ? config.imageToVideo : config.textToVideo;
+      const isMotionControl = mode === "motion-control";
+      const isImageMode = (mode === "image-to-video") && referenceImages.length > 0;
+
+      let endpoint: string | undefined;
+      if (isMotionControl) {
+        endpoint = config.motionControl;
+      } else if (isImageMode) {
+        endpoint = config.imageToVideo;
+      } else {
+        endpoint = config.textToVideo;
+      }
 
       if (!endpoint) {
-        // Fallback: if no image-to-video endpoint, use text-to-video
-        endpoint = config.textToVideo || config.imageToVideo;
+        endpoint = config.textToVideo || config.imageToVideo || config.motionControl;
       }
       if (!endpoint) {
         return new Response(JSON.stringify({ error: `Model ${model} does not support ${mode}` }), {
@@ -171,18 +192,31 @@ serve(async (req) => {
         });
       }
 
-      const reqBody: Record<string, unknown> = { prompt };
+      const reqBody: Record<string, unknown> = {};
 
-      // Duration & aspect ratio
-      reqBody.duration = duration;
-      reqBody.aspect_ratio = aspectRatio;
-      reqBody.negative_prompt = "blur, distort, and low quality";
+      if (isMotionControl) {
+        // Motion control: image_url (character), video_url (motion reference), optional prompt
+        if (referenceImages.length > 0) reqBody.image_url = referenceImages[0];
+        if (referenceImages.length > 1) reqBody.video_url = referenceImages[1];
+        if (prompt) reqBody.prompt = prompt;
+        reqBody.duration = duration;
+        reqBody.aspect_ratio = aspectRatio;
+        // character_orientation and keep_original_sound
+        const charOrientation = body?.characterOrientation || "video";
+        reqBody.character_orientation = charOrientation;
+        reqBody.keep_original_sound = body?.keepOriginalSound !== false;
+      } else {
+        reqBody.prompt = prompt;
+        reqBody.duration = duration;
+        reqBody.aspect_ratio = aspectRatio;
+        reqBody.negative_prompt = "blur, distort, and low quality";
 
-      // Image input
-      if (isImageMode && referenceImages.length > 0) {
-        reqBody.image_url = referenceImages[0];
-        if (referenceImages.length > 1) {
-          reqBody.tail_image_url = referenceImages[1];
+        // Image input
+        if (isImageMode && referenceImages.length > 0) {
+          reqBody.image_url = referenceImages[0];
+          if (referenceImages.length > 1) {
+            reqBody.tail_image_url = referenceImages[1];
+          }
         }
       }
 

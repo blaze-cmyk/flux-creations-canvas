@@ -196,7 +196,7 @@ function SidebarModelDropdown({ model, setModel, search, setSearch, onClose, mod
   }, [onClose]);
 
   const filtered = VIDEO_MODELS
-    .filter(m => m.modes.includes(mode as any))
+    .filter(m => (m.modes as readonly string[]).includes(mode))
     .filter(m => m.name.toLowerCase().includes(search.toLowerCase()));
 
   return createPortal(
