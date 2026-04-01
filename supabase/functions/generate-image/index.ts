@@ -214,10 +214,19 @@ serve(async (req) => {
         }
 
         const data = await response.json();
-        imageUrl = data?.data?.[0]?.url;
+        const rawUrl = data?.data?.[0]?.url;
 
-        if (!imageUrl) {
-          // Check if base64 response
+        if (rawUrl) {
+          // Download the image to avoid CORS issues on client
+          const imgResp = await fetch(rawUrl);
+          if (imgResp.ok) {
+            const buf = await imgResp.arrayBuffer();
+            const bytes = new Uint8Array(buf);
+            imageBase64 = toBase64DataUri(bytes, imgResp.headers.get("content-type") || "image/png");
+          } else {
+            imageUrl = rawUrl; // fallback
+          }
+        } else {
           const b64 = data?.data?.[0]?.b64_json;
           if (b64) {
             imageBase64 = `data:image/png;base64,${b64}`;
