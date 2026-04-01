@@ -305,6 +305,16 @@ serve(async (req) => {
       if (!response.ok) {
         const errText = await response.text();
         console.error("Runware error:", response.status, errText);
+        // Check for provider content moderation
+        try {
+          const rwErr = JSON.parse(errText);
+          const providerErr = rwErr?.errors?.[0];
+          if (providerErr?.code === "invalidProviderContent") {
+            return new Response(JSON.stringify({ error: "Image was filtered by the model provider's safety system.", filtered: true }), {
+              status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
+            });
+          }
+        } catch { /* not JSON, fall through */ }
         return new Response(JSON.stringify({ error: `Runware API error: ${response.status}`, details: errText }), {
           status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
