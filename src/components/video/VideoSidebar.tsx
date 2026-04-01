@@ -185,18 +185,16 @@ function SidebarModelDropdown({ model, setModel, search, setSearch, onClose, mod
 
   return (
     <>
-      {/* Backdrop */}
-      <div className="fixed inset-0 bg-black/50 z-50" onClick={onClose} />
-      {/* Modal */}
-      <div ref={ref} className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[320px] max-h-[480px] bg-popover border border-border rounded-xl shadow-2xl overflow-hidden z-50 flex flex-col">
-        <div className="p-3 border-b border-border">
+      <div className="fixed inset-0 z-40" onClick={onClose} />
+      <div ref={ref} className="absolute left-full top-0 ml-2 w-[260px] max-h-[400px] bg-popover border border-border rounded-xl shadow-2xl overflow-hidden z-50 flex flex-col">
+        <div className="p-2 border-b border-border">
           <div className="flex items-center gap-2 bg-muted rounded-lg px-3 py-2">
             <Search className="w-3.5 h-3.5 text-muted-foreground" />
             <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search..." className="bg-transparent text-sm text-foreground placeholder:text-muted-foreground/50 border-0 focus:outline-none flex-1" autoFocus />
           </div>
         </div>
-        <div className="p-2 border-b border-border">
-          <span className="text-[10px] text-muted-foreground px-2">All models</span>
+        <div className="px-3 py-1.5 border-b border-border">
+          <span className="text-[10px] text-muted-foreground">All models</span>
         </div>
         <div className="flex-1 overflow-y-auto px-1 py-1" style={{ scrollbarWidth: 'none' }}>
           {filtered.map(m => (
