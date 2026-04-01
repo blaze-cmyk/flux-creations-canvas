@@ -334,18 +334,22 @@ serve(async (req) => {
         });
       }
 
+      const { width: rwWidth, height: rwHeight } = aspectRatio === "9:16" ? { width: 720, height: 1280 } : aspectRatio === "1:1" ? { width: 1024, height: 1024 } : { width: 1280, height: 720 };
+
       const task: Record<string, unknown> = {
         taskType: "videoInference",
         taskUUID: crypto.randomUUID(),
         model: config.runwareModel,
         positivePrompt: prompt,
-        duration: parseInt(duration),
-        aspectRatio,
+        duration: parseInt(duration) || 5,
+        width: rwWidth,
+        height: rwHeight,
         outputFormat: "MP4",
+        outputType: "URL",
       };
 
-      if (referenceImages.length > 0 && (mode === "image-to-video" || mode === "motion-control")) {
-        task.seedImage = referenceImages[0];
+      if (referenceImages.length > 0 && (mode === "image-to-video")) {
+        task.frameImages = referenceImages.map((url: string) => ({ imageURL: url }));
       }
 
       console.log(`Calling Runware video: model=${config.runwareModel}`);
