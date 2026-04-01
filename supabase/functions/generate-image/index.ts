@@ -266,7 +266,7 @@ serve(async (req) => {
       reqBody.image_size = imageSize;
       reqBody.num_inference_steps = 28;
       reqBody.guidance_scale = 3.5;
-      if (model === "flux-uncensored-v2") reqBody.acceleration = "regular";
+      if (activeModel === "flux-uncensored-v2") reqBody.acceleration = "regular";
 
       // Add LoRA if configured + disable safety checker for LoRA models
       if (modelConfig.lora) {
