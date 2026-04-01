@@ -213,30 +213,14 @@ serve(async (req) => {
         let imageToSend: { bytes: Uint8Array; mimeType: string };
         let enhancedPrompt = prompt;
 
-        if (allImages.length === 2) {
-          const baseImage = allImages[0];
-          const sourceImage = allImages[1];
-          console.log("Preparing dual-image Flux edit: left=source(image 2), right=base(image 1)");
-          imageToSend = await mergeImagesSideBySide([sourceImage, baseImage]);
-
-          enhancedPrompt = [
-            "This is a side-by-side reference sheet.",
-            "The LEFT image is the source identity/reference from image 2.",
-            "The RIGHT image is the base/target composition from image 1.",
-            "Create ONE final image based on the RIGHT image only.",
-            "Replace only the person in the RIGHT image with the identity, face, and hair from the LEFT image.",
-            "Keep the RIGHT image's body, clothes, pose, hands, camera angle, framing, background, lighting, and expression unchanged unless the user explicitly asks otherwise.",
-            "Remove any visible text or captions from the final output.",
-            "Do not return a split-screen, collage, contact sheet, or two separate images.",
-            `User request: ${rewritePromptForMerged(prompt, 2)}`,
-          ].join(" ");
-
-          console.log(`Rewritten prompt: ${enhancedPrompt}`);
-        } else if (allImages.length >= 3) {
+        if (allImages.length >= 2) {
+          // Merge all reference images side-by-side, numbered left to right
           console.log(`Merging ${allImages.length} images side-by-side for Flux edit`);
           imageToSend = await mergeImagesSideBySide(allImages);
-          enhancedPrompt = rewritePromptForMerged(prompt, allImages.length);
-          console.log(`Rewritten prompt: ${enhancedPrompt}`);
+          // Minimal context — let the user's prompt do the work
+          const labels = allImages.map((_, i) => `image ${i + 1}`).join(", ");
+          enhancedPrompt = `This image contains ${allImages.length} reference images placed side by side (left to right: ${labels}). Output a single final image, not a collage. ${prompt}`;
+          console.log(`Enhanced prompt: ${enhancedPrompt}`);
         } else {
           imageToSend = allImages[0];
         }
