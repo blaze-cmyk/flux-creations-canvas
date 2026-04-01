@@ -140,9 +140,10 @@ serve(async (req) => {
       });
     }
 
-    const modelConfig = MODEL_MAP[model];
+    let activeModel = model;
+    let modelConfig = MODEL_MAP[activeModel];
     if (!modelConfig) {
-      return new Response(JSON.stringify({ error: `Unknown model: ${model}` }), {
+      return new Response(JSON.stringify({ error: `Unknown model: ${activeModel}` }), {
         status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
@@ -150,59 +151,83 @@ serve(async (req) => {
     let imageUrl: string | undefined;
     let imageBase64: string | undefined;
     const ar = aspectRatio === "Auto" ? "1:1" : aspectRatio;
+    let geminiFailed = false;
 
     // ========== GEMINI MODELS (via apiyi) ==========
     if (modelConfig.type === "gemini") {
       const APIYI_API_KEY = Deno.env.get("APIYI_API_KEY");
       if (!APIYI_API_KEY) {
-        return new Response(JSON.stringify({ error: "APIYI_API_KEY not configured" }), {
-          status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
-
-      const parts: any[] = [];
-      for (const refImg of referenceImages) {
-        const dataUri = await fetchImageAsDataUri(refImg);
-        if (!dataUri) continue;
-        const match = dataUri.match(/^data:(image\/\w+);base64,(.+)$/);
-        if (!match) continue;
-        parts.push({ inlineData: { mimeType: match[1], data: match[2] } });
-      }
-      parts.push({ text: prompt });
-
-      const imageSize = QUALITY_MAP[quality] || "2K";
-      const endpoint = `${APIYI_BASE}/v1beta/models/${modelConfig.apiModel}:generateContent`;
-      console.log(`Calling Gemini: ${endpoint}, ar=${ar}, size=${imageSize}, refs=${referenceImages.length}`);
-
-      const response = await fetch(endpoint, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${APIYI_API_KEY}`, "Content-Type": "application/json" },
-        body: JSON.stringify({
-          contents: [{ parts }],
-          generationConfig: { responseModalities: ["IMAGE"], imageConfig: { aspectRatio: ar, imageSize } },
-        }),
-      });
-
-      if (!response.ok) {
-        const errText = await response.text();
-        console.error("Gemini error:", response.status, errText);
-        return new Response(JSON.stringify({ error: `API error: ${response.status}`, details: errText }), {
-          status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
-
-      const data = await response.json();
-      const candidate = data?.candidates?.[0];
-      const resParts = candidate?.content?.parts ?? [];
-      const imgPart = resParts.find((p: any) => p.inlineData?.data);
-
-      if (imgPart?.inlineData?.data) {
-        imageBase64 = `data:${imgPart.inlineData.mimeType || "image/png"};base64,${imgPart.inlineData.data}`;
+        // No apiyi key — skip straight to fallback
+        geminiFailed = true;
+        console.log("APIYI_API_KEY not configured, will try fallback");
       } else {
-        const errorMsg = candidate?.finishMessage || "Image generation failed. Try rephrasing your prompt.";
-        const isFiltered = candidate?.finishReason === "SAFETY" || candidate?.finishReason === "PROHIBITED_CONTENT";
-        return new Response(JSON.stringify({ error: errorMsg, filtered: isFiltered }), {
-          status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        try {
+          const parts: any[] = [];
+          for (const refImg of referenceImages) {
+            const dataUri = await fetchImageAsDataUri(refImg);
+            if (!dataUri) continue;
+            const match = dataUri.match(/^data:(image\/\w+);base64,(.+)$/);
+            if (!match) continue;
+            parts.push({ inlineData: { mimeType: match[1], data: match[2] } });
+          }
+          parts.push({ text: prompt });
+
+          const imageSize = QUALITY_MAP[quality] || "2K";
+          const endpoint = `${APIYI_BASE}/v1beta/models/${modelConfig.apiModel}:generateContent`;
+          console.log(`Calling Gemini: ${endpoint}, ar=${ar}, size=${imageSize}, refs=${referenceImages.length}`);
+
+          const response = await fetch(endpoint, {
+            method: "POST",
+            headers: { Authorization: `Bearer ${APIYI_API_KEY}`, "Content-Type": "application/json" },
+            body: JSON.stringify({
+              contents: [{ parts }],
+              generationConfig: { responseModalities: ["IMAGE"], imageConfig: { aspectRatio: ar, imageSize } },
+            }),
+          });
+
+          if (!response.ok) {
+            const errText = await response.text();
+            console.error("Gemini error:", response.status, errText, "— will try fallback");
+            geminiFailed = true;
+          } else {
+            const data = await response.json();
+            const candidate = data?.candidates?.[0];
+            const resParts = candidate?.content?.parts ?? [];
+            const imgPart = resParts.find((p: any) => p.inlineData?.data);
+
+            if (imgPart?.inlineData?.data) {
+              imageBase64 = `data:${imgPart.inlineData.mimeType || "image/png"};base64,${imgPart.inlineData.data}`;
+            } else {
+              const isFiltered = candidate?.finishReason === "SAFETY" || candidate?.finishReason === "PROHIBITED_CONTENT";
+              if (isFiltered) {
+                // Content filtered — don't fallback, return filter result
+                return new Response(JSON.stringify({ error: "Image was filtered due to content policy.", filtered: true }), {
+                  status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
+                });
+              }
+              console.log("Gemini returned no image, will try fallback");
+              geminiFailed = true;
+            }
+          }
+        } catch (e) {
+          console.error("Gemini exception:", e, "— will try fallback");
+          geminiFailed = true;
+        }
+      }
+
+      // If Gemini failed and we have a fallback, switch to it
+      if (geminiFailed && modelConfig.fallbackModel) {
+        activeModel = modelConfig.fallbackModel;
+        modelConfig = MODEL_MAP[activeModel];
+        console.log(`Gemini failed, falling back to: ${activeModel} (${modelConfig.type})`);
+        if (!modelConfig) {
+          return new Response(JSON.stringify({ error: `Fallback model not found: ${activeModel}` }), {
+            status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+      } else if (geminiFailed) {
+        return new Response(JSON.stringify({ error: "Gemini generation failed and no fallback configured" }), {
+          status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
     }
