@@ -1,10 +1,11 @@
-import { Handle, Position } from '@xyflow/react';
+import { Handle, Position, useNodeId } from '@xyflow/react';
 import type { SpaceNodeData } from '@/store/canvasStore';
 import { useCanvasStore } from '@/store/canvasStore';
 import { MODELS, ASPECT_RATIOS } from '@/store/generatorStore';
 import { Image, Play, Minus, Plus, Settings, Type, ImageIcon, Search, ChevronDown, X } from 'lucide-react';
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { NodeToolbar } from './NodeToolbar';
 
 const NODE_MODELS = MODELS.map(m => ({ id: m.id, name: m.name }));
 
