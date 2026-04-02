@@ -91,6 +91,50 @@ export type Database = {
           },
         ]
       }
+      spaces_history: {
+        Row: {
+          content_url: string | null
+          created_at: string
+          event_type: string
+          id: string
+          metadata: Json | null
+          model: string | null
+          node_id: string | null
+          project_id: string
+          prompt: string | null
+        }
+        Insert: {
+          content_url?: string | null
+          created_at?: string
+          event_type?: string
+          id?: string
+          metadata?: Json | null
+          model?: string | null
+          node_id?: string | null
+          project_id: string
+          prompt?: string | null
+        }
+        Update: {
+          content_url?: string | null
+          created_at?: string
+          event_type?: string
+          id?: string
+          metadata?: Json | null
+          model?: string | null
+          node_id?: string | null
+          project_id?: string
+          prompt?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "spaces_history_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "spaces_projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       spaces_nodes: {
         Row: {
           created_at: string
