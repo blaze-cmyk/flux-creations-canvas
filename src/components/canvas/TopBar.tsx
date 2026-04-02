@@ -1,15 +1,19 @@
 import { useCanvasStore } from '@/store/canvasStore';
 import { Share2, User } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 
 export function TopBar() {
   const projectName = useCanvasStore((s) => s.projectName);
+  const navigate = useNavigate();
 
   return (
     <div className="fixed top-0 left-10 right-0 h-10 bg-toolbar/80 backdrop-blur border-b border-border z-40 flex items-center justify-between px-4">
       <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
         <span>Personal project</span>
         <span>/</span>
-        <span>Spaces</span>
+        <button onClick={() => navigate('/spaces-projects')} className="hover:text-foreground transition-colors">
+          Spaces
+        </button>
         <span>/</span>
         <span className="flex items-center gap-1.5">
           <span className="w-2 h-2 rounded-full bg-muted" />
