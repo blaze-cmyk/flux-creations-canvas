@@ -10,6 +10,7 @@ import { CreationNode } from './CreationNode';
 import { ImageGeneratorNode } from './ImageGeneratorNode';
 import { VideoGeneratorNode } from './VideoGeneratorNode';
 import { TextNode } from './TextNode';
+import { AssistantNode } from './AssistantNode';
 import { LeftToolbar } from './LeftToolbar';
 import { TopBar } from './TopBar';
 import { NodePalette } from './NodePalette';
@@ -23,6 +24,7 @@ const nodeTypes: NodeTypes = {
   'image-generator': ImageGeneratorNode,
   'video-generator': VideoGeneratorNode,
   'text-node': TextNode,
+  assistant: AssistantNode,
 };
 
 const welcomeNodes = [
