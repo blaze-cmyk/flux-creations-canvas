@@ -67,8 +67,18 @@ export function ImageGeneratorNode({ id, data }: { id: string; data: SpaceNodeDa
     }
   }, [prompt, generating, selectedModel, selectedAR, id, updateNodeData]);
 
+  const [selected, setSelected] = useState(false);
+
   return (
-    <div className="space-node w-[520px] rounded-2xl bg-[hsl(var(--card))] border border-[hsl(var(--border)/0.3)] shadow-[0_8px_40px_rgba(0,0,0,0.5)]">
+    <div
+      className="space-node w-[520px] rounded-2xl bg-[hsl(var(--card))] border border-[hsl(var(--border)/0.3)] shadow-[0_8px_40px_rgba(0,0,0,0.5)] relative"
+      onClick={() => setSelected(true)}
+      onBlur={() => setSelected(false)}
+      tabIndex={0}
+    >
+      {/* Toolbar */}
+      {selected && <NodeToolbar nodeId={id} nodeType="image-generator" />}
+
       {/* Header */}
       <div className="flex items-center gap-2 px-4 py-2.5 text-sm text-muted-foreground">
         <Image className="w-4 h-4" />
