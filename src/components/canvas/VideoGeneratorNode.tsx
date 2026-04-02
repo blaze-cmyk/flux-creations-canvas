@@ -1,83 +1,299 @@
 import { Handle, Position } from '@xyflow/react';
 import type { SpaceNodeData } from '@/store/canvasStore';
 import { useCanvasStore } from '@/store/canvasStore';
-import { Video, Play, Minus, Plus } from 'lucide-react';
-import { useState } from 'react';
+import { VIDEO_MODELS, VIDEO_ASPECT_RATIOS, VIDEO_DURATIONS } from '@/store/videoStore';
+import { Video, Play, Minus, Plus, Settings, Type, ImageIcon, ChevronDown, Search, Clapperboard, AudioLines } from 'lucide-react';
+import { useState, useRef, useEffect, useCallback } from 'react';
+import { supabase } from '@/integrations/supabase/client';
 import { NodeToolbar } from './NodeToolbar';
+
+const NODE_MODELS = VIDEO_MODELS.map(m => ({ id: m.id, name: m.name }));
 
 export function VideoGeneratorNode({ id, data, selected }: { id: string; data: SpaceNodeData; selected?: boolean }) {
   const updateNodeData = useCanvasStore((s) => s.updateNodeData);
   const [prompt, setPrompt] = useState(data.prompt || '');
+  const [quantity, setQuantity] = useState(1);
+  const [modelOpen, setModelOpen] = useState(false);
+  const [arOpen, setArOpen] = useState(false);
+  const [durOpen, setDurOpen] = useState(false);
+  const [modelSearch, setModelSearch] = useState('');
+  const [generating, setGenerating] = useState(false);
+  const [soundEffects, setSoundEffects] = useState(false);
+  const modelRef = useRef<HTMLDivElement>(null);
+  const arRef = useRef<HTMLDivElement>(null);
+  const durRef = useRef<HTMLDivElement>(null);
+
+  const selectedModel = data.model || 'kling-v3-pro';
+  const selectedAR = data.aspectRatio || '16:9';
+  const selectedDuration = '5';
+  const modelName = NODE_MODELS.find(m => m.id === selectedModel)?.name || 'Auto';
+
+  const filteredModels = NODE_MODELS.filter(m =>
+    m.name.toLowerCase().includes(modelSearch.toLowerCase())
+  );
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (modelRef.current && !modelRef.current.contains(e.target as Node)) setModelOpen(false);
+      if (arRef.current && !arRef.current.contains(e.target as Node)) setArOpen(false);
+      if (durRef.current && !durRef.current.contains(e.target as Node)) setDurOpen(false);
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
+
+  const handleGenerate = useCallback(async () => {
+    if (!prompt.trim() || generating) return;
+    setGenerating(true);
+    updateNodeData(id, { status: 'running' });
+
+    try {
+      const { data: result, error } = await supabase.functions.invoke('generate-video', {
+        body: {
+          prompt,
+          referenceImages: [],
+          model: selectedModel,
+          aspectRatio: selectedAR,
+          duration: selectedDuration,
+          mode: 'text-to-video',
+        },
+      });
+
+      if (error || result?.error) {
+        updateNodeData(id, { status: 'error' });
+      } else {
+        const videoUrl = result?.videoUrl;
+        updateNodeData(id, { status: 'complete', videoUrl });
+      }
+    } catch {
+      updateNodeData(id, { status: 'error' });
+    } finally {
+      setGenerating(false);
+    }
+  }, [prompt, generating, selectedModel, selectedAR, selectedDuration, id, updateNodeData]);
 
   return (
-    <div className={`space-node w-[340px] rounded-xl bg-node border border-node-border shadow-[0_4px_24px_rgba(0,0,0,0.6)] relative ${data.status === 'running' ? 'node-running' : ''}`}>
+    <div className="space-node w-[520px] rounded-2xl bg-[hsl(var(--card))] border border-[hsl(var(--border)/0.3)] shadow-[0_8px_40px_rgba(0,0,0,0.5)] relative">
       {selected && <NodeToolbar nodeId={id} nodeType="video-generator" />}
-      <div className="flex items-center gap-1.5 px-3 py-2 text-xs text-muted-foreground">
-        <Video className="w-3 h-3" />
+
+      {/* Header */}
+      <div className="flex items-center gap-2 px-4 py-2.5 text-sm text-muted-foreground">
+        <Video className="w-4 h-4" />
         {data.label}
       </div>
 
-      <div className="px-3 pb-3">
-        <textarea
-          value={prompt}
-          onChange={(e) => {
-            setPrompt(e.target.value);
-            updateNodeData(id, { prompt: e.target.value });
-          }}
-          placeholder="Describe the video you want to generate..."
-          className="w-full h-48 bg-background rounded-lg p-3 text-sm text-foreground placeholder:text-muted-foreground/50 resize-none border-0 focus:outline-none focus:ring-1 focus:ring-accent"
-        />
-
-        <div className="flex items-center gap-2 mt-2 flex-wrap">
-          <div className="flex items-center gap-1 bg-background rounded px-2 py-1">
-            <Minus className="w-3 h-3 text-muted-foreground cursor-pointer" />
-            <span className="text-xs text-foreground">x1</span>
-            <Plus className="w-3 h-3 text-muted-foreground cursor-pointer" />
-          </div>
-
-          <select className="bg-background text-xs text-muted-foreground rounded px-2 py-1 border-0">
-            <option>Auto</option>
-            <option>kling-v2</option>
-            <option>veo-2</option>
-            <option>minimax</option>
-          </select>
-
-          <select
-            value={data.aspectRatio || '16:9'}
-            onChange={(e) => updateNodeData(id, { aspectRatio: e.target.value })}
-            className="bg-background text-xs text-muted-foreground rounded px-2 py-1 border-0"
-          >
-            <option value="16:9">16:9</option>
-            <option value="9:16">9:16</option>
-            <option value="1:1">1:1</option>
-          </select>
-
-          <select className="bg-background text-xs text-muted-foreground rounded px-2 py-1 border-0">
-            <option>Auto</option>
-            <option>5s</option>
-            <option>10s</option>
-          </select>
+      {/* Main content area */}
+      <div className="relative px-3 pb-3">
+        <div className="relative rounded-xl overflow-hidden bg-[hsl(var(--background))]" style={{ minHeight: 340 }}>
+          {data.videoUrl ? (
+            <video src={data.videoUrl} controls className="w-full h-[340px] object-contain bg-black/20" />
+          ) : (
+            <textarea
+              value={prompt}
+              onChange={(e) => {
+                setPrompt(e.target.value);
+                updateNodeData(id, { prompt: e.target.value });
+              }}
+              placeholder="Describe the video you want to generate..."
+              className="w-full h-[340px] bg-transparent p-4 pt-6 text-sm text-foreground placeholder:text-muted-foreground/40 resize-none border-0 focus:outline-none"
+            />
+          )}
         </div>
 
-        <div className="flex items-center justify-between mt-2">
-          <label className="flex items-center gap-2 text-xs text-muted-foreground cursor-pointer">
-            <div className="w-8 h-4 bg-muted rounded-full relative">
-              <div className="w-3 h-3 bg-muted-foreground/50 rounded-full absolute left-0.5 top-0.5" />
-            </div>
-            Sound Effects
-          </label>
+        {/* Left side connector icons */}
+        <div className="absolute left-0 bottom-24 -translate-x-1/2 flex flex-col gap-3 z-10">
+          <div className="group relative w-10 h-10 rounded-full bg-[hsl(var(--muted))] flex items-center justify-center cursor-pointer hover:bg-[hsl(var(--muted)/0.8)] transition-colors" title="Text input">
+            <Type className="w-4 h-4 text-muted-foreground" />
+            <span className="absolute right-full mr-2 px-2 py-1 bg-[hsl(var(--card))] border border-[hsl(var(--border)/0.3)] rounded-lg text-xs text-foreground whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">Text</span>
+          </div>
+          <div className="group relative w-10 h-10 rounded-full bg-[hsl(var(--muted))] flex items-center justify-center cursor-pointer hover:bg-[hsl(var(--muted)/0.8)] transition-colors" title="Start image">
+            <ImageIcon className="w-4 h-4 text-muted-foreground" />
+            <span className="absolute right-full mr-2 px-2 py-1 bg-[hsl(var(--card))] border border-[hsl(var(--border)/0.3)] rounded-lg text-xs text-foreground whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">Start image</span>
+          </div>
+          <div className="group relative w-10 h-10 rounded-full bg-[hsl(var(--muted))] flex items-center justify-center cursor-pointer hover:bg-[hsl(var(--muted)/0.8)] transition-colors" title="End image">
+            <ImageIcon className="w-4 h-4 text-muted-foreground" />
+            <span className="absolute right-full mr-2 px-2 py-1 bg-[hsl(var(--card))] border border-[hsl(var(--border)/0.3)] rounded-lg text-xs text-foreground whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">End image</span>
+          </div>
+          <div className="group relative w-10 h-10 rounded-full bg-[hsl(var(--muted))] flex items-center justify-center cursor-pointer hover:bg-[hsl(var(--muted)/0.8)] transition-colors" title="References">
+            <ImageIcon className="w-4 h-4 text-muted-foreground" />
+            <span className="absolute right-full mr-2 px-2 py-1 bg-[hsl(var(--card))] border border-[hsl(var(--border)/0.3)] rounded-lg text-xs text-foreground whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">References</span>
+          </div>
+        </div>
 
+        {/* Right side connector icons */}
+        <div className="absolute right-0 top-8 translate-x-1/2 flex flex-col gap-3 z-10">
+          <div className="group relative w-10 h-10 rounded-full bg-[hsl(var(--muted))] flex items-center justify-center cursor-pointer hover:bg-[hsl(var(--muted)/0.8)] transition-colors" title="Start image output">
+            <ImageIcon className="w-4 h-4 text-muted-foreground" />
+            <span className="absolute left-full ml-2 px-2 py-1 bg-[hsl(var(--card))] border border-[hsl(var(--border)/0.3)] rounded-lg text-xs text-foreground whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">Start image</span>
+          </div>
+          <div className="group relative w-10 h-10 rounded-full bg-[hsl(var(--muted))] flex items-center justify-center cursor-pointer hover:bg-[hsl(var(--muted)/0.8)] transition-colors" title="End image output">
+            <ImageIcon className="w-4 h-4 text-muted-foreground" />
+            <span className="absolute left-full ml-2 px-2 py-1 bg-[hsl(var(--card))] border border-[hsl(var(--border)/0.3)] rounded-lg text-xs text-foreground whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">End image</span>
+          </div>
+          <div className="group relative w-10 h-10 rounded-full bg-[hsl(var(--muted))] flex items-center justify-center cursor-pointer hover:bg-[hsl(var(--muted)/0.8)] transition-colors" title="Generated video">
+            <Clapperboard className="w-4 h-4 text-muted-foreground" />
+            <span className="absolute left-full ml-2 px-2 py-1 bg-[hsl(var(--card))] border border-[hsl(var(--border)/0.3)] rounded-lg text-xs text-foreground whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">Generated video</span>
+          </div>
+          <div className="group relative w-10 h-10 rounded-full bg-[hsl(var(--muted))] flex items-center justify-center cursor-pointer hover:bg-[hsl(var(--muted)/0.8)] transition-colors" title="Audio">
+            <AudioLines className="w-4 h-4 text-muted-foreground" />
+            <span className="absolute left-full ml-2 px-2 py-1 bg-[hsl(var(--card))] border border-[hsl(var(--border)/0.3)] rounded-lg text-xs text-foreground whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">Audio</span>
+          </div>
+        </div>
+
+        {/* Bottom toolbar row 1 */}
+        <div className="flex items-center gap-2 mt-3 px-1">
+          {/* Quantity */}
+          <div className="flex items-center gap-0.5 bg-[hsl(var(--muted))] rounded-full px-2 py-1.5">
+            <button onClick={() => setQuantity(Math.max(1, quantity - 1))} className="w-5 h-5 flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors">
+              <Minus className="w-3 h-3" />
+            </button>
+            <span className="text-xs font-medium text-foreground min-w-[24px] text-center">x{quantity}</span>
+            <button onClick={() => setQuantity(Math.min(4, quantity + 1))} className="w-5 h-5 flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors">
+              <Plus className="w-3 h-3" />
+            </button>
+          </div>
+
+          {/* Model selector */}
+          <div ref={modelRef} className="relative">
+            <button
+              onClick={() => { setModelOpen(!modelOpen); setArOpen(false); setDurOpen(false); }}
+              className="flex items-center gap-1.5 bg-[hsl(var(--muted))] rounded-full px-3 py-1.5 text-xs text-foreground hover:bg-[hsl(var(--muted)/0.8)] transition-colors"
+            >
+              {modelName.length > 14 ? modelName.slice(0, 14) + '…' : modelName}
+              <ChevronDown className="w-3 h-3 text-muted-foreground" />
+            </button>
+            {modelOpen && (
+              <div className="absolute bottom-full mb-2 left-0 w-[260px] bg-[hsl(var(--card))] border border-[hsl(var(--border)/0.3)] rounded-xl shadow-2xl z-50 overflow-hidden">
+                <div className="p-2">
+                  <div className="flex items-center gap-2 bg-[hsl(var(--muted))] rounded-lg px-2 py-1.5">
+                    <Search className="w-3 h-3 text-muted-foreground" />
+                    <input
+                      value={modelSearch}
+                      onChange={(e) => setModelSearch(e.target.value)}
+                      placeholder="Search"
+                      className="bg-transparent text-xs text-foreground placeholder:text-muted-foreground/50 border-0 focus:outline-none w-full"
+                      autoFocus
+                    />
+                  </div>
+                </div>
+                <div className="max-h-[280px] overflow-y-auto px-1 pb-1">
+                  {filteredModels.map(m => (
+                    <button
+                      key={m.id}
+                      onClick={() => {
+                        updateNodeData(id, { model: m.id });
+                        setModelOpen(false);
+                        setModelSearch('');
+                      }}
+                      className={`w-full text-left px-3 py-2 text-xs rounded-lg transition-colors ${m.id === selectedModel ? 'bg-[hsl(var(--accent))] text-accent-foreground' : 'text-foreground hover:bg-[hsl(var(--muted))]'}`}
+                    >
+                      {m.name}
+                    </button>
+                  ))}
+                </div>
+                <div className="border-t border-[hsl(var(--border)/0.2)] px-3 py-1.5 flex items-center justify-between text-[10px] text-muted-foreground">
+                  <span>All models</span>
+                  <span>↑↓ Navigate</span>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Aspect ratio */}
+          <div ref={arRef} className="relative">
+            <button
+              onClick={() => { setArOpen(!arOpen); setModelOpen(false); setDurOpen(false); }}
+              className="flex items-center gap-1.5 bg-[hsl(var(--muted))] rounded-full px-3 py-1.5 text-xs text-foreground hover:bg-[hsl(var(--muted)/0.8)] transition-colors"
+            >
+              <span className="w-3 h-3 border border-muted-foreground/50 rounded-sm" />
+              {selectedAR}
+              <ChevronDown className="w-3 h-3 text-muted-foreground" />
+            </button>
+            {arOpen && (
+              <div className="absolute bottom-full mb-2 left-0 w-[120px] bg-[hsl(var(--card))] border border-[hsl(var(--border)/0.3)] rounded-xl shadow-2xl z-50 overflow-hidden p-1">
+                {VIDEO_ASPECT_RATIOS.map(ar => (
+                  <button
+                    key={ar}
+                    onClick={() => { updateNodeData(id, { aspectRatio: ar }); setArOpen(false); }}
+                    className={`w-full text-left px-3 py-1.5 text-xs rounded-lg transition-colors ${ar === selectedAR ? 'bg-[hsl(var(--accent))] text-accent-foreground' : 'text-foreground hover:bg-[hsl(var(--muted))]'}`}
+                  >
+                    {ar}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Duration */}
+          <div ref={durRef} className="relative">
+            <button
+              onClick={() => { setDurOpen(!durOpen); setModelOpen(false); setArOpen(false); }}
+              className="flex items-center gap-1.5 bg-[hsl(var(--muted))] rounded-full px-3 py-1.5 text-xs text-foreground hover:bg-[hsl(var(--muted)/0.8)] transition-colors"
+            >
+              Auto
+              <ChevronDown className="w-3 h-3 text-muted-foreground" />
+            </button>
+            {durOpen && (
+              <div className="absolute bottom-full mb-2 left-0 w-[100px] bg-[hsl(var(--card))] border border-[hsl(var(--border)/0.3)] rounded-xl shadow-2xl z-50 overflow-hidden p-1">
+                <button onClick={() => setDurOpen(false)} className="w-full text-left px-3 py-1.5 text-xs rounded-lg text-foreground hover:bg-[hsl(var(--muted))]">Auto</button>
+                {VIDEO_DURATIONS.map(d => (
+                  <button key={d} onClick={() => setDurOpen(false)} className="w-full text-left px-3 py-1.5 text-xs rounded-lg text-foreground hover:bg-[hsl(var(--muted))]">{d}s</button>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Bottom toolbar row 2 — Sound Effects + Settings + Generate */}
+        <div className="flex items-center gap-2 mt-2 px-1">
+          {/* Sound Effects toggle */}
           <button
-            onClick={() => updateNodeData(id, { status: 'running' })}
-            className="flex items-center justify-center w-8 h-8 rounded-full bg-primary/20 text-primary hover:bg-primary/30 transition-colors"
+            onClick={() => setSoundEffects(!soundEffects)}
+            className="flex items-center gap-2"
+          >
+            <div className={`w-9 h-5 rounded-full relative transition-colors ${soundEffects ? 'bg-primary' : 'bg-[hsl(var(--muted))]'}`}>
+              <div className={`w-4 h-4 rounded-full bg-foreground absolute top-0.5 transition-all ${soundEffects ? 'left-[18px]' : 'left-0.5'}`} />
+            </div>
+            <span className="text-xs text-muted-foreground">Sound Effects</span>
+          </button>
+
+          {/* Settings */}
+          <button className="w-8 h-8 rounded-full bg-[hsl(var(--muted))] flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors">
+            <Settings className="w-4 h-4" />
+          </button>
+
+          <div className="flex-1" />
+
+          {/* Generate */}
+          <button
+            onClick={handleGenerate}
+            disabled={generating || !prompt.trim()}
+            className="w-9 h-9 rounded-full bg-[hsl(var(--muted))] flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors disabled:opacity-40"
           >
             <Play className="w-4 h-4" />
           </button>
         </div>
+
+        {/* Generating overlay */}
+        {generating && (
+          <div className="absolute inset-3 rounded-xl bg-black/60 flex items-center justify-center backdrop-blur-sm">
+            <div className="flex items-center gap-2 text-sm text-foreground">
+              <div className="w-4 h-4 border-2 border-foreground/30 border-t-foreground rounded-full animate-spin" />
+              Generating…
+            </div>
+          </div>
+        )}
       </div>
 
-      <Handle type="target" position={Position.Left} id="img-in" />
-      <Handle type="source" position={Position.Right} id="video-out" />
+      {/* Handles */}
+      <Handle type="target" position={Position.Left} id="text-in" style={{ top: '55%' }} className="!w-3 !h-3 !bg-muted-foreground/50 !border-0" />
+      <Handle type="target" position={Position.Left} id="start-img-in" style={{ top: '65%' }} className="!w-3 !h-3 !bg-muted-foreground/50 !border-0" />
+      <Handle type="target" position={Position.Left} id="end-img-in" style={{ top: '75%' }} className="!w-3 !h-3 !bg-muted-foreground/50 !border-0" />
+      <Handle type="target" position={Position.Left} id="ref-in" style={{ top: '85%' }} className="!w-3 !h-3 !bg-muted-foreground/50 !border-0" />
+      <Handle type="source" position={Position.Right} id="start-img-out" style={{ top: '25%' }} className="!w-3 !h-3 !bg-muted-foreground/50 !border-0" />
+      <Handle type="source" position={Position.Right} id="end-img-out" style={{ top: '38%' }} className="!w-3 !h-3 !bg-muted-foreground/50 !border-0" />
+      <Handle type="source" position={Position.Right} id="video-out" style={{ top: '51%' }} className="!w-3 !h-3 !bg-muted-foreground/50 !border-0" />
+      <Handle type="source" position={Position.Right} id="audio-out" style={{ top: '64%' }} className="!w-3 !h-3 !bg-muted-foreground/50 !border-0" />
     </div>
   );
 }
