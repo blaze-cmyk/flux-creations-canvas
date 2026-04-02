@@ -1,7 +1,6 @@
 import { Handle, Position } from '@xyflow/react';
 import type { SpaceNodeData } from '@/store/canvasStore';
 import { Grid3X3, Volume2 } from 'lucide-react';
-import { useState } from 'react';
 import { NodeToolbar } from './NodeToolbar';
 
 export function CreationNode({ id, data, selected }: { id: string; data: SpaceNodeData; selected?: boolean }) {
