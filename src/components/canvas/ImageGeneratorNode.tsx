@@ -81,6 +81,35 @@ export function ImageGeneratorNode({ id, data, selected }: { id: string; data: S
     }
   }, [prompt, generating, selectedModel, selectedAR, id, updateNodeData, getConnectedInputs]);
 
+  // When image is generated, show as a clean image container
+  if (data.imageUrl) {
+    return (
+      <div className="space-node relative">
+        {selected && <NodeToolbar nodeId={id} nodeType="image-generator" />}
+
+        {/* Label */}
+        <div className="flex items-center gap-1.5 px-1 py-1.5 text-sm text-[#999]">
+          <Image className="w-4 h-4" />
+          <span className="truncate max-w-[400px]">{data.label}</span>
+        </div>
+
+        {/* Image card — true size */}
+        <div className="relative w-[320px] rounded-2xl overflow-hidden border border-[#2a2a2a]">
+          <img src={data.imageUrl} alt="" className="w-full h-auto object-contain" draggable={false} />
+          <button
+            onClick={() => updateNodeData(id, { imageUrl: undefined, status: 'idle' })}
+            className="absolute bottom-3 left-3 flex items-center gap-1.5 px-3 py-1.5 bg-black/60 backdrop-blur-sm rounded-lg text-xs text-white hover:bg-black/80 transition-colors"
+          >
+            <Play className="w-3.5 h-3.5" />
+            Regenerate
+          </button>
+        </div>
+
+        <NodeConnectors inputs={NODE_INPUTS['image-generator']} outputs={NODE_OUTPUTS['image-generator']} />
+      </div>
+    );
+  }
+
   return (
     <div className="space-node w-[520px] rounded-2xl bg-[hsl(var(--card))] border border-[hsl(var(--border)/0.3)] shadow-[0_8px_40px_rgba(0,0,0,0.5)] relative">
       {selected && <NodeToolbar nodeId={id} nodeType="image-generator" />}
@@ -94,19 +123,15 @@ export function ImageGeneratorNode({ id, data, selected }: { id: string; data: S
       {/* Main content area */}
       <div className="relative px-3 pb-3">
         <div className="relative rounded-xl overflow-hidden bg-[hsl(var(--background))]" style={{ minHeight: 340 }}>
-          {data.imageUrl ? (
-            <img src={data.imageUrl} alt="" className="w-full h-[340px] object-contain bg-black/20" />
-          ) : (
-            <textarea
-              value={prompt}
-              onChange={(e) => {
-                setPrompt(e.target.value);
-                updateNodeData(id, { prompt: e.target.value });
-              }}
-              placeholder="Describe the image you want to generate..."
-              className="w-full h-[340px] bg-transparent p-4 pt-6 text-sm text-foreground placeholder:text-muted-foreground/40 resize-none border-0 focus:outline-none"
-            />
-          )}
+          <textarea
+            value={prompt}
+            onChange={(e) => {
+              setPrompt(e.target.value);
+              updateNodeData(id, { prompt: e.target.value });
+            }}
+            placeholder="Describe the image you want to generate..."
+            className="w-full h-[340px] bg-transparent p-4 pt-6 text-sm text-foreground placeholder:text-muted-foreground/40 resize-none border-0 focus:outline-none"
+          />
         </div>
 
         {/* Bottom toolbar */}
@@ -189,7 +214,7 @@ export function ImageGeneratorNode({ id, data, selected }: { id: string; data: S
         )}
       </div>
 
-      {/* Smart connectors — Image Generator accepts: text, reference images. Outputs: generated image */}
+      {/* Smart connectors */}
       <NodeConnectors inputs={NODE_INPUTS['image-generator']} outputs={NODE_OUTPUTS['image-generator']} />
     </div>
   );
