@@ -114,6 +114,37 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
     if (get().projectId) debouncedSave(get().saveProject);
   },
 
+  deleteNode: (nodeId) => {
+    set({
+      nodes: get().nodes.filter((n) => n.id !== nodeId),
+      edges: get().edges.filter((e) => e.source !== nodeId && e.target !== nodeId),
+    });
+    if (get().projectId) debouncedSave(get().saveProject);
+  },
+
+  duplicateNode: (nodeId) => {
+    const node = get().nodes.find((n) => n.id === nodeId);
+    if (!node) return;
+    const d = node.data as SpaceNodeData;
+    const counter = get().nodeCounter;
+    const newCount = (counter[d.type] || 0) + 1;
+    const label = `${nodeLabels[d.type]} #${newCount}`;
+    const newId = `${d.type}-${newCount}`;
+
+    const newNode: Node<SpaceNodeData> = {
+      id: newId,
+      type: node.type,
+      position: { x: node.position.x + 40, y: node.position.y + 40 },
+      data: { ...d, label, status: 'idle' },
+    };
+
+    set({
+      nodes: [...get().nodes, newNode],
+      nodeCounter: { ...counter, [d.type]: newCount },
+    });
+    if (get().projectId) debouncedSave(get().saveProject);
+  },
+
   setPaletteOpen: (open) => set({ paletteOpen: open }),
 
   setProjectName: (name) => {
