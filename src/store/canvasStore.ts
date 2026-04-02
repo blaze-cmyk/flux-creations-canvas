@@ -38,6 +38,7 @@ type CanvasState = {
   updateNodeData: (nodeId: string, data: Partial<SpaceNodeData>) => void;
   deleteNode: (nodeId: string) => void;
   duplicateNode: (nodeId: string) => void;
+  getConnectedInputs: (nodeId: string) => { texts: string[]; images: string[]; videos: string[]; startImage?: string; endImage?: string };
   setPaletteOpen: (open: boolean) => void;
   setProjectName: (name: string) => void;
   loadProject: (projectId: string) => Promise<void>;
@@ -143,6 +144,46 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
       nodeCounter: { ...counter, [d.type]: newCount },
     });
     if (get().projectId) debouncedSave(get().saveProject);
+  },
+
+  getConnectedInputs: (nodeId: string) => {
+    const { nodes, edges } = get();
+    const texts: string[] = [];
+    const images: string[] = [];
+    const videos: string[] = [];
+    let startImage: string | undefined;
+    let endImage: string | undefined;
+
+    // Find all edges targeting this node
+    const incomingEdges = edges.filter((e) => e.target === nodeId);
+    for (const edge of incomingEdges) {
+      const sourceNode = nodes.find((n) => n.id === edge.source);
+      if (!sourceNode) continue;
+      const sd = sourceNode.data as SpaceNodeData;
+
+      // Text nodes → texts
+      if (sd.type === 'text' && sd.text) {
+        texts.push(sd.text);
+      }
+
+      // Creation / image-generator nodes → images
+      if (sd.imageUrl) {
+        const targetHandle = edge.targetHandle || '';
+        if (targetHandle === 'start-img-in') {
+          startImage = sd.imageUrl;
+        } else if (targetHandle === 'end-img-in') {
+          endImage = sd.imageUrl;
+        } else {
+          images.push(sd.imageUrl);
+        }
+      }
+
+      // Video nodes → videos
+      if (sd.videoUrl) {
+        videos.push(sd.videoUrl);
+      }
+    }
+    return { texts, images, videos, startImage, endImage };
   },
 
   setPaletteOpen: (open) => set({ paletteOpen: open }),

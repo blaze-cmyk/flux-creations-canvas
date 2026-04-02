@@ -10,7 +10,7 @@ import { NodeToolbar } from './NodeToolbar';
 const NODE_MODELS = MODELS.map(m => ({ id: m.id, name: m.name }));
 
 export function ImageGeneratorNode({ id, data, selected }: { id: string; data: SpaceNodeData; selected?: boolean }) {
-  const updateNodeData = useCanvasStore((s) => s.updateNodeData);
+  const { updateNodeData, getConnectedInputs } = useCanvasStore();
   const [prompt, setPrompt] = useState(data.prompt || '');
   const [quantity, setQuantity] = useState(1);
   const [modelOpen, setModelOpen] = useState(false);
@@ -39,15 +39,26 @@ export function ImageGeneratorNode({ id, data, selected }: { id: string; data: S
   }, []);
 
   const handleGenerate = useCallback(async () => {
-    if (!prompt.trim() || generating) return;
+    if (generating) return;
     setGenerating(true);
     updateNodeData(id, { status: 'running' });
+
+    // Gather inputs from connected nodes
+    const inputs = getConnectedInputs(id);
+    const finalPrompt = [...inputs.texts, prompt].filter(Boolean).join('\n');
+    const refImages = inputs.images;
+
+    if (!finalPrompt.trim() && refImages.length === 0) {
+      updateNodeData(id, { status: 'error' });
+      setGenerating(false);
+      return;
+    }
 
     try {
       const { data: result, error } = await supabase.functions.invoke('generate-image', {
         body: {
-          prompt,
-          referenceImages: [],
+          prompt: finalPrompt || 'generate an image',
+          referenceImages: refImages,
           model: selectedModel,
           quality: '2K',
           aspectRatio: selectedAR,
@@ -65,7 +76,7 @@ export function ImageGeneratorNode({ id, data, selected }: { id: string; data: S
     } finally {
       setGenerating(false);
     }
-  }, [prompt, generating, selectedModel, selectedAR, id, updateNodeData]);
+  }, [prompt, generating, selectedModel, selectedAR, id, updateNodeData, getConnectedInputs]);
 
   return (
     <div className="space-node w-[520px] rounded-2xl bg-[hsl(var(--card))] border border-[hsl(var(--border)/0.3)] shadow-[0_8px_40px_rgba(0,0,0,0.5)] relative">
@@ -211,7 +222,7 @@ export function ImageGeneratorNode({ id, data, selected }: { id: string; data: S
           {/* Generate button */}
           <button
             onClick={handleGenerate}
-            disabled={generating || !prompt.trim()}
+            disabled={generating}
             className="w-9 h-9 rounded-full bg-[hsl(var(--muted))] flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors disabled:opacity-40"
           >
             <Play className="w-4 h-4" />

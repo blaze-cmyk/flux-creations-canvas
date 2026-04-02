@@ -85,9 +85,11 @@ export function SpacesCanvas() {
           fitView
           fitViewOptions={{ padding: 0.3 }}
           defaultEdgeOptions={{
-            type: 'smoothstep',
+            type: 'default',
             animated: false,
+            style: { stroke: 'hsl(240 5% 35%)', strokeWidth: 2 },
           }}
+          connectionLineStyle={{ stroke: 'hsl(240 5% 50%)', strokeWidth: 2 }}
           proOptions={{ hideAttribution: true }}
         >
           <Background variant={BackgroundVariant.Dots} gap={20} size={1} color="hsl(0 0% 15%)" />
