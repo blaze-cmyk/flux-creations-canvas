@@ -36,10 +36,33 @@ const welcomeNodes = [
 ];
 
 export function SpacesCanvas() {
-  const { nodes, edges, onNodesChange, onEdgesChange, onConnect, paletteOpen, setPaletteOpen, loadProject, saving, addNode } = useCanvasStore();
+  const { nodes, edges, onNodesChange, onEdgesChange, onConnect, paletteOpen, setPaletteOpen, loadProject, saving, addNode, updateNodeData } = useCanvasStore();
   const [searchParams] = useSearchParams();
   const projectId = searchParams.get('project');
   const [loaded, setLoaded] = useState(false);
+  const [canvasDragging, setCanvasDragging] = useState(false);
+
+  // Canvas-level drop handler for images
+  const handleCanvasDrop = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    setCanvasDragging(false);
+    const files = Array.from(e.dataTransfer.files).filter(f => f.type.startsWith('image/') || f.type.startsWith('video/'));
+    if (files.length === 0) return;
+    
+    files.forEach((file, i) => {
+      const pos = { x: e.clientX - 160 + i * 50, y: e.clientY - 200 + i * 50 };
+      addNode('creation', pos);
+      // Read file and update the latest creation node
+      const reader = new FileReader();
+      reader.onload = () => {
+        const counter = useCanvasStore.getState().nodeCounter;
+        const nodeId = `creation-${counter['creation']}`;
+        const label = file.name.length > 35 ? file.name.slice(0, 32) + '...' : file.name;
+        updateNodeData(nodeId, { imageUrl: reader.result as string, label });
+      };
+      reader.readAsDataURL(file);
+    });
+  }, [addNode, updateNodeData]);
 
   useEffect(() => {
     if (projectId) {
