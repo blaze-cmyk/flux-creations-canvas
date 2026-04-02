@@ -24,6 +24,7 @@ const nodeTypes: NodeTypes = {
   'image-generator': ImageGeneratorNode,
   'video-generator': VideoGeneratorNode,
   'text-node': TextNode,
+  assistant: AssistantNode,
 };
 
 const welcomeNodes = [
