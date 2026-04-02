@@ -16,6 +16,7 @@ import { NodePalette } from './NodePalette';
 import { useCallback, useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Search, FolderOpen, Image, Video, Sparkles } from 'lucide-react';
+import { motion } from 'framer-motion';
 
 const nodeTypes: NodeTypes = {
   creation: CreationNode,
@@ -33,7 +34,7 @@ const welcomeNodes = [
 ];
 
 export function SpacesCanvas() {
-  const { nodes, edges, onNodesChange, onEdgesChange, onConnect, setPaletteOpen, loadProject, saving, addNode } = useCanvasStore();
+  const { nodes, edges, onNodesChange, onEdgesChange, onConnect, paletteOpen, setPaletteOpen, loadProject, saving, addNode } = useCanvasStore();
   const [searchParams] = useSearchParams();
   const projectId = searchParams.get('project');
   const [loaded, setLoaded] = useState(false);
@@ -43,6 +44,17 @@ export function SpacesCanvas() {
       loadProject(projectId).then(() => setLoaded(true));
     }
   }, [projectId, loadProject]);
+
+  // N key shortcut to open palette
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === 'n' && !e.metaKey && !e.ctrlKey && !(e.target instanceof HTMLInputElement) && !(e.target instanceof HTMLTextAreaElement)) {
+        setPaletteOpen(!paletteOpen);
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [setPaletteOpen, paletteOpen]);
 
   const onPaneDoubleClick = useCallback(() => {
     setPaletteOpen(true);
@@ -68,7 +80,7 @@ export function SpacesCanvas() {
           onEdgesChange={onEdgesChange}
           onConnect={onConnect}
           nodeTypes={nodeTypes}
-          onPaneClick={() => setPaletteOpen(false)}
+          onPaneClick={() => {}}
           onDoubleClick={onPaneDoubleClick}
           fitView
           fitViewOptions={{ padding: 0.3 }}
@@ -96,25 +108,35 @@ export function SpacesCanvas() {
               />
             </svg>
 
-            <div className="relative z-10 flex flex-col items-center">
+            <motion.div
+              className="relative z-10 flex flex-col items-center"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
+            >
               <h2 className="text-2xl font-semibold text-foreground mb-2">Your space is ready</h2>
               <p className="text-sm text-muted-foreground mb-8">Choose your first node and start creating</p>
 
               <div className="flex gap-3 pointer-events-auto">
-                {welcomeNodes.map((node) => (
-                  <button
+                {welcomeNodes.map((node, i) => (
+                  <motion.button
                     key={node.label}
                     onClick={() => addNode(node.type, { x: 300, y: 200 })}
                     className="flex flex-col items-center gap-3 w-[130px] h-[110px] bg-card/80 backdrop-blur border border-border rounded-xl hover:border-muted-foreground/40 transition-colors justify-center"
+                    initial={{ opacity: 0, y: 16 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.2 + i * 0.06, duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
+                    whileHover={{ scale: 1.04, y: -2 }}
+                    whileTap={{ scale: 0.97 }}
                   >
                     <div className={`w-8 h-8 flex items-center justify-center ${node.color}`}>
                       <node.icon className="w-6 h-6" />
                     </div>
                     <span className="text-xs text-muted-foreground">{node.label}</span>
-                  </button>
+                  </motion.button>
                 ))}
               </div>
-            </div>
+            </motion.div>
           </div>
         )}
       </div>
