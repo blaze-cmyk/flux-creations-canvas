@@ -60,7 +60,7 @@ export function SpacesCanvas() {
       <TopBar />
       <LeftToolbar />
 
-      <div className="absolute inset-0 ml-10 mt-10">
+      <div className="absolute inset-0 ml-10 mt-10" onContextMenu={onPaneContextMenu}>
         <ReactFlow
           nodes={nodes}
           edges={edges}
