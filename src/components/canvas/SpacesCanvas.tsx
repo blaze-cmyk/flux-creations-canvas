@@ -92,7 +92,7 @@ export function SpacesCanvas() {
           connectionLineStyle={{ stroke: 'hsl(240 5% 50%)', strokeWidth: 2 }}
           proOptions={{ hideAttribution: true }}
         >
-          <Background variant={BackgroundVariant.Dots} gap={20} size={1} color="hsl(0 0% 15%)" />
+          <Background variant={BackgroundVariant.Dots} gap={20} size={1.2} color="hsl(0 0% 22%)" />
         </ReactFlow>
 
         {/* Empty state welcome screen */}
