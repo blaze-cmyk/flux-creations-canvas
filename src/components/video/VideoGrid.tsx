@@ -58,30 +58,25 @@ function VideoCard({ video }: { video: GeneratedVideo }) {
 
   // Details panel (right side) — shared across states
   const DetailsPanel = () => (
-    <div className="flex flex-col justify-between h-full p-4 min-w-[220px]">
-      <div className="space-y-3">
+    <div className="flex flex-col justify-between h-full p-3 min-w-[180px]">
+      <div className="space-y-2">
         {/* Model + Mode badges */}
-        <div className="flex items-center gap-2 flex-wrap">
-          <span className="flex items-center gap-1.5 bg-muted/80 text-foreground text-xs px-2.5 py-1 rounded-full">
+        <div className="flex items-center gap-1.5 flex-wrap">
+          <span className="flex items-center gap-1 bg-muted/80 text-foreground text-[11px] px-2 py-0.5 rounded-full">
             ⚙ {modelName}
           </span>
           {video.mode !== 'text-to-video' && (
-            <span className="text-[10px] bg-muted/60 text-muted-foreground px-2 py-0.5 rounded-full">
+            <span className="text-[10px] bg-muted/60 text-muted-foreground px-1.5 py-0.5 rounded-full">
               {modeLabel}
             </span>
           )}
         </div>
 
-        {/* Prompt */}
-        {video.prompt && (
-          <p className="text-sm text-muted-foreground leading-relaxed">{video.prompt}</p>
-        )}
-
         {/* Reference thumbnails */}
         {refs.length > 0 && (
-          <div className="flex gap-2">
+          <div className="flex gap-1.5">
             {refs.map((img, i) => (
-              <div key={i} className="w-12 h-12 rounded-lg overflow-hidden border border-border">
+              <div key={i} className="w-10 h-10 rounded-md overflow-hidden border border-border">
                 {img.startsWith('data:video') ? (
                   <video src={img} className="w-full h-full object-cover" muted />
                 ) : (
@@ -93,33 +88,31 @@ function VideoCard({ video }: { video: GeneratedVideo }) {
         )}
 
         {/* Quality + Duration tags */}
-        <div className="flex items-center gap-2">
-          <span className="flex items-center gap-1 text-[10px] text-muted-foreground bg-muted/50 px-2 py-0.5 rounded-full">
-            <Diamond className="w-3 h-3" /> 1080p
+        <div className="flex items-center gap-1.5">
+          <span className="flex items-center gap-1 text-[10px] text-muted-foreground bg-muted/50 px-1.5 py-0.5 rounded-full">
+            <Diamond className="w-2.5 h-2.5" /> 1080p
           </span>
-          <span className="flex items-center gap-1 text-[10px] text-muted-foreground bg-muted/50 px-2 py-0.5 rounded-full">
-            <Clock className="w-3 h-3" /> {video.duration}s
+          <span className="flex items-center gap-1 text-[10px] text-muted-foreground bg-muted/50 px-1.5 py-0.5 rounded-full">
+            <Clock className="w-2.5 h-2.5" /> {video.duration}s
           </span>
         </div>
       </div>
 
       {/* Date at bottom */}
-      <p className="text-[10px] text-muted-foreground/50 mt-4">{dateStr}</p>
+      <p className="text-[10px] text-muted-foreground/50 mt-2">{dateStr}</p>
     </div>
   );
 
   // Generating
   if (video.status === 'generating') {
     return (
-      <div className="flex border border-border rounded-2xl overflow-hidden bg-card min-h-[320px]">
-        {/* Left: generating area */}
-        <div className="flex-1 bg-background flex items-center justify-center relative">
-          <span className="absolute top-3 left-3 flex items-center gap-1.5 text-xs font-semibold px-3 py-1 rounded-full" style={{ backgroundColor: 'hsl(var(--primary))', color: 'hsl(var(--primary-foreground))' }}>
+      <div className="flex border border-border rounded-xl overflow-hidden bg-card h-[180px]">
+        <div className="w-[280px] shrink-0 bg-background flex items-center justify-center relative">
+          <span className="absolute top-2 left-2 flex items-center gap-1.5 text-[11px] font-semibold px-2.5 py-0.5 rounded-full" style={{ backgroundColor: 'hsl(var(--primary))', color: 'hsl(var(--primary-foreground))' }}>
             <Loader2 className="w-3 h-3 animate-spin" /> Generating{video.progress ? ` ${video.progress}%` : ''}
           </span>
         </div>
-        {/* Right: details */}
-        <div className="w-[280px] border-l border-border shrink-0">
+        <div className="flex-1 border-l border-border shrink-0">
           <DetailsPanel />
         </div>
       </div>
@@ -132,31 +125,24 @@ function VideoCard({ video }: { video: GeneratedVideo }) {
     const errorTitle = video.status === 'nsfw' ? 'Content Filtered' : isProviderError ? 'Upload Issue' : 'Generation Failed';
 
     return (
-      <div className="flex border border-border rounded-2xl overflow-hidden bg-card min-h-[320px]">
-        {/* Left: error area */}
-        <div className="flex-1 bg-background flex flex-col items-center justify-center gap-3 px-6">
-          <span className={`flex items-center gap-1 text-[10px] px-2.5 py-1 rounded-full font-medium ${
+      <div className="flex border border-border rounded-xl overflow-hidden bg-card h-[180px]">
+        <div className="w-[280px] shrink-0 bg-background flex flex-col items-center justify-center gap-2 px-4">
+          <span className={`flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full font-medium ${
             video.status === 'nsfw' ? 'bg-amber-500/20 text-amber-400' : isProviderError ? 'bg-amber-500/20 text-amber-400' : 'bg-destructive/20 text-destructive'
           }`}>
             <AlertCircle className="w-3 h-3" /> {errorTitle}
           </span>
-          <p className="text-xs text-muted-foreground text-center max-w-sm leading-relaxed">{video.error || 'Generation failed'}</p>
-          {isProviderError && (
-            <p className="text-[10px] text-muted-foreground/50 text-center max-w-xs">
-              Tip: Use smaller reference images or try a different model
-            </p>
-          )}
-          <div className="flex items-center gap-2 mt-2">
-            <button onClick={() => retryVideo(video.id)} className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground bg-muted/60 px-3 py-1.5 rounded-lg transition-colors">
+          <p className="text-[11px] text-muted-foreground text-center leading-relaxed line-clamp-2">{video.error || 'Generation failed'}</p>
+          <div className="flex items-center gap-2">
+            <button onClick={() => retryVideo(video.id)} className="flex items-center gap-1 text-[11px] text-muted-foreground hover:text-foreground bg-muted/60 px-2.5 py-1 rounded-lg transition-colors">
               <RefreshCw className="w-3 h-3" /> Retry
             </button>
-            <button onClick={() => deleteVideo(video.id)} className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-destructive bg-muted/60 px-3 py-1.5 rounded-lg transition-colors">
+            <button onClick={() => deleteVideo(video.id)} className="flex items-center gap-1 text-[11px] text-muted-foreground hover:text-destructive bg-muted/60 px-2.5 py-1 rounded-lg transition-colors">
               <Trash2 className="w-3 h-3" /> Delete
             </button>
           </div>
         </div>
-        {/* Right: details */}
-        <div className="w-[280px] border-l border-border shrink-0">
+        <div className="flex-1 border-l border-border">
           <DetailsPanel />
         </div>
       </div>
@@ -165,17 +151,17 @@ function VideoCard({ video }: { video: GeneratedVideo }) {
 
   // Complete
   return (
-    <div className="flex border border-border rounded-2xl overflow-hidden bg-card min-h-[320px]">
+    <div className="flex border border-border rounded-xl overflow-hidden bg-card h-[200px]">
       {/* Left: video */}
       <div
-        className="flex-1 bg-black relative cursor-pointer"
+        className="w-[300px] shrink-0 bg-black relative cursor-pointer"
         onClick={() => setSelectedVideoId(video.id)}
         onMouseEnter={() => setHovered(true)}
         onMouseLeave={() => setHovered(false)}
       >
         <video
           src={video.videoUrl}
-          className="w-full h-full object-contain"
+          className="w-full h-full object-cover"
           muted
           loop
           playsInline
@@ -184,36 +170,32 @@ function VideoCard({ video }: { video: GeneratedVideo }) {
         />
         {!hovered && (
           <div className="absolute inset-0 flex items-center justify-center">
-            <div className="w-12 h-12 rounded-full bg-black/40 flex items-center justify-center backdrop-blur-sm">
-              <Play className="w-6 h-6 text-white ml-0.5" />
+            <div className="w-10 h-10 rounded-full bg-black/40 flex items-center justify-center backdrop-blur-sm">
+              <Play className="w-5 h-5 text-white ml-0.5" />
             </div>
           </div>
         )}
-        {/* Expand icon */}
-        <button className="absolute top-3 right-3 w-7 h-7 rounded-lg bg-black/40 flex items-center justify-center text-white/80 hover:bg-black/60 backdrop-blur-sm opacity-0 group-hover:opacity-100 transition-opacity">
-          <Maximize2 className="w-3.5 h-3.5" />
-        </button>
       </div>
 
       {/* Right: details */}
-      <div className="w-[280px] border-l border-border shrink-0 flex flex-col">
+      <div className="flex-1 border-l border-border flex flex-col">
         <div className="flex-1">
           <DetailsPanel />
         </div>
         {/* Footer actions */}
-        <div className="flex items-center justify-between px-4 py-3 border-t border-border">
-          <button onClick={() => retryVideo(video.id)} className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors">
-            <RefreshCw className="w-3.5 h-3.5" /> Rerun
+        <div className="flex items-center justify-between px-3 py-2 border-t border-border">
+          <button onClick={() => retryVideo(video.id)} className="flex items-center gap-1 text-[11px] text-muted-foreground hover:text-foreground transition-colors">
+            <RefreshCw className="w-3 h-3" /> Rerun
           </button>
-          <div className="flex items-center gap-1">
-            <button onClick={handleDownload} className="w-7 h-7 rounded-lg flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-colors" title="Download">
-              <Download className="w-3.5 h-3.5" />
+          <div className="flex items-center gap-0.5">
+            <button onClick={handleDownload} className="w-6 h-6 rounded-md flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-colors" title="Download">
+              <Download className="w-3 h-3" />
             </button>
-            <button className="w-7 h-7 rounded-lg flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-colors" title="Copy">
-              <Copy className="w-3.5 h-3.5" />
+            <button className="w-6 h-6 rounded-md flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-colors" title="Copy">
+              <Copy className="w-3 h-3" />
             </button>
-            <button onClick={e => { e.stopPropagation(); deleteVideo(video.id); }} className="w-7 h-7 rounded-lg flex items-center justify-center text-muted-foreground hover:text-destructive hover:bg-muted transition-colors" title="Delete">
-              <Trash2 className="w-3.5 h-3.5" />
+            <button onClick={e => { e.stopPropagation(); deleteVideo(video.id); }} className="w-6 h-6 rounded-md flex items-center justify-center text-muted-foreground hover:text-destructive hover:bg-muted transition-colors" title="Delete">
+              <Trash2 className="w-3 h-3" />
             </button>
           </div>
         </div>
