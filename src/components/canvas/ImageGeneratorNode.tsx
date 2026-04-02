@@ -67,16 +67,8 @@ export function ImageGeneratorNode({ id, data, selected }: { id: string; data: S
     }
   }, [prompt, generating, selectedModel, selectedAR, id, updateNodeData]);
 
-  const [selected, setSelected] = useState(false);
-
   return (
-    <div
-      className="space-node w-[520px] rounded-2xl bg-[hsl(var(--card))] border border-[hsl(var(--border)/0.3)] shadow-[0_8px_40px_rgba(0,0,0,0.5)] relative"
-      onClick={() => setSelected(true)}
-      onBlur={() => setSelected(false)}
-      tabIndex={0}
-    >
-      {/* Toolbar */}
+    <div className="space-node w-[520px] rounded-2xl bg-[hsl(var(--card))] border border-[hsl(var(--border)/0.3)] shadow-[0_8px_40px_rgba(0,0,0,0.5)] relative">
       {selected && <NodeToolbar nodeId={id} nodeType="image-generator" />}
 
       {/* Header */}

@@ -4,11 +4,9 @@ import { Grid3X3, Volume2 } from 'lucide-react';
 import { useState } from 'react';
 import { NodeToolbar } from './NodeToolbar';
 
-export function CreationNode({ id, data }: { id: string; data: SpaceNodeData }) {
-  const [selected, setSelected] = useState(false);
-
+export function CreationNode({ id, data, selected }: { id: string; data: SpaceNodeData; selected?: boolean }) {
   return (
-    <div className="space-node w-[220px] rounded-xl bg-node border border-node-border shadow-[0_4px_24px_rgba(0,0,0,0.6)] relative" onClick={() => setSelected(true)} onBlur={() => setSelected(false)} tabIndex={0}>
+    <div className="space-node w-[220px] rounded-xl bg-node border border-node-border shadow-[0_4px_24px_rgba(0,0,0,0.6)] relative">
       {selected && <NodeToolbar nodeId={id} nodeType="creation" />}
       <div className="flex items-center gap-1.5 px-3 py-2 text-xs text-muted-foreground">
         <Grid3X3 className="w-3 h-3" />
