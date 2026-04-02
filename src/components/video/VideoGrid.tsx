@@ -58,30 +58,25 @@ function VideoCard({ video }: { video: GeneratedVideo }) {
 
   // Details panel (right side) — shared across states
   const DetailsPanel = () => (
-    <div className="flex flex-col justify-between h-full p-4 min-w-[220px]">
-      <div className="space-y-3">
+    <div className="flex flex-col justify-between h-full p-3 min-w-[180px]">
+      <div className="space-y-2">
         {/* Model + Mode badges */}
-        <div className="flex items-center gap-2 flex-wrap">
-          <span className="flex items-center gap-1.5 bg-muted/80 text-foreground text-xs px-2.5 py-1 rounded-full">
+        <div className="flex items-center gap-1.5 flex-wrap">
+          <span className="flex items-center gap-1 bg-muted/80 text-foreground text-[11px] px-2 py-0.5 rounded-full">
             ⚙ {modelName}
           </span>
           {video.mode !== 'text-to-video' && (
-            <span className="text-[10px] bg-muted/60 text-muted-foreground px-2 py-0.5 rounded-full">
+            <span className="text-[10px] bg-muted/60 text-muted-foreground px-1.5 py-0.5 rounded-full">
               {modeLabel}
             </span>
           )}
         </div>
 
-        {/* Prompt */}
-        {video.prompt && (
-          <p className="text-sm text-muted-foreground leading-relaxed">{video.prompt}</p>
-        )}
-
         {/* Reference thumbnails */}
         {refs.length > 0 && (
-          <div className="flex gap-2">
+          <div className="flex gap-1.5">
             {refs.map((img, i) => (
-              <div key={i} className="w-12 h-12 rounded-lg overflow-hidden border border-border">
+              <div key={i} className="w-10 h-10 rounded-md overflow-hidden border border-border">
                 {img.startsWith('data:video') ? (
                   <video src={img} className="w-full h-full object-cover" muted />
                 ) : (
@@ -93,18 +88,18 @@ function VideoCard({ video }: { video: GeneratedVideo }) {
         )}
 
         {/* Quality + Duration tags */}
-        <div className="flex items-center gap-2">
-          <span className="flex items-center gap-1 text-[10px] text-muted-foreground bg-muted/50 px-2 py-0.5 rounded-full">
-            <Diamond className="w-3 h-3" /> 1080p
+        <div className="flex items-center gap-1.5">
+          <span className="flex items-center gap-1 text-[10px] text-muted-foreground bg-muted/50 px-1.5 py-0.5 rounded-full">
+            <Diamond className="w-2.5 h-2.5" /> 1080p
           </span>
-          <span className="flex items-center gap-1 text-[10px] text-muted-foreground bg-muted/50 px-2 py-0.5 rounded-full">
-            <Clock className="w-3 h-3" /> {video.duration}s
+          <span className="flex items-center gap-1 text-[10px] text-muted-foreground bg-muted/50 px-1.5 py-0.5 rounded-full">
+            <Clock className="w-2.5 h-2.5" /> {video.duration}s
           </span>
         </div>
       </div>
 
       {/* Date at bottom */}
-      <p className="text-[10px] text-muted-foreground/50 mt-4">{dateStr}</p>
+      <p className="text-[10px] text-muted-foreground/50 mt-2">{dateStr}</p>
     </div>
   );
 
