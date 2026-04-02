@@ -9,7 +9,7 @@ import { NodeToolbar } from './NodeToolbar';
 
 const NODE_MODELS = MODELS.map(m => ({ id: m.id, name: m.name }));
 
-export function ImageGeneratorNode({ id, data }: { id: string; data: SpaceNodeData }) {
+export function ImageGeneratorNode({ id, data, selected }: { id: string; data: SpaceNodeData; selected?: boolean }) {
   const updateNodeData = useCanvasStore((s) => s.updateNodeData);
   const [prompt, setPrompt] = useState(data.prompt || '');
   const [quantity, setQuantity] = useState(1);
