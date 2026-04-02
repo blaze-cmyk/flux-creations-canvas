@@ -146,6 +146,7 @@ export function SpacesCanvas() {
           onNodesChange={onNodesChange}
           onEdgesChange={onEdgesChange}
           onConnect={onConnect}
+          isValidConnection={(connection: Connection) => isValidConnection(connection.sourceHandle, connection.targetHandle)}
           nodeTypes={nodeTypes}
           edgeTypes={edgeTypes}
           onPaneClick={() => {}}
