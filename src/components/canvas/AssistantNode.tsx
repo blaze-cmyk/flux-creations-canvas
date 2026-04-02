@@ -5,6 +5,7 @@ import { Pen, MessageSquareText, Sparkles, Settings, Play, ChevronDown, Search }
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { NodeToolbar } from './NodeToolbar';
+import { logSpacesEvent } from '@/lib/spacesHistory';
 import { NodeConnectors } from './NodeConnectors';
 import { NODE_INPUTS, NODE_OUTPUTS } from '@/lib/connectionRules';
 
