@@ -6,6 +6,7 @@ import { Video, Play, Minus, Plus, Settings, ChevronDown, Search } from 'lucide-
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { NodeToolbar } from './NodeToolbar';
+import { logSpacesEvent } from '@/lib/spacesHistory';
 import { NodeConnectors } from './NodeConnectors';
 import { NODE_INPUTS, NODE_OUTPUTS } from '@/lib/connectionRules';
 
@@ -95,6 +96,8 @@ export function VideoGeneratorNode({ id, data, selected }: { id: string; data: S
             if (pollResult?.status === 'complete' && pollResult.videoUrl) {
               clearInterval(pollInterval);
               updateNodeData(id, { status: 'complete', videoUrl: pollResult.videoUrl });
+              const projectId = useCanvasStore.getState().projectId;
+              if (projectId) logSpacesEvent({ projectId, nodeId: id, eventType: 'video_generated', contentUrl: pollResult.videoUrl, prompt: finalPrompt, model: selectedModel, metadata: { aspectRatio: selectedAR, duration: selectedDuration } });
               setGenerating(false);
             } else if (pollResult?.status === 'failed') {
               clearInterval(pollInterval);
@@ -109,6 +112,8 @@ export function VideoGeneratorNode({ id, data, selected }: { id: string; data: S
         }, 5000);
       } else if (result?.videoUrl) {
         updateNodeData(id, { status: 'complete', videoUrl: result.videoUrl });
+        const projectId = useCanvasStore.getState().projectId;
+        if (projectId) logSpacesEvent({ projectId, nodeId: id, eventType: 'video_generated', contentUrl: result.videoUrl, prompt: finalPrompt, model: selectedModel, metadata: { aspectRatio: selectedAR, duration: selectedDuration } });
         setGenerating(false);
       }
     } catch {

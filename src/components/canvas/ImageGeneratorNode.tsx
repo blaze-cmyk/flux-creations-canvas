@@ -6,6 +6,7 @@ import { Image, Play, Minus, Plus, Settings, ChevronDown, Search } from 'lucide-
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { NodeToolbar } from './NodeToolbar';
+import { logSpacesEvent } from '@/lib/spacesHistory';
 import { NodeConnectors } from './NodeConnectors';
 import { NODE_INPUTS, NODE_OUTPUTS } from '@/lib/connectionRules';
 
@@ -70,6 +71,8 @@ export function ImageGeneratorNode({ id, data, selected }: { id: string; data: S
       } else {
         const imageUrl = result?.imageBase64 || result?.imageUrl;
         updateNodeData(id, { status: 'complete', imageUrl });
+        const projectId = useCanvasStore.getState().projectId;
+        if (projectId) logSpacesEvent({ projectId, nodeId: id, eventType: 'image_generated', contentUrl: imageUrl, prompt: finalPrompt, model: selectedModel, metadata: { aspectRatio: selectedAR } });
       }
     } catch {
       updateNodeData(id, { status: 'error' });

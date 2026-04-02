@@ -5,6 +5,7 @@ import { Pen, MessageSquareText, Sparkles, Settings, Play, ChevronDown, Search }
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { NodeToolbar } from './NodeToolbar';
+import { logSpacesEvent } from '@/lib/spacesHistory';
 import { NodeConnectors } from './NodeConnectors';
 import { NODE_INPUTS, NODE_OUTPUTS } from '@/lib/connectionRules';
 
@@ -74,6 +75,8 @@ export function AssistantNode({ id, data, selected }: { id: string; data: SpaceN
         const text = result?.text || result?.content || '';
         setResponse(text);
         updateNodeData(id, { status: 'complete', text });
+        const projectId = useCanvasStore.getState().projectId;
+        if (projectId) logSpacesEvent({ projectId, nodeId: id, eventType: 'assistant_response', prompt: finalPrompt, model: selectedModel, metadata: { mode, responseLength: text.length } });
       }
     } catch {
       updateNodeData(id, { status: 'error' });

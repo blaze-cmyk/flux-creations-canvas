@@ -4,6 +4,7 @@ import { useCanvasStore } from '@/store/canvasStore';
 import { ImageIcon, Upload, Replace } from 'lucide-react';
 import { useState, useCallback, useRef } from 'react';
 import { resolveToUrl } from '@/lib/uploadToStorage';
+import { logSpacesEvent } from '@/lib/spacesHistory';
 import { NodeToolbar } from './NodeToolbar';
 import { NodeConnectors } from './NodeConnectors';
 import { NODE_INPUTS, NODE_OUTPUTS } from '@/lib/connectionRules';
@@ -26,6 +27,8 @@ export function CreationNode({ id, data, selected }: { id: string; data: SpaceNo
         try {
           const publicUrl = await resolveToUrl(dataUrl);
           updateNodeData(id, { imageUrl: publicUrl });
+          const projectId = useCanvasStore.getState().projectId;
+          if (projectId) logSpacesEvent({ projectId, nodeId: id, eventType: 'image_uploaded', contentUrl: publicUrl, metadata: { fileName: file.name } });
         } catch (e) {
           console.error('Upload failed:', e);
         }
