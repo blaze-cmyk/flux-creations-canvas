@@ -106,15 +106,13 @@ function VideoCard({ video }: { video: GeneratedVideo }) {
   // Generating
   if (video.status === 'generating') {
     return (
-      <div className="flex border border-border rounded-2xl overflow-hidden bg-card min-h-[320px]">
-        {/* Left: generating area */}
-        <div className="flex-1 bg-background flex items-center justify-center relative">
-          <span className="absolute top-3 left-3 flex items-center gap-1.5 text-xs font-semibold px-3 py-1 rounded-full" style={{ backgroundColor: 'hsl(var(--primary))', color: 'hsl(var(--primary-foreground))' }}>
+      <div className="flex border border-border rounded-xl overflow-hidden bg-card h-[180px]">
+        <div className="w-[280px] shrink-0 bg-background flex items-center justify-center relative">
+          <span className="absolute top-2 left-2 flex items-center gap-1.5 text-[11px] font-semibold px-2.5 py-0.5 rounded-full" style={{ backgroundColor: 'hsl(var(--primary))', color: 'hsl(var(--primary-foreground))' }}>
             <Loader2 className="w-3 h-3 animate-spin" /> Generating{video.progress ? ` ${video.progress}%` : ''}
           </span>
         </div>
-        {/* Right: details */}
-        <div className="w-[280px] border-l border-border shrink-0">
+        <div className="flex-1 border-l border-border shrink-0">
           <DetailsPanel />
         </div>
       </div>
