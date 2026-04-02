@@ -97,7 +97,13 @@ export function SpacesCanvas() {
       <TopBar />
       <LeftToolbar />
 
-      <div className="absolute inset-0 ml-10 mt-10" onContextMenu={onPaneContextMenu}>
+      <div
+        className={`absolute inset-0 ml-10 mt-10 ${canvasDragging ? 'ring-2 ring-inset ring-primary/30' : ''}`}
+        onContextMenu={onPaneContextMenu}
+        onDragOver={(e) => { e.preventDefault(); setCanvasDragging(true); }}
+        onDragLeave={() => setCanvasDragging(false)}
+        onDrop={handleCanvasDrop}
+      >
         <ReactFlow
           nodes={nodes}
           edges={edges}
