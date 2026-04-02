@@ -151,7 +151,7 @@ function VideoCard({ video }: { video: GeneratedVideo }) {
 
   // Complete
   return (
-    <div className="flex border border-border rounded-xl overflow-hidden bg-card h-[280px]">
+    <div className="flex border border-border rounded-xl overflow-hidden bg-card" style={{ aspectRatio: '16/9' }}>
       {/* Left: video area — 16:9 card, video shown at native ratio inside */}
       <div
         className="flex-1 bg-black relative cursor-pointer flex items-center justify-center"
