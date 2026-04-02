@@ -36,6 +36,8 @@ type CanvasState = {
   onConnect: OnConnect;
   addNode: (type: SpaceNodeData['type'], position?: { x: number; y: number }) => void;
   updateNodeData: (nodeId: string, data: Partial<SpaceNodeData>) => void;
+  deleteNode: (nodeId: string) => void;
+  duplicateNode: (nodeId: string) => void;
   setPaletteOpen: (open: boolean) => void;
   setProjectName: (name: string) => void;
   loadProject: (projectId: string) => Promise<void>;
