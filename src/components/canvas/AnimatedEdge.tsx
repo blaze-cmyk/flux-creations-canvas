@@ -18,7 +18,7 @@ export function AnimatedEdge({
     targetX,
     targetY,
     targetPosition,
-    curvature: 0.4,
+    curvature: 0.25,
   });
 
   return (

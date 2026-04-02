@@ -154,8 +154,8 @@ export function SpacesCanvas() {
           fitView
           fitViewOptions={{ padding: 0.3 }}
           connectionMode={ConnectionMode.Loose}
-          connectionLineType={ConnectionLineType.SmoothStep}
-          connectionLineStyle={{ stroke: 'hsl(233 63% 53%)', strokeWidth: 2.5 }}
+          connectionLineType={ConnectionLineType.Bezier}
+          connectionLineStyle={{ stroke: 'hsl(233 63% 53%)', strokeWidth: 2.5, strokeLinecap: 'round' }}
           defaultEdgeOptions={{
             type: 'animated',
             animated: false,
