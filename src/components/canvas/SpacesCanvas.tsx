@@ -23,8 +23,8 @@ import { useCallback, useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Search, FolderOpen, Image, Video, Sparkles } from 'lucide-react';
 import { motion } from 'framer-motion';
+import { isValidConnection } from '@/lib/connectionRules';
 
-const nodeTypes: NodeTypes = {
   creation: CreationNode,
   'image-generator': ImageGeneratorNode,
   'video-generator': VideoGeneratorNode,
