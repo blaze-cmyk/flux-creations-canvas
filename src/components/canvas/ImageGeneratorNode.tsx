@@ -40,20 +40,17 @@ export function ImageGeneratorNode({ id, data, selected }: { id: string; data: S
     return () => document.removeEventListener('mousedown', handler);
   }, []);
 
-  const handleGenerate = useCallback(async () => {
-    if (generating) return;
-    setGenerating(true);
-    updateNodeData(id, { status: 'running' });
-
+  const generateSingle = useCallback(async (nodeId: string) => {
     const inputs = getConnectedInputs(id);
     const finalPrompt = [...inputs.texts, prompt].filter(Boolean).join('\n');
     const refImages = inputs.images;
 
     if (!finalPrompt.trim() && refImages.length === 0) {
-      updateNodeData(id, { status: 'error' });
-      setGenerating(false);
+      updateNodeData(nodeId, { status: 'error' });
       return;
     }
+
+    updateNodeData(nodeId, { status: 'running' });
 
     try {
       const { data: result, error } = await supabase.functions.invoke('generate-image', {
@@ -67,19 +64,73 @@ export function ImageGeneratorNode({ id, data, selected }: { id: string; data: S
       });
 
       if (error || result?.error) {
-        updateNodeData(id, { status: 'error' });
+        updateNodeData(nodeId, { status: 'error' });
       } else {
         const imageUrl = result?.imageBase64 || result?.imageUrl;
-        updateNodeData(id, { status: 'complete', imageUrl });
+        updateNodeData(nodeId, { status: 'complete', imageUrl });
         const projectId = useCanvasStore.getState().projectId;
-        if (projectId) logSpacesEvent({ projectId, nodeId: id, eventType: 'image_generated', contentUrl: imageUrl, prompt: finalPrompt, model: selectedModel, metadata: { aspectRatio: selectedAR } });
+        if (projectId) logSpacesEvent({ projectId, nodeId, eventType: 'image_generated', contentUrl: imageUrl, prompt: finalPrompt, model: selectedModel, metadata: { aspectRatio: selectedAR } });
       }
     } catch {
-      updateNodeData(id, { status: 'error' });
-    } finally {
-      setGenerating(false);
+      updateNodeData(nodeId, { status: 'error' });
     }
-  }, [prompt, generating, selectedModel, selectedAR, id, updateNodeData, getConnectedInputs]);
+  }, [prompt, selectedModel, selectedAR, id, updateNodeData, getConnectedInputs]);
+
+  const handleGenerate = useCallback(async () => {
+    if (generating) return;
+    setGenerating(true);
+
+    const { addNode, nodes, edges } = useCanvasStore.getState();
+    const currentNode = nodes.find(n => n.id === id);
+    const basePos = currentNode?.position || { x: 300, y: 200 };
+
+    // Spawn extra generator nodes for quantity > 1
+    const nodeIds = [id];
+    for (let i = 1; i < quantity; i++) {
+      const store = useCanvasStore.getState();
+      const counter = store.nodeCounter;
+      const newCount = (counter['image-generator'] || 0) + 1;
+      const newId = `image-generator-${newCount}`;
+      const pos = { x: basePos.x + i * 360, y: basePos.y };
+
+      const newNode = {
+        id: newId,
+        type: 'image-generator' as const,
+        position: pos,
+        data: {
+          label: `Image Generator #${newCount}`,
+          type: 'image-generator' as const,
+          status: 'idle' as const,
+          model: selectedModel,
+          aspectRatio: selectedAR,
+          prompt,
+        },
+      };
+
+      useCanvasStore.setState({
+        nodes: [...useCanvasStore.getState().nodes, newNode],
+        nodeCounter: { ...useCanvasStore.getState().nodeCounter, 'image-generator': newCount },
+      });
+
+      // Copy edges from original node to new node
+      const incomingEdges = edges.filter(e => e.target === id);
+      if (incomingEdges.length > 0) {
+        const newEdges = incomingEdges.map(e => ({
+          ...e,
+          id: `${e.id}-clone-${i}-${newCount}`,
+          target: newId,
+        }));
+        useCanvasStore.setState({ edges: [...useCanvasStore.getState().edges, ...newEdges] });
+      }
+
+      nodeIds.push(newId);
+    }
+
+    // Generate all in parallel
+    await Promise.all(nodeIds.map(nid => generateSingle(nid)));
+
+    setGenerating(false);
+  }, [prompt, generating, selectedModel, selectedAR, id, quantity, generateSingle]);
 
   // When image is generated, show as a clean image container
   if (data.imageUrl) {
