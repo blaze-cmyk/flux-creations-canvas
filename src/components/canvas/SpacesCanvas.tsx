@@ -48,6 +48,11 @@ export function SpacesCanvas() {
     setPaletteOpen(true);
   }, [setPaletteOpen]);
 
+  const onPaneContextMenu = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    setPaletteOpen(true);
+  }, [setPaletteOpen]);
+
   const isEmpty = loaded && nodes.length === 0;
 
   return (
