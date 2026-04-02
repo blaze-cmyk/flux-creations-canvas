@@ -1,10 +1,11 @@
-import { Handle, Position } from '@xyflow/react';
+import { Handle, Position, useNodeId } from '@xyflow/react';
 import type { SpaceNodeData } from '@/store/canvasStore';
 import { useCanvasStore } from '@/store/canvasStore';
 import { MODELS, ASPECT_RATIOS } from '@/store/generatorStore';
 import { Image, Play, Minus, Plus, Settings, Type, ImageIcon, Search, ChevronDown, X } from 'lucide-react';
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { NodeToolbar } from './NodeToolbar';
 
 const NODE_MODELS = MODELS.map(m => ({ id: m.id, name: m.name }));
 
@@ -66,8 +67,18 @@ export function ImageGeneratorNode({ id, data }: { id: string; data: SpaceNodeDa
     }
   }, [prompt, generating, selectedModel, selectedAR, id, updateNodeData]);
 
+  const [selected, setSelected] = useState(false);
+
   return (
-    <div className="space-node w-[520px] rounded-2xl bg-[hsl(var(--card))] border border-[hsl(var(--border)/0.3)] shadow-[0_8px_40px_rgba(0,0,0,0.5)]">
+    <div
+      className="space-node w-[520px] rounded-2xl bg-[hsl(var(--card))] border border-[hsl(var(--border)/0.3)] shadow-[0_8px_40px_rgba(0,0,0,0.5)] relative"
+      onClick={() => setSelected(true)}
+      onBlur={() => setSelected(false)}
+      tabIndex={0}
+    >
+      {/* Toolbar */}
+      {selected && <NodeToolbar nodeId={id} nodeType="image-generator" />}
+
       {/* Header */}
       <div className="flex items-center gap-2 px-4 py-2.5 text-sm text-muted-foreground">
         <Image className="w-4 h-4" />
