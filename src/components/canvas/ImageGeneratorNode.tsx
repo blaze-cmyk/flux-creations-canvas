@@ -91,18 +91,21 @@ export function ImageGeneratorNode({ id, data }: { id: string; data: SpaceNodeDa
             />
           )}
 
-          {/* Right-side output handle icon */}
-          <div className="absolute top-4 -right-5 w-10 h-10 rounded-full bg-[hsl(var(--muted))] flex items-center justify-center cursor-pointer hover:bg-[hsl(var(--muted)/0.8)] transition-colors" title="Generated image output">
-            <ImageIcon className="w-4 h-4 text-muted-foreground" />
-          </div>
         </div>
 
-        {/* Left side connector icons */}
-        <div className="absolute -left-5 top-1/3 flex flex-col gap-3">
+        {/* Left side connector icons — anchored to card edge */}
+        <div className="absolute left-0 bottom-16 -translate-x-1/2 flex flex-col gap-3 z-10">
           <div className="w-10 h-10 rounded-full bg-[hsl(var(--muted))] flex items-center justify-center cursor-pointer hover:bg-[hsl(var(--muted)/0.8)] transition-colors" title="Text input">
             <Type className="w-4 h-4 text-muted-foreground" />
           </div>
           <div className="w-10 h-10 rounded-full bg-[hsl(var(--muted))] flex items-center justify-center cursor-pointer hover:bg-[hsl(var(--muted)/0.8)] transition-colors" title="Reference image">
+            <ImageIcon className="w-4 h-4 text-muted-foreground" />
+          </div>
+        </div>
+
+        {/* Right side output icon — anchored to card edge */}
+        <div className="absolute right-0 top-8 translate-x-1/2 z-10">
+          <div className="w-10 h-10 rounded-full bg-[hsl(var(--muted))] flex items-center justify-center cursor-pointer hover:bg-[hsl(var(--muted)/0.8)] transition-colors" title="Generated image output">
             <ImageIcon className="w-4 h-4 text-muted-foreground" />
           </div>
         </div>
