@@ -98,94 +98,30 @@ export default function SpacesProjects() {
 
       {/* Hero section */}
       <div className="relative mx-6 mt-4 rounded-2xl overflow-hidden" style={{ height: 400 }}>
-        {/* Dark gradient background with colored glows */}
-        <div className="absolute inset-0 bg-[#0a0a0f]" />
-        <div className="absolute inset-0 bg-gradient-to-br from-emerald-900/20 via-transparent to-indigo-900/15" />
-        <div className="absolute bottom-0 left-0 w-[500px] h-[300px] bg-gradient-to-tr from-emerald-500/8 via-teal-500/5 to-transparent rounded-full blur-3xl" />
-        <div className="absolute top-0 right-1/3 w-[400px] h-[250px] bg-gradient-to-b from-violet-500/6 via-purple-500/4 to-transparent rounded-full blur-3xl" />
+        {/* Video background */}
+        <video
+          autoPlay
+          muted
+          loop
+          playsInline
+          className="absolute inset-0 w-full h-full object-cover"
+          src="/spaces-hero-video-2.mp4"
+        />
+        {/* Dark overlay for text readability */}
+        <div className="absolute inset-0 bg-gradient-to-r from-black/70 via-black/30 to-transparent" />
 
         {/* Content */}
-        <div className="relative z-10 h-full flex">
-          {/* Left side text */}
-          <div className="flex flex-col justify-end p-10 max-w-md">
-            <h1 className="text-5xl font-bold text-foreground mb-3 leading-tight tracking-tight">Spaces</h1>
-            <p className="text-base font-semibold text-foreground mb-0.5">Start from scratch</p>
-            <p className="text-sm text-muted-foreground mb-5">Create a new space and start collaborating.</p>
-            <button
-              onClick={createProject}
-              className="flex items-center gap-2 bg-foreground text-background px-5 py-2.5 rounded-full text-sm font-medium hover:opacity-90 transition-opacity w-fit"
-            >
-              <Plus className="w-4 h-4" />
-              New space
-            </button>
-          </div>
-
-          {/* Right side — floating nodes with connection lines */}
-          <div className="flex-1 relative hidden lg:block">
-            {/* SVG connection lines */}
-            <svg className="absolute inset-0 w-full h-full pointer-events-none" xmlns="http://www.w3.org/2000/svg">
-              {/* Green line: from left edge through prompt card to top-right image */}
-              <path d="M 0 200 C 60 180, 120 120, 200 130 C 280 140, 300 100, 360 80 C 420 60, 480 50, 530 70 C 560 80, 580 60, 600 50" 
-                stroke="#34d399" strokeWidth="2" fill="none" opacity="0.5" />
-              {/* Green dots */}
-              <circle cx="0" cy="200" r="5" fill="#34d399" opacity="0.7" />
-              <circle cx="200" cy="130" r="5" fill="#34d399" opacity="0.7" />
-              <circle cx="360" cy="80" r="5" fill="#34d399" opacity="0.7" />
-              <circle cx="530" cy="70" r="5" fill="#34d399" opacity="0.7" />
-              <circle cx="600" cy="50" r="5" fill="#34d399" opacity="0.7" />
-
-              {/* Purple/blue line: connecting bottom images */}
-              <path d="M 160 340 C 200 300, 240 280, 280 290 C 320 300, 350 280, 390 260 C 430 240, 460 250, 500 230 C 530 215, 560 200, 590 180" 
-                stroke="#8b5cf6" strokeWidth="2" fill="none" opacity="0.4" />
-              {/* Purple dots */}
-              <circle cx="160" cy="340" r="5" fill="#8b5cf6" opacity="0.6" />
-              <circle cx="280" cy="290" r="5" fill="#8b5cf6" opacity="0.6" />
-              <circle cx="390" cy="260" r="5" fill="#8b5cf6" opacity="0.6" />
-              <circle cx="500" cy="230" r="5" fill="#8b5cf6" opacity="0.6" />
-              <circle cx="590" cy="180" r="5" fill="#8b5cf6" opacity="0.6" />
-            </svg>
-
-            {/* Prompt card — top center */}
-            <div className="absolute top-12 left-24 bg-[#1a1a24]/90 backdrop-blur-sm border border-white/10 rounded-xl px-4 py-3 max-w-[210px] shadow-2xl">
-              <p className="text-[11px] text-muted-foreground leading-relaxed">
-                Slowly and cinematically zoom out of the scene, focusing on the subject and the background
-              </p>
-              <circle className="hidden" />
-            </div>
-
-            {/* Top-right image card (small) */}
-            <div className="absolute top-4 right-12 w-[100px] h-[100px] rounded-2xl overflow-hidden border-2 border-emerald-500/30 shadow-2xl">
-              <img src={spacesHeroImage} alt="" className="w-full h-full object-cover" />
-            </div>
-
-            {/* Center-right image (main hero image, larger) */}
-            <div className="absolute top-[110px] right-[60px] w-[120px] h-[120px] rounded-2xl overflow-hidden border-2 border-cyan-400/25 shadow-2xl">
-              <img src={spacesHeroImage} alt="" className="w-full h-full object-cover" />
-            </div>
-
-            {/* Bottom-left image card */}
-            <div className="absolute bottom-10 left-20 w-[110px] h-[110px] rounded-2xl overflow-hidden border-2 border-violet-400/25 shadow-2xl">
-              <img src={spacesHeroImage} alt="" className="w-full h-full object-cover" />
-            </div>
-
-            {/* Bottom-center image card */}
-            <div className="absolute bottom-8 left-52 w-[110px] h-[110px] rounded-2xl overflow-hidden border-2 border-blue-400/25 shadow-2xl">
-              <img src={spacesHeroImage} alt="" className="w-full h-full object-cover" />
-            </div>
-
-            {/* Run button floating */}
-            <div className="absolute bottom-16 left-[340px] bg-[#1a1a24]/90 backdrop-blur-sm border border-white/10 rounded-lg px-4 py-2 flex items-center gap-2 shadow-xl">
-              <Play className="w-3 h-3 text-foreground" fill="currentColor" />
-              <span className="text-sm font-medium text-foreground">Run</span>
-            </div>
-
-            {/* Prompt card — center-left */}
-            <div className="absolute top-[90px] left-0 bg-[#1a1a24]/90 backdrop-blur-sm border border-white/10 rounded-xl px-4 py-3 max-w-[210px] shadow-2xl">
-              <p className="text-[11px] text-muted-foreground leading-relaxed">
-                Dreamy full-body portrait of a silhouetted figure in motion against a soft, cool blue backdrop—long exposure double-exposure style.
-              </p>
-            </div>
-          </div>
+        <div className="relative z-10 h-full flex flex-col justify-end p-10 max-w-md">
+          <h1 className="text-5xl font-bold text-foreground mb-3 leading-tight tracking-tight">Spaces</h1>
+          <p className="text-base font-semibold text-foreground mb-0.5">Start from scratch</p>
+          <p className="text-sm text-muted-foreground mb-5">Create a new space and start collaborating.</p>
+          <button
+            onClick={createProject}
+            className="flex items-center gap-2 bg-foreground text-background px-5 py-2.5 rounded-full text-sm font-medium hover:opacity-90 transition-opacity w-fit"
+          >
+            <Plus className="w-4 h-4" />
+            New space
+          </button>
         </div>
       </div>
 
