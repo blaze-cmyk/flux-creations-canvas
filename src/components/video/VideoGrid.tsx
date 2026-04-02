@@ -151,18 +151,17 @@ function VideoCard({ video }: { video: GeneratedVideo }) {
 
   // Complete
   return (
-    <div className="flex border border-border rounded-xl overflow-hidden bg-card">
-      {/* Left: video — true aspect ratio */}
+    <div className="flex border border-border rounded-xl overflow-hidden bg-card h-[280px]">
+      {/* Left: video area — 16:9 card, video shown at native ratio inside */}
       <div
-        className="w-[240px] shrink-0 bg-black relative cursor-pointer"
-        style={{ aspectRatio: '9/16' }}
+        className="flex-1 bg-black relative cursor-pointer flex items-center justify-center"
         onClick={() => setSelectedVideoId(video.id)}
         onMouseEnter={() => setHovered(true)}
         onMouseLeave={() => setHovered(false)}
       >
         <video
           src={video.videoUrl}
-          className="w-full h-full object-contain"
+          className="max-w-full max-h-full object-contain"
           muted
           loop
           playsInline
@@ -178,12 +177,11 @@ function VideoCard({ video }: { video: GeneratedVideo }) {
         )}
       </div>
 
-      {/* Right: details */}
-      <div className="flex-1 border-l border-border flex flex-col min-w-[160px]">
+      {/* Right: compact details */}
+      <div className="w-[180px] shrink-0 border-l border-border flex flex-col">
         <div className="flex-1">
           <DetailsPanel />
         </div>
-        {/* Footer actions */}
         <div className="flex items-center justify-between px-3 py-2 border-t border-border">
           <button onClick={() => retryVideo(video.id)} className="flex items-center gap-1 text-[11px] text-muted-foreground hover:text-foreground transition-colors">
             <RefreshCw className="w-3 h-3" /> Rerun
