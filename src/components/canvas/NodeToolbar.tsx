@@ -41,8 +41,16 @@ export function NodeToolbar({ nodeId, nodeType }: Props) {
     if (!currentNode) return;
     const pos = { x: currentNode.position.x + 600, y: currentNode.position.y };
     addNode(type as any, pos);
+
+    // Auto-create edge from this node to the new node
+    const counter = useCanvasStore.getState().nodeCounter;
+    const newNodeId = `${type}-${counter[type]}`;
+    const sourceHandle = nodeType === 'text' ? 'text-out' : 'img-out';
+    const targetHandle = nodeType === 'text' ? 'text-in' : type === 'video-generator' ? 'ref-in' : 'img-in';
+    onConnect({ source: nodeId, target: newNodeId, sourceHandle, targetHandle });
+
     setConnectOpen(false);
-  }, [nodeId, nodes, addNode]);
+  }, [nodeId, nodeType, nodes, addNode, onConnect]);
 
   const handleDuplicate = useCallback(() => {
     duplicateNode(nodeId);
