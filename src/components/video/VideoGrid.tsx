@@ -151,17 +151,17 @@ function VideoCard({ video }: { video: GeneratedVideo }) {
 
   // Complete
   return (
-    <div className="flex border border-border rounded-2xl overflow-hidden bg-card min-h-[320px]">
+    <div className="flex border border-border rounded-xl overflow-hidden bg-card h-[200px]">
       {/* Left: video */}
       <div
-        className="flex-1 bg-black relative cursor-pointer"
+        className="w-[300px] shrink-0 bg-black relative cursor-pointer"
         onClick={() => setSelectedVideoId(video.id)}
         onMouseEnter={() => setHovered(true)}
         onMouseLeave={() => setHovered(false)}
       >
         <video
           src={video.videoUrl}
-          className="w-full h-full object-contain"
+          className="w-full h-full object-cover"
           muted
           loop
           playsInline
@@ -170,36 +170,32 @@ function VideoCard({ video }: { video: GeneratedVideo }) {
         />
         {!hovered && (
           <div className="absolute inset-0 flex items-center justify-center">
-            <div className="w-12 h-12 rounded-full bg-black/40 flex items-center justify-center backdrop-blur-sm">
-              <Play className="w-6 h-6 text-white ml-0.5" />
+            <div className="w-10 h-10 rounded-full bg-black/40 flex items-center justify-center backdrop-blur-sm">
+              <Play className="w-5 h-5 text-white ml-0.5" />
             </div>
           </div>
         )}
-        {/* Expand icon */}
-        <button className="absolute top-3 right-3 w-7 h-7 rounded-lg bg-black/40 flex items-center justify-center text-white/80 hover:bg-black/60 backdrop-blur-sm opacity-0 group-hover:opacity-100 transition-opacity">
-          <Maximize2 className="w-3.5 h-3.5" />
-        </button>
       </div>
 
       {/* Right: details */}
-      <div className="w-[280px] border-l border-border shrink-0 flex flex-col">
+      <div className="flex-1 border-l border-border flex flex-col">
         <div className="flex-1">
           <DetailsPanel />
         </div>
         {/* Footer actions */}
-        <div className="flex items-center justify-between px-4 py-3 border-t border-border">
-          <button onClick={() => retryVideo(video.id)} className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors">
-            <RefreshCw className="w-3.5 h-3.5" /> Rerun
+        <div className="flex items-center justify-between px-3 py-2 border-t border-border">
+          <button onClick={() => retryVideo(video.id)} className="flex items-center gap-1 text-[11px] text-muted-foreground hover:text-foreground transition-colors">
+            <RefreshCw className="w-3 h-3" /> Rerun
           </button>
-          <div className="flex items-center gap-1">
-            <button onClick={handleDownload} className="w-7 h-7 rounded-lg flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-colors" title="Download">
-              <Download className="w-3.5 h-3.5" />
+          <div className="flex items-center gap-0.5">
+            <button onClick={handleDownload} className="w-6 h-6 rounded-md flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-colors" title="Download">
+              <Download className="w-3 h-3" />
             </button>
-            <button className="w-7 h-7 rounded-lg flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-colors" title="Copy">
-              <Copy className="w-3.5 h-3.5" />
+            <button className="w-6 h-6 rounded-md flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-colors" title="Copy">
+              <Copy className="w-3 h-3" />
             </button>
-            <button onClick={e => { e.stopPropagation(); deleteVideo(video.id); }} className="w-7 h-7 rounded-lg flex items-center justify-center text-muted-foreground hover:text-destructive hover:bg-muted transition-colors" title="Delete">
-              <Trash2 className="w-3.5 h-3.5" />
+            <button onClick={e => { e.stopPropagation(); deleteVideo(video.id); }} className="w-6 h-6 rounded-md flex items-center justify-center text-muted-foreground hover:text-destructive hover:bg-muted transition-colors" title="Delete">
+              <Trash2 className="w-3 h-3" />
             </button>
           </div>
         </div>
