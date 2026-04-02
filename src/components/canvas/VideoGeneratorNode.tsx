@@ -312,7 +312,7 @@ export function VideoGeneratorNode({ id, data, selected }: { id: string; data: S
           {/* Generate */}
           <button
             onClick={handleGenerate}
-            disabled={generating || !prompt.trim()}
+            disabled={generating}
             className="w-9 h-9 rounded-full bg-[hsl(var(--muted))] flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors disabled:opacity-40"
           >
             <Play className="w-4 h-4" />
