@@ -4,6 +4,8 @@ import { useCanvasStore } from '@/store/canvasStore';
 import { Type, Bold, Italic, List, ListOrdered, Minus, ChevronUp, ChevronDown } from 'lucide-react';
 import { useState, useRef, useEffect } from 'react';
 import { NodeToolbar } from './NodeToolbar';
+import { NodeConnectors } from './NodeConnectors';
+import { NODE_INPUTS, NODE_OUTPUTS } from '@/lib/connectionRules';
 
 const COLORS = [
   { id: 'none', slash: true },
@@ -43,7 +45,7 @@ export function TextNode({ id, data, selected }: { id: string; data: SpaceNodeDa
     <div className="space-node relative">
       {selected && <NodeToolbar nodeId={id} nodeType="text" />}
 
-      {/* Color palette — floating above */}
+      {/* Color palette */}
       <div className="flex justify-center mb-2">
         <div className="flex items-center gap-1 bg-[#1a1a1a] rounded-full px-2.5 py-2 border border-[#2a2a2a]">
           {COLORS.map((c) => (
@@ -63,10 +65,9 @@ export function TextNode({ id, data, selected }: { id: string; data: SpaceNodeDa
         </div>
       </div>
 
-      {/* Formatting toolbar — floating */}
+      {/* Formatting toolbar */}
       <div className="flex justify-center mb-3">
         <div className="flex items-center gap-0 bg-[#1a1a1a] rounded-full px-2 py-1.5 border border-[#2a2a2a]">
-          {/* Color indicator */}
           <div className="flex items-center">
             <span className="w-6 h-6 rounded-full flex items-center justify-center">
               <span className="w-4 h-4 rounded-full" style={{ backgroundColor: activeColor }} />
@@ -75,100 +76,50 @@ export function TextNode({ id, data, selected }: { id: string; data: SpaceNodeDa
               <ChevronUp className="w-3 h-3" />
             </button>
           </div>
-
           <span className="w-px h-5 bg-[#333] mx-1.5" />
-
-          {/* Paragraph dropdown */}
           <div ref={paraRef} className="relative">
-            <button
-              onClick={() => setParaOpen(!paraOpen)}
-              className="flex items-center gap-1 px-2 py-1 text-sm text-white hover:bg-white/5 rounded-md"
-            >
+            <button onClick={() => setParaOpen(!paraOpen)} className="flex items-center gap-1 px-2 py-1 text-sm text-white hover:bg-white/5 rounded-md">
               {paraType}
               <ChevronDown className="w-3 h-3 text-[#888]" />
             </button>
             {paraOpen && (
               <div className="absolute top-full mt-1 left-0 w-[140px] bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl shadow-2xl z-50 p-1">
                 {PARAGRAPH_OPTIONS.map((opt) => (
-                  <button
-                    key={opt}
-                    onClick={() => { setParaType(opt); setParaOpen(false); }}
-                    className={`w-full text-left px-3 py-1.5 text-xs rounded-lg transition-colors ${opt === paraType ? 'bg-[hsl(var(--accent))] text-white' : 'text-white hover:bg-white/10'}`}
-                  >
+                  <button key={opt} onClick={() => { setParaType(opt); setParaOpen(false); }} className={`w-full text-left px-3 py-1.5 text-xs rounded-lg transition-colors ${opt === paraType ? 'bg-[hsl(var(--accent))] text-white' : 'text-white hover:bg-white/10'}`}>
                     {opt}
                   </button>
                 ))}
               </div>
             )}
           </div>
-
           <span className="w-px h-5 bg-[#333] mx-1.5" />
-
-          {/* Bold */}
-          <button
-            onClick={() => setBold(!bold)}
-            className={`w-7 h-7 flex items-center justify-center rounded-md text-lg font-bold ${bold ? 'text-white bg-white/10' : 'text-[#999] hover:text-white'}`}
-          >
-            B
-          </button>
-
-          {/* Italic */}
-          <button
-            onClick={() => setItalic(!italic)}
-            className={`w-7 h-7 flex items-center justify-center rounded-md text-lg italic ${italic ? 'text-white bg-white/10' : 'text-[#999] hover:text-white'}`}
-          >
-            I
-          </button>
-
-          {/* Bullet list */}
-          <button className="w-7 h-7 flex items-center justify-center rounded-md text-[#999] hover:text-white">
-            <List className="w-4 h-4" />
-          </button>
-
-          {/* Numbered list */}
-          <button className="w-7 h-7 flex items-center justify-center rounded-md text-[#999] hover:text-white">
-            <ListOrdered className="w-4 h-4" />
-          </button>
-
-          {/* Divider */}
-          <button className="w-7 h-7 flex items-center justify-center rounded-md text-[#999] hover:text-white">
-            <Minus className="w-4 h-4" />
-          </button>
+          <button onClick={() => setBold(!bold)} className={`w-7 h-7 flex items-center justify-center rounded-md text-lg font-bold ${bold ? 'text-white bg-white/10' : 'text-[#999] hover:text-white'}`}>B</button>
+          <button onClick={() => setItalic(!italic)} className={`w-7 h-7 flex items-center justify-center rounded-md text-lg italic ${italic ? 'text-white bg-white/10' : 'text-[#999] hover:text-white'}`}>I</button>
+          <button className="w-7 h-7 flex items-center justify-center rounded-md text-[#999] hover:text-white"><List className="w-4 h-4" /></button>
+          <button className="w-7 h-7 flex items-center justify-center rounded-md text-[#999] hover:text-white"><ListOrdered className="w-4 h-4" /></button>
+          <button className="w-7 h-7 flex items-center justify-center rounded-md text-[#999] hover:text-white"><Minus className="w-4 h-4" /></button>
         </div>
       </div>
 
-      {/* Text #1 label */}
+      {/* Label */}
       <div className="flex items-center gap-1.5 px-1 py-1.5 text-sm text-[#999]">
         <span className="w-5 h-5 rounded border border-[#555] flex items-center justify-center text-[10px] font-bold text-[#999]">T</span>
         {data.label}
       </div>
 
-      {/* Text area card — separate darker bg */}
+      {/* Text area */}
       <div className="w-[520px] rounded-xl bg-[#141414] border border-[#262626] overflow-hidden">
         <textarea
           value={text}
-          onChange={(e) => {
-            setText(e.target.value);
-            updateNodeData(id, { text: e.target.value });
-          }}
+          onChange={(e) => { setText(e.target.value); updateNodeData(id, { text: e.target.value }); }}
           placeholder='Try "Happy dog with sunglasses and floating ring"'
           className="w-full h-[160px] bg-transparent p-4 text-sm text-white placeholder:text-[#555] resize-none border-0 focus:outline-none"
-          style={{
-            fontWeight: bold ? 'bold' : 'normal',
-            fontStyle: italic ? 'italic' : 'normal',
-          }}
+          style={{ fontWeight: bold ? 'bold' : 'normal', fontStyle: italic ? 'italic' : 'normal' }}
         />
       </div>
 
-      {/* Right connector icon */}
-      <div className="absolute right-0 top-[65%] translate-x-[calc(100%+8px)] z-10">
-        <div className="group relative w-10 h-10 rounded-lg bg-[#1e1e1e] border border-[#333] flex items-center justify-center cursor-pointer hover:bg-[#282828] transition-colors">
-          <span className="text-xs font-bold text-[#999]">T</span>
-          <span className="absolute left-full ml-2 px-2 py-1 bg-[#1a1a1a] border border-[#2a2a2a] rounded-lg text-xs text-white whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">Text output</span>
-        </div>
-      </div>
-
-      <Handle type="source" position={Position.Right} id="text-out" style={{ top: '70%' }} className="!w-3 !h-3 !bg-[#555] !border-0" />
+      {/* Smart connectors — Text has no inputs, only text output */}
+      <NodeConnectors inputs={NODE_INPUTS['text']} outputs={NODE_OUTPUTS['text']} />
     </div>
   );
 }

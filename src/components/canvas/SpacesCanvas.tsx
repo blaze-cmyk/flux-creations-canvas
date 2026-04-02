@@ -4,9 +4,9 @@ import {
   BackgroundVariant,
   type NodeTypes,
   type EdgeTypes,
+  type Connection,
   ConnectionMode,
   ConnectionLineType,
-  MarkerType,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import { useCanvasStore } from '@/store/canvasStore';
@@ -23,6 +23,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Search, FolderOpen, Image, Video, Sparkles } from 'lucide-react';
 import { motion } from 'framer-motion';
+import { isValidConnection } from '@/lib/connectionRules';
 
 const nodeTypes: NodeTypes = {
   creation: CreationNode,
@@ -145,6 +146,7 @@ export function SpacesCanvas() {
           onNodesChange={onNodesChange}
           onEdgesChange={onEdgesChange}
           onConnect={onConnect}
+          isValidConnection={(connection: Connection) => isValidConnection(connection.sourceHandle, connection.targetHandle)}
           nodeTypes={nodeTypes}
           edgeTypes={edgeTypes}
           onPaneClick={() => {}}

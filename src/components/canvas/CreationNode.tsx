@@ -5,6 +5,8 @@ import { ImageIcon, Upload, Replace } from 'lucide-react';
 import { useState, useCallback, useRef } from 'react';
 import { resolveToUrl } from '@/lib/uploadToStorage';
 import { NodeToolbar } from './NodeToolbar';
+import { NodeConnectors } from './NodeConnectors';
+import { NODE_INPUTS, NODE_OUTPUTS } from '@/lib/connectionRules';
 
 export function CreationNode({ id, data, selected }: { id: string; data: SpaceNodeData; selected?: boolean }) {
   const updateNodeData = useCanvasStore((s) => s.updateNodeData);
@@ -17,12 +19,10 @@ export function CreationNode({ id, data, selected }: { id: string; data: SpaceNo
     if (!file) return;
     setUploading(true);
     try {
-      // Show local preview immediately
       const reader = new FileReader();
       reader.onload = async () => {
         const dataUrl = reader.result as string;
         updateNodeData(id, { imageUrl: dataUrl, label: file.name.length > 35 ? file.name.slice(0, 32) + '...' : file.name });
-        // Upload to storage for a public URL
         try {
           const publicUrl = await resolveToUrl(dataUrl);
           updateNodeData(id, { imageUrl: publicUrl });
@@ -43,10 +43,6 @@ export function CreationNode({ id, data, selected }: { id: string; data: SpaceNo
     setDragging(false);
     if (e.dataTransfer.files.length > 0) handleFiles(e.dataTransfer.files);
   }, [handleFiles]);
-
-  const handleReplace = useCallback(() => {
-    fileRef.current?.click();
-  }, []);
 
   return (
     <div className="space-node relative">
@@ -78,15 +74,9 @@ export function CreationNode({ id, data, selected }: { id: string; data: SpaceNo
       >
         {data.imageUrl ? (
           <>
-            <img
-              src={data.imageUrl}
-              alt=""
-              className="w-full h-auto object-contain"
-              draggable={false}
-            />
-            {/* Replace button */}
+            <img src={data.imageUrl} alt="" className="w-full h-auto object-contain" draggable={false} />
             <button
-              onClick={handleReplace}
+              onClick={() => fileRef.current?.click()}
               className="absolute bottom-3 left-3 flex items-center gap-1.5 px-3 py-1.5 bg-black/60 backdrop-blur-sm rounded-lg text-xs text-white hover:bg-black/80 transition-colors"
             >
               <Replace className="w-3.5 h-3.5" />
@@ -103,7 +93,6 @@ export function CreationNode({ id, data, selected }: { id: string; data: SpaceNo
           </button>
         )}
 
-        {/* Upload overlay */}
         {uploading && (
           <div className="absolute inset-0 bg-black/60 flex items-center justify-center backdrop-blur-sm rounded-2xl">
             <div className="flex items-center gap-2 text-sm text-white">
@@ -113,7 +102,6 @@ export function CreationNode({ id, data, selected }: { id: string; data: SpaceNo
           </div>
         )}
 
-        {/* Drag overlay */}
         {dragging && (
           <div className="absolute inset-0 bg-primary/10 border-2 border-dashed border-primary rounded-2xl flex items-center justify-center">
             <span className="text-sm text-primary font-medium">Drop to upload</span>
@@ -121,16 +109,8 @@ export function CreationNode({ id, data, selected }: { id: string; data: SpaceNo
         )}
       </div>
 
-      {/* Right connector */}
-      <div className="absolute right-0 top-[40%] translate-x-[calc(100%+8px)] z-10">
-        <div className="group relative w-10 h-10 rounded-lg bg-[#1e1e1e] border border-[#333] flex items-center justify-center cursor-pointer hover:bg-[#282828] transition-colors">
-          <ImageIcon className="w-4 h-4 text-[#999]" />
-          <span className="absolute left-full ml-2 px-2 py-1 bg-[#1a1a1a] border border-[#2a2a2a] rounded-lg text-xs text-white whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">Image output</span>
-        </div>
-      </div>
-
-      <Handle type="source" position={Position.Right} id="img-out" style={{ top: '40%' }} className="!w-3 !h-3 !bg-[#555] !border-0" />
-      <Handle type="source" position={Position.Right} id="img-out-2" style={{ top: '55%' }} className="!w-3 !h-3 !bg-[#555] !border-0" />
+      {/* Connectors — creation only has outputs (image) */}
+      <NodeConnectors inputs={NODE_INPUTS['creation']} outputs={NODE_OUTPUTS['creation']} />
     </div>
   );
 }
