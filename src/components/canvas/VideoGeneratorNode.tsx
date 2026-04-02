@@ -43,34 +43,79 @@ export function VideoGeneratorNode({ id, data, selected }: { id: string; data: S
   }, []);
 
   const handleGenerate = useCallback(async () => {
-    if (!prompt.trim() || generating) return;
+    if (generating) return;
     setGenerating(true);
     updateNodeData(id, { status: 'running' });
+
+    // Gather inputs from connected nodes
+    const inputs = getConnectedInputs(id);
+    const finalPrompt = [...inputs.texts, prompt].filter(Boolean).join('\n');
+    const refImages = [...(inputs.startImage ? [inputs.startImage] : []), ...(inputs.endImage ? [inputs.endImage] : []), ...inputs.images];
+    const hasImage = refImages.length > 0;
+    const mode = hasImage ? 'image-to-video' : 'text-to-video';
+
+    if (!finalPrompt.trim() && !hasImage) {
+      updateNodeData(id, { status: 'error' });
+      setGenerating(false);
+      return;
+    }
 
     try {
       const { data: result, error } = await supabase.functions.invoke('generate-video', {
         body: {
-          prompt,
-          referenceImages: [],
+          action: 'submit',
+          prompt: finalPrompt || 'generate a video',
+          referenceImages: refImages,
           model: selectedModel,
           aspectRatio: selectedAR,
           duration: selectedDuration,
-          mode: 'text-to-video',
+          mode,
         },
       });
 
       if (error || result?.error) {
         updateNodeData(id, { status: 'error' });
-      } else {
-        const videoUrl = result?.videoUrl;
-        updateNodeData(id, { status: 'complete', videoUrl });
+        setGenerating(false);
+        return;
+      }
+
+      // Poll for completion
+      if (result?.submitted) {
+        const pollInterval = setInterval(async () => {
+          try {
+            const { data: pollResult } = await supabase.functions.invoke('generate-video', {
+              body: {
+                action: 'poll',
+                provider: result.provider,
+                taskId: result.taskId,
+                responseUrl: result.responseUrl,
+                statusUrl: result.statusUrl,
+              },
+            });
+            if (pollResult?.status === 'complete' && pollResult.videoUrl) {
+              clearInterval(pollInterval);
+              updateNodeData(id, { status: 'complete', videoUrl: pollResult.videoUrl });
+              setGenerating(false);
+            } else if (pollResult?.status === 'failed') {
+              clearInterval(pollInterval);
+              updateNodeData(id, { status: 'error' });
+              setGenerating(false);
+            }
+          } catch {
+            clearInterval(pollInterval);
+            updateNodeData(id, { status: 'error' });
+            setGenerating(false);
+          }
+        }, 5000);
+      } else if (result?.videoUrl) {
+        updateNodeData(id, { status: 'complete', videoUrl: result.videoUrl });
+        setGenerating(false);
       }
     } catch {
       updateNodeData(id, { status: 'error' });
-    } finally {
       setGenerating(false);
     }
-  }, [prompt, generating, selectedModel, selectedAR, selectedDuration, id, updateNodeData]);
+  }, [prompt, generating, selectedModel, selectedAR, selectedDuration, id, updateNodeData, getConnectedInputs]);
 
   return (
     <div className="space-node w-[520px] rounded-2xl bg-[hsl(var(--card))] border border-[hsl(var(--border)/0.3)] shadow-[0_8px_40px_rgba(0,0,0,0.5)] relative">
