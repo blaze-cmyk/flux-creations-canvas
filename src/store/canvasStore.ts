@@ -9,6 +9,7 @@ import {
   applyEdgeChanges,
   addEdge,
 } from '@xyflow/react';
+import { supabase } from '@/integrations/supabase/client';
 
 export type SpaceNodeData = {
   label: string;
@@ -28,6 +29,8 @@ type CanvasState = {
   nodeCounter: Record<string, number>;
   paletteOpen: boolean;
   projectName: string;
+  projectId: string | null;
+  saving: boolean;
   onNodesChange: OnNodesChange;
   onEdgesChange: OnEdgesChange;
   onConnect: OnConnect;
@@ -35,51 +38,9 @@ type CanvasState = {
   updateNodeData: (nodeId: string, data: Partial<SpaceNodeData>) => void;
   setPaletteOpen: (open: boolean) => void;
   setProjectName: (name: string) => void;
+  loadProject: (projectId: string) => Promise<void>;
+  saveProject: () => Promise<void>;
 };
-
-const defaultNodes: Node<SpaceNodeData>[] = [
-  {
-    id: 'creation-1',
-    type: 'creation',
-    position: { x: 100, y: 150 },
-    data: {
-      label: 'Creation #1',
-      type: 'creation',
-      status: 'complete',
-      imageUrl: '',
-      text: 'Life only starts once you\nstart moving in silence\n\nIf you seek constant\napplause, you are no more\nthan a performer',
-    },
-  },
-  {
-    id: 'image-gen-1',
-    type: 'image-generator',
-    position: { x: 550, y: 100 },
-    data: {
-      label: 'Image Generator #1',
-      type: 'image-generator',
-      status: 'idle',
-      model: 'flux-dev',
-      aspectRatio: '1:1',
-    },
-  },
-  {
-    id: 'video-gen-1',
-    type: 'video-generator',
-    position: { x: 550, y: 450 },
-    data: {
-      label: 'Video Generator #1',
-      type: 'video-generator',
-      status: 'idle',
-      model: 'kling-v2',
-      aspectRatio: '16:9',
-    },
-  },
-];
-
-const defaultEdges: Edge[] = [
-  { id: 'e1-2', source: 'creation-1', target: 'image-gen-1', sourceHandle: 'img-out', targetHandle: 'img-in' },
-  { id: 'e1-3', source: 'creation-1', target: 'video-gen-1', sourceHandle: 'img-out-2', targetHandle: 'img-in' },
-];
 
 const nodeLabels: Record<string, string> = {
   creation: 'Creation',
@@ -90,16 +51,34 @@ const nodeLabels: Record<string, string> = {
   upscaler: 'Image Upscaler',
 };
 
-export const useCanvasStore = create<CanvasState>((set, get) => ({
-  nodes: defaultNodes,
-  edges: defaultEdges,
-  nodeCounter: { creation: 1, 'image-generator': 1, 'video-generator': 1, text: 0, assistant: 0, upscaler: 0 },
-  paletteOpen: false,
-  projectName: 'Dynamic Video Creation Studio',
+let saveTimeout: ReturnType<typeof setTimeout> | null = null;
 
-  onNodesChange: (changes) => set({ nodes: applyNodeChanges(changes, get().nodes) as Node<SpaceNodeData>[] }),
-  onEdgesChange: (changes) => set({ edges: applyEdgeChanges(changes, get().edges) }),
-  onConnect: (connection) => set({ edges: addEdge(connection, get().edges) }),
+const debouncedSave = (save: () => Promise<void>) => {
+  if (saveTimeout) clearTimeout(saveTimeout);
+  saveTimeout = setTimeout(() => save(), 1500);
+};
+
+export const useCanvasStore = create<CanvasState>((set, get) => ({
+  nodes: [],
+  edges: [],
+  nodeCounter: {},
+  paletteOpen: false,
+  projectName: 'Untitled Space',
+  projectId: null,
+  saving: false,
+
+  onNodesChange: (changes) => {
+    set({ nodes: applyNodeChanges(changes, get().nodes) as Node<SpaceNodeData>[] });
+    if (get().projectId) debouncedSave(get().saveProject);
+  },
+  onEdgesChange: (changes) => {
+    set({ edges: applyEdgeChanges(changes, get().edges) });
+    if (get().projectId) debouncedSave(get().saveProject);
+  },
+  onConnect: (connection) => {
+    set({ edges: addEdge(connection, get().edges) });
+    if (get().projectId) debouncedSave(get().saveProject);
+  },
 
   addNode: (type, position) => {
     const counter = get().nodeCounter;
@@ -120,6 +99,8 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
       nodeCounter: { ...counter, [type]: newCount },
       paletteOpen: false,
     });
+
+    if (get().projectId) debouncedSave(get().saveProject);
   },
 
   updateNodeData: (nodeId, data) => {
@@ -128,8 +109,115 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
         n.id === nodeId ? { ...n, data: { ...n.data, ...data } } : n
       ),
     });
+    if (get().projectId) debouncedSave(get().saveProject);
   },
 
   setPaletteOpen: (open) => set({ paletteOpen: open }),
-  setProjectName: (name) => set({ projectName: name }),
+
+  setProjectName: (name) => {
+    set({ projectName: name });
+    const pid = get().projectId;
+    if (pid) {
+      supabase.from('spaces_projects').update({ name }).eq('id', pid);
+    }
+  },
+
+  loadProject: async (projectId: string) => {
+    // Load project info
+    const { data: project } = await supabase
+      .from('spaces_projects')
+      .select('*')
+      .eq('id', projectId)
+      .maybeSingle();
+
+    if (!project) return;
+
+    // Load nodes
+    const { data: nodesData } = await supabase
+      .from('spaces_nodes')
+      .select('*')
+      .eq('project_id', projectId);
+
+    // Load edges
+    const { data: edgesData } = await supabase
+      .from('spaces_edges')
+      .select('*')
+      .eq('project_id', projectId);
+
+    const nodes: Node<SpaceNodeData>[] = (nodesData || []).map((n: any) => ({
+      id: n.node_id,
+      type: n.node_type,
+      position: { x: n.position_x, y: n.position_y },
+      data: n.node_data as SpaceNodeData,
+    }));
+
+    const edges: Edge[] = (edgesData || []).map((e: any) => ({
+      id: e.edge_id,
+      source: e.source_node,
+      target: e.target_node,
+      sourceHandle: e.source_handle,
+      targetHandle: e.target_handle,
+    }));
+
+    // Build counter from existing nodes
+    const counter: Record<string, number> = {};
+    nodes.forEach((n) => {
+      const d = n.data as SpaceNodeData;
+      const match = n.id.match(/-(\d+)$/);
+      if (match) {
+        const num = parseInt(match[1]);
+        counter[d.type] = Math.max(counter[d.type] || 0, num);
+      }
+    });
+
+    set({
+      projectId,
+      projectName: (project as any).name || 'Untitled Space',
+      nodes,
+      edges,
+      nodeCounter: counter,
+    });
+  },
+
+  saveProject: async () => {
+    const { projectId, nodes, edges } = get();
+    if (!projectId) return;
+
+    set({ saving: true });
+
+    // Update project timestamp
+    await supabase.from('spaces_projects').update({ updated_at: new Date().toISOString() }).eq('id', projectId);
+
+    // Delete old nodes/edges and re-insert
+    await supabase.from('spaces_nodes').delete().eq('project_id', projectId);
+    await supabase.from('spaces_edges').delete().eq('project_id', projectId);
+
+    if (nodes.length > 0) {
+      await supabase.from('spaces_nodes').insert(
+        nodes.map((n) => ({
+          project_id: projectId,
+          node_id: n.id,
+          node_type: n.type || 'creation',
+          position_x: n.position.x,
+          position_y: n.position.y,
+          node_data: n.data as any,
+        }))
+      );
+    }
+
+    if (edges.length > 0) {
+      await supabase.from('spaces_edges').insert(
+        edges.map((e) => ({
+          project_id: projectId,
+          edge_id: e.id,
+          source_node: e.source,
+          target_node: e.target,
+          source_handle: e.sourceHandle || null,
+          target_handle: e.targetHandle || null,
+        }))
+      );
+    }
+
+    set({ saving: false });
+  },
 }));

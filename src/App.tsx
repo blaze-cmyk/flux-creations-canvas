@@ -6,6 +6,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import Index from "./pages/Index.tsx";
 import Generator from "./pages/Generator.tsx";
 import Video from "./pages/Video.tsx";
+import SpacesProjects from "./pages/SpacesProjects.tsx";
 import NotFound from "./pages/NotFound.tsx";
 
 const queryClient = new QueryClient();
@@ -20,6 +21,7 @@ const App = () => (
           <Route path="/" element={<Generator />} />
           <Route path="/generator" element={<Generator />} />
           <Route path="/video" element={<Video />} />
+          <Route path="/spaces-projects" element={<SpacesProjects />} />
           <Route path="/spaces" element={<Index />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
