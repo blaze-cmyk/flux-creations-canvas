@@ -75,6 +75,8 @@ export function AssistantNode({ id, data, selected }: { id: string; data: SpaceN
         const text = result?.text || result?.content || '';
         setResponse(text);
         updateNodeData(id, { status: 'complete', text });
+        const projectId = useCanvasStore.getState().projectId;
+        if (projectId) logSpacesEvent({ projectId, nodeId: id, eventType: 'assistant_response', prompt: finalPrompt, model: selectedModel, metadata: { mode, responseLength: text.length } });
       }
     } catch {
       updateNodeData(id, { status: 'error' });

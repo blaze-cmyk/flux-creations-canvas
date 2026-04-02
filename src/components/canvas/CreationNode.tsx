@@ -27,6 +27,8 @@ export function CreationNode({ id, data, selected }: { id: string; data: SpaceNo
         try {
           const publicUrl = await resolveToUrl(dataUrl);
           updateNodeData(id, { imageUrl: publicUrl });
+          const projectId = useCanvasStore.getState().projectId;
+          if (projectId) logSpacesEvent({ projectId, nodeId: id, eventType: 'image_uploaded', contentUrl: publicUrl, metadata: { fileName: file.name } });
         } catch (e) {
           console.error('Upload failed:', e);
         }

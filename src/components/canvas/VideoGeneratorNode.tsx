@@ -112,6 +112,8 @@ export function VideoGeneratorNode({ id, data, selected }: { id: string; data: S
         }, 5000);
       } else if (result?.videoUrl) {
         updateNodeData(id, { status: 'complete', videoUrl: result.videoUrl });
+        const projectId = useCanvasStore.getState().projectId;
+        if (projectId) logSpacesEvent({ projectId, nodeId: id, eventType: 'video_generated', contentUrl: result.videoUrl, prompt: finalPrompt, model: selectedModel, metadata: { aspectRatio: selectedAR, duration: selectedDuration } });
         setGenerating(false);
       }
     } catch {

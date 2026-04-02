@@ -71,6 +71,8 @@ export function ImageGeneratorNode({ id, data, selected }: { id: string; data: S
       } else {
         const imageUrl = result?.imageBase64 || result?.imageUrl;
         updateNodeData(id, { status: 'complete', imageUrl });
+        const projectId = useCanvasStore.getState().projectId;
+        if (projectId) logSpacesEvent({ projectId, nodeId: id, eventType: 'image_generated', contentUrl: imageUrl, prompt: finalPrompt, model: selectedModel, metadata: { aspectRatio: selectedAR } });
       }
     } catch {
       updateNodeData(id, { status: 'error' });
