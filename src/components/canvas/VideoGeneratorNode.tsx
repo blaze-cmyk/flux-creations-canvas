@@ -5,13 +5,12 @@ import { Video, Play, Minus, Plus } from 'lucide-react';
 import { useState } from 'react';
 import { NodeToolbar } from './NodeToolbar';
 
-export function VideoGeneratorNode({ id, data }: { id: string; data: SpaceNodeData }) {
+export function VideoGeneratorNode({ id, data, selected }: { id: string; data: SpaceNodeData; selected?: boolean }) {
   const updateNodeData = useCanvasStore((s) => s.updateNodeData);
   const [prompt, setPrompt] = useState(data.prompt || '');
-  const [selected, setSelected] = useState(false);
 
   return (
-    <div className={`space-node w-[340px] rounded-xl bg-node border border-node-border shadow-[0_4px_24px_rgba(0,0,0,0.6)] relative ${data.status === 'running' ? 'node-running' : ''}`} onClick={() => setSelected(true)} onBlur={() => setSelected(false)} tabIndex={0}>
+    <div className={`space-node w-[340px] rounded-xl bg-node border border-node-border shadow-[0_4px_24px_rgba(0,0,0,0.6)] relative ${data.status === 'running' ? 'node-running' : ''}`}>
       {selected && <NodeToolbar nodeId={id} nodeType="video-generator" />}
       <div className="flex items-center gap-1.5 px-3 py-2 text-xs text-muted-foreground">
         <Video className="w-3 h-3" />
