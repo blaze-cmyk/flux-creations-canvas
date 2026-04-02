@@ -72,19 +72,43 @@
 .react-flow__edge-path {
   stroke: hsl(var(--connection)) !important;
   stroke-width: 2 !important;
+  transition: stroke 0.2s, stroke-width 0.2s;
+}
+
+.react-flow__edge:hover .react-flow__edge-path {
+  stroke-width: 3 !important;
+  filter: drop-shadow(0 0 6px hsl(var(--connection) / 0.4));
 }
 
 .react-flow__handle {
   width: 12px !important;
   height: 12px !important;
-  background: hsl(var(--muted)) !important;
-  border: 2px solid hsl(var(--border)) !important;
+  background: hsl(0 0% 30%) !important;
+  border: 2px solid hsl(0 0% 22%) !important;
   border-radius: 50% !important;
+  transition: all 0.2s cubic-bezier(0.22, 1, 0.36, 1) !important;
 }
 
 .react-flow__handle:hover {
   background: hsl(var(--accent)) !important;
   border-color: hsl(var(--accent)) !important;
+  transform: scale(1.4) !important;
+  box-shadow: 0 0 10px hsl(var(--accent) / 0.5) !important;
+}
+
+.react-flow__handle.connecting {
+  background: hsl(var(--accent)) !important;
+  animation: handle-pulse 0.8s ease-in-out infinite alternate;
+}
+
+@keyframes handle-pulse {
+  from { box-shadow: 0 0 4px hsl(var(--accent) / 0.3); }
+  to { box-shadow: 0 0 12px hsl(var(--accent) / 0.6); }
+}
+
+.react-flow__connection-line {
+  stroke: hsl(var(--connection)) !important;
+  stroke-width: 2.5 !important;
 }
 
 .react-flow__controls {
@@ -98,7 +122,12 @@
 /* Node selected state */
 .react-flow__node.selected .space-node {
   border-color: hsl(var(--accent)) !important;
-  box-shadow: 0 0 0 2px hsl(var(--accent) / 0.3) !important;
+  box-shadow: 0 0 0 2px hsl(var(--accent) / 0.3), 0 8px 40px rgba(0,0,0,0.4) !important;
+}
+
+/* Smooth node transitions */
+.react-flow__node {
+  transition: box-shadow 0.2s ease !important;
 }
 
 @keyframes pulse-border {
@@ -108,4 +137,17 @@
 
 .node-running {
   animation: pulse-border 1.5s ease-in-out infinite;
+}
+
+/* Selection box */
+.react-flow__selection {
+  background: hsl(var(--accent) / 0.08) !important;
+  border: 1px solid hsl(var(--accent) / 0.4) !important;
+}
+
+/* Minimap styling */
+.react-flow__minimap {
+  background: hsl(var(--card)) !important;
+  border: 1px solid hsl(var(--border)) !important;
+  border-radius: 8px !important;
 }
