@@ -259,37 +259,57 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
 
     set({ saving: true });
 
-    // Update project timestamp
-    await supabase.from('spaces_projects').update({ updated_at: new Date().toISOString() }).eq('id', projectId);
-
-    // Delete old nodes/edges and re-insert
-    await supabase.from('spaces_nodes').delete().eq('project_id', projectId);
-    await supabase.from('spaces_edges').delete().eq('project_id', projectId);
-
-    if (nodes.length > 0) {
-      await supabase.from('spaces_nodes').insert(
-        nodes.map((n) => ({
-          project_id: projectId,
-          node_id: n.id,
-          node_type: n.type || 'creation',
-          position_x: n.position.x,
-          position_y: n.position.y,
-          node_data: n.data as any,
-        }))
+    try {
+      // Upload any base64 images to storage before saving
+      const processedNodes = await Promise.all(
+        nodes.map(async (n) => {
+          const data = { ...(n.data as any) };
+          if (data.imageUrl && data.imageUrl.startsWith('data:')) {
+            try {
+              const { resolveToUrl } = await import('@/lib/uploadToStorage');
+              data.imageUrl = await resolveToUrl(data.imageUrl);
+            } catch (e) {
+              console.error('Failed to upload image for node', n.id, e);
+            }
+          }
+          return { ...n, data };
+        })
       );
-    }
 
-    if (edges.length > 0) {
-      await supabase.from('spaces_edges').insert(
-        edges.map((e) => ({
-          project_id: projectId,
-          edge_id: e.id,
-          source_node: e.source,
-          target_node: e.target,
-          source_handle: e.sourceHandle || null,
-          target_handle: e.targetHandle || null,
-        }))
-      );
+      // Update project timestamp
+      await supabase.from('spaces_projects').update({ updated_at: new Date().toISOString() }).eq('id', projectId);
+
+      // Delete old nodes/edges and re-insert
+      await supabase.from('spaces_nodes').delete().eq('project_id', projectId);
+      await supabase.from('spaces_edges').delete().eq('project_id', projectId);
+
+      if (processedNodes.length > 0) {
+        await supabase.from('spaces_nodes').insert(
+          processedNodes.map((n) => ({
+            project_id: projectId,
+            node_id: n.id,
+            node_type: n.type || 'creation',
+            position_x: n.position.x,
+            position_y: n.position.y,
+            node_data: n.data as any,
+          }))
+        );
+      }
+
+      if (edges.length > 0) {
+        await supabase.from('spaces_edges').insert(
+          edges.map((e) => ({
+            project_id: projectId,
+            edge_id: e.id,
+            source_node: e.source,
+            target_node: e.target,
+            source_handle: e.sourceHandle || null,
+            target_handle: e.targetHandle || null,
+          }))
+        );
+      }
+    } catch (e) {
+      console.error('Save project failed:', e);
     }
 
     set({ saving: false });
