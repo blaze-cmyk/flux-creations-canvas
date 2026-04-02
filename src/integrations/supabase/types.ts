@@ -50,6 +50,118 @@ export type Database = {
         }
         Relationships: []
       }
+      spaces_edges: {
+        Row: {
+          created_at: string
+          edge_id: string
+          id: string
+          project_id: string
+          source_handle: string | null
+          source_node: string
+          target_handle: string | null
+          target_node: string
+        }
+        Insert: {
+          created_at?: string
+          edge_id: string
+          id?: string
+          project_id: string
+          source_handle?: string | null
+          source_node: string
+          target_handle?: string | null
+          target_node: string
+        }
+        Update: {
+          created_at?: string
+          edge_id?: string
+          id?: string
+          project_id?: string
+          source_handle?: string | null
+          source_node?: string
+          target_handle?: string | null
+          target_node?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "spaces_edges_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "spaces_projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      spaces_nodes: {
+        Row: {
+          created_at: string
+          id: string
+          node_data: Json
+          node_id: string
+          node_type: string
+          position_x: number
+          position_y: number
+          project_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          node_data?: Json
+          node_id: string
+          node_type: string
+          position_x?: number
+          position_y?: number
+          project_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          node_data?: Json
+          node_id?: string
+          node_type?: string
+          position_x?: number
+          position_y?: number
+          project_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "spaces_nodes_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "spaces_projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      spaces_projects: {
+        Row: {
+          cover_image_url: string | null
+          created_at: string
+          description: string | null
+          id: string
+          name: string
+          updated_at: string
+        }
+        Insert: {
+          cover_image_url?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          name?: string
+          updated_at?: string
+        }
+        Update: {
+          cover_image_url?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          name?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       video_generations: {
         Row: {
           aspect_ratio: string
