@@ -151,17 +151,18 @@ function VideoCard({ video }: { video: GeneratedVideo }) {
 
   // Complete
   return (
-    <div className="flex border border-border rounded-xl overflow-hidden bg-card h-[200px]">
-      {/* Left: video */}
+    <div className="flex border border-border rounded-xl overflow-hidden bg-card">
+      {/* Left: video — true aspect ratio */}
       <div
-        className="w-[300px] shrink-0 bg-black relative cursor-pointer"
+        className="w-[240px] shrink-0 bg-black relative cursor-pointer"
+        style={{ aspectRatio: '9/16' }}
         onClick={() => setSelectedVideoId(video.id)}
         onMouseEnter={() => setHovered(true)}
         onMouseLeave={() => setHovered(false)}
       >
         <video
           src={video.videoUrl}
-          className="w-full h-full object-cover"
+          className="w-full h-full object-contain"
           muted
           loop
           playsInline
@@ -178,7 +179,7 @@ function VideoCard({ video }: { video: GeneratedVideo }) {
       </div>
 
       {/* Right: details */}
-      <div className="flex-1 border-l border-border flex flex-col">
+      <div className="flex-1 border-l border-border flex flex-col min-w-[160px]">
         <div className="flex-1">
           <DetailsPanel />
         </div>
