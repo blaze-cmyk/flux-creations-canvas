@@ -4,6 +4,7 @@ import { useCanvasStore } from '@/store/canvasStore';
 import { ImageIcon, Upload, Replace } from 'lucide-react';
 import { useState, useCallback, useRef } from 'react';
 import { resolveToUrl } from '@/lib/uploadToStorage';
+import { logSpacesEvent } from '@/lib/spacesHistory';
 import { NodeToolbar } from './NodeToolbar';
 import { NodeConnectors } from './NodeConnectors';
 import { NODE_INPUTS, NODE_OUTPUTS } from '@/lib/connectionRules';
