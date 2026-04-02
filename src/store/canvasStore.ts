@@ -92,7 +92,7 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
 
     const newNode: Node<SpaceNodeData> = {
       id,
-      type: type === 'creation' ? 'creation' : type === 'image-generator' ? 'image-generator' : type === 'video-generator' ? 'video-generator' : type === 'text' ? 'text-node' : type,
+      type: type === 'creation' ? 'creation' : type === 'image-generator' ? 'image-generator' : type === 'video-generator' ? 'video-generator' : type === 'text' ? 'text-node' : type === 'assistant' ? 'assistant' : type,
       position: pos,
       data: { label, type, status: 'idle', model: type === 'image-generator' ? 'flux-dev' : type === 'video-generator' ? 'kling-v2' : undefined, aspectRatio: '1:1' },
     };
