@@ -96,6 +96,8 @@ export function VideoGeneratorNode({ id, data, selected }: { id: string; data: S
             if (pollResult?.status === 'complete' && pollResult.videoUrl) {
               clearInterval(pollInterval);
               updateNodeData(id, { status: 'complete', videoUrl: pollResult.videoUrl });
+              const projectId = useCanvasStore.getState().projectId;
+              if (projectId) logSpacesEvent({ projectId, nodeId: id, eventType: 'video_generated', contentUrl: pollResult.videoUrl, prompt: finalPrompt, model: selectedModel, metadata: { aspectRatio: selectedAR, duration: selectedDuration } });
               setGenerating(false);
             } else if (pollResult?.status === 'failed') {
               clearInterval(pollInterval);
