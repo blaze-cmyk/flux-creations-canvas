@@ -38,6 +38,7 @@ type CanvasState = {
   updateNodeData: (nodeId: string, data: Partial<SpaceNodeData>) => void;
   deleteNode: (nodeId: string) => void;
   duplicateNode: (nodeId: string) => void;
+  getConnectedInputs: (nodeId: string) => { texts: string[]; images: string[]; videos: string[]; startImage?: string; endImage?: string };
   setPaletteOpen: (open: boolean) => void;
   setProjectName: (name: string) => void;
   loadProject: (projectId: string) => Promise<void>;
