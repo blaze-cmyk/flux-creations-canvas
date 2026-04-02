@@ -4,9 +4,9 @@ import {
   BackgroundVariant,
   type NodeTypes,
   type EdgeTypes,
+  type Connection,
   ConnectionMode,
   ConnectionLineType,
-  MarkerType,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import { useCanvasStore } from '@/store/canvasStore';
