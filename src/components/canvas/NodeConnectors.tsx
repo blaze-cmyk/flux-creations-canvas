@@ -33,25 +33,25 @@ export function NodeConnectors({ inputs, outputs }: Props) {
         const topPct = inputSpacing * (i + 1);
         return (
           <div key={inp.id}>
-            {/* Visual icon */}
+            {/* Visual icon — pointer-events-none so Handle beneath can be dragged */}
             <div
-              className="absolute left-0 -translate-x-1/2 z-10"
+              className="absolute left-0 z-10 pointer-events-none"
               style={{ top: `${topPct}%`, transform: `translate(-50%, -50%)` }}
             >
-              <div className="group relative w-10 h-10 rounded-full bg-[hsl(var(--muted))] border-2 border-[hsl(var(--border))] flex items-center justify-center cursor-pointer hover:border-[hsl(var(--accent))] hover:bg-[hsl(var(--accent)/0.15)] transition-all duration-200">
+              <div className="group relative w-10 h-10 rounded-full bg-[hsl(var(--muted))] border-2 border-[hsl(var(--border))] flex items-center justify-center">
                 {ICON_MAP[inp.icon]}
-                <span className="absolute right-full mr-2 px-2 py-1 bg-[hsl(var(--card))] border border-[hsl(var(--border)/0.3)] rounded-lg text-xs text-foreground whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
+                <span className="absolute right-full mr-2 px-2 py-1 bg-[hsl(var(--card))] border border-[hsl(var(--border)/0.3)] rounded-lg text-xs text-foreground whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity">
                   {inp.label}
                 </span>
               </div>
             </div>
-            {/* Actual handle */}
+            {/* Actual handle — large hit area */}
             <Handle
               type="target"
               position={Position.Left}
               id={inp.id}
               style={{ top: `${topPct}%` }}
-              className="!w-3 !h-3 !bg-transparent !border-0"
+              className="!w-10 !h-10 !bg-transparent !border-0 !-left-5 z-20"
             />
           </div>
         );
