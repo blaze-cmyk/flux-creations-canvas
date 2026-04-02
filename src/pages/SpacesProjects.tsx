@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
-import { Plus, MoreHorizontal, Pencil, Copy, Trash2, Search } from 'lucide-react';
+import { Plus, MoreHorizontal, Pencil, Copy, Trash2, Search, Play } from 'lucide-react';
 import spacesHeroImage from '@/assets/spaces-hero-image.png';
 
 type SpaceProject = {
