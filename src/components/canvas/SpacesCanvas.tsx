@@ -3,6 +3,10 @@ import {
   Background,
   BackgroundVariant,
   type NodeTypes,
+  type EdgeTypes,
+  ConnectionMode,
+  ConnectionLineType,
+  MarkerType,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import { useCanvasStore } from '@/store/canvasStore';
@@ -14,6 +18,7 @@ import { AssistantNode } from './AssistantNode';
 import { LeftToolbar } from './LeftToolbar';
 import { TopBar } from './TopBar';
 import { NodePalette } from './NodePalette';
+import { AnimatedEdge } from './AnimatedEdge';
 import { useCallback, useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Search, FolderOpen, Image, Video, Sparkles } from 'lucide-react';
@@ -27,6 +32,10 @@ const nodeTypes: NodeTypes = {
   assistant: AssistantNode,
 };
 
+const edgeTypes: EdgeTypes = {
+  animated: AnimatedEdge,
+};
+
 const welcomeNodes = [
   { label: 'Stock', icon: Search, type: 'creation' as const, color: 'text-muted-foreground' },
   { label: 'Media', icon: FolderOpen, type: 'creation' as const, color: 'text-muted-foreground' },
@@ -36,7 +45,7 @@ const welcomeNodes = [
 ];
 
 export function SpacesCanvas() {
-  const { nodes, edges, onNodesChange, onEdgesChange, onConnect, paletteOpen, setPaletteOpen, loadProject, saving, addNode, updateNodeData } = useCanvasStore();
+  const { nodes, edges, onNodesChange, onEdgesChange, onConnect, paletteOpen, setPaletteOpen, loadProject, saving, addNode, updateNodeData, deleteNode, duplicateNode } = useCanvasStore();
   const [searchParams] = useSearchParams();
   const projectId = searchParams.get('project');
   const [loaded, setLoaded] = useState(false);
@@ -52,7 +61,6 @@ export function SpacesCanvas() {
     files.forEach((file, i) => {
       const pos = { x: e.clientX - 160 + i * 50, y: e.clientY - 200 + i * 50 };
       addNode('creation', pos);
-      // Read file and update the latest creation node
       const reader = new FileReader();
       reader.onload = () => {
         const counter = useCanvasStore.getState().nodeCounter;
@@ -70,16 +78,36 @@ export function SpacesCanvas() {
     }
   }, [projectId, loadProject]);
 
-  // N key shortcut to open palette
+  // Keyboard shortcuts
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
-      if (e.key === 'n' && !e.metaKey && !e.ctrlKey && !(e.target instanceof HTMLInputElement) && !(e.target instanceof HTMLTextAreaElement)) {
+      const target = e.target as HTMLElement;
+      const isInput = target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement;
+
+      // N key to open palette (not in inputs)
+      if (e.key === 'n' && !e.metaKey && !e.ctrlKey && !isInput) {
         setPaletteOpen(!paletteOpen);
+        return;
+      }
+
+      // Delete/Backspace to remove selected nodes
+      if ((e.key === 'Delete' || e.key === 'Backspace') && !isInput) {
+        const selected = nodes.filter(n => n.selected);
+        selected.forEach(n => deleteNode(n.id));
+        return;
+      }
+
+      // ⌘D / Ctrl+D to duplicate
+      if (e.key === 'd' && (e.metaKey || e.ctrlKey) && !isInput) {
+        e.preventDefault();
+        const selected = nodes.filter(n => n.selected);
+        selected.forEach(n => duplicateNode(n.id));
+        return;
       }
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [setPaletteOpen, paletteOpen]);
+  }, [setPaletteOpen, paletteOpen, nodes, deleteNode, duplicateNode]);
 
   const onPaneDoubleClick = useCallback(() => {
     setPaletteOpen(true);
@@ -91,6 +119,13 @@ export function SpacesCanvas() {
   }, [setPaletteOpen]);
 
   const isEmpty = loaded && nodes.length === 0;
+
+  // Convert edges to use animated type
+  const styledEdges = edges.map(e => ({
+    ...e,
+    type: 'animated',
+    animated: false,
+  }));
 
   return (
     <div className="w-screen h-screen bg-canvas overflow-hidden">
@@ -106,22 +141,27 @@ export function SpacesCanvas() {
       >
         <ReactFlow
           nodes={nodes}
-          edges={edges}
+          edges={styledEdges}
           onNodesChange={onNodesChange}
           onEdgesChange={onEdgesChange}
           onConnect={onConnect}
           nodeTypes={nodeTypes}
+          edgeTypes={edgeTypes}
           onPaneClick={() => {}}
           onDoubleClick={onPaneDoubleClick}
           fitView
           fitViewOptions={{ padding: 0.3 }}
+          connectionMode={ConnectionMode.Loose}
+          connectionLineType={ConnectionLineType.SmoothStep}
+          connectionLineStyle={{ stroke: 'hsl(233 63% 53%)', strokeWidth: 2.5 }}
           defaultEdgeOptions={{
-            type: 'default',
+            type: 'animated',
             animated: false,
-            style: { stroke: 'hsl(240 5% 35%)', strokeWidth: 2 },
           }}
-          connectionLineStyle={{ stroke: 'hsl(240 5% 50%)', strokeWidth: 2 }}
+          snapToGrid
+          snapGrid={[10, 10]}
           proOptions={{ hideAttribution: true }}
+          deleteKeyCode={null} // We handle delete ourselves
         >
           <Background variant={BackgroundVariant.Dots} gap={20} size={1.2} color="hsl(0 0% 22%)" />
         </ReactFlow>
@@ -129,7 +169,6 @@ export function SpacesCanvas() {
         {/* Empty state welcome screen */}
         {isEmpty && (
           <div className="absolute inset-0 flex flex-col items-center justify-center z-30 pointer-events-none">
-            {/* Dotted arc decoration */}
             <svg className="absolute w-[600px] h-[500px]" viewBox="0 0 600 500" xmlns="http://www.w3.org/2000/svg">
               <path
                 d="M 100 420 C 60 300, 80 180, 160 100 C 240 20, 360 20, 440 100 C 520 180, 540 300, 500 420"
