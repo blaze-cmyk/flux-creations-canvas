@@ -10,7 +10,7 @@ import { NodeToolbar } from './NodeToolbar';
 const NODE_MODELS = VIDEO_MODELS.map(m => ({ id: m.id, name: m.name }));
 
 export function VideoGeneratorNode({ id, data, selected }: { id: string; data: SpaceNodeData; selected?: boolean }) {
-  const updateNodeData = useCanvasStore((s) => s.updateNodeData);
+  const { updateNodeData, getConnectedInputs } = useCanvasStore();
   const [prompt, setPrompt] = useState(data.prompt || '');
   const [quantity, setQuantity] = useState(1);
   const [modelOpen, setModelOpen] = useState(false);
