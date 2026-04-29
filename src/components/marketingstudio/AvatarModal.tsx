@@ -1,6 +1,6 @@
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { useMemo, useState } from 'react';
-import { Search, Plus, Pin, Sparkles, Mars, Venus } from 'lucide-react';
+import { Search, Plus, Pin, Sparkles, User, UserRound } from 'lucide-react';
 
 interface Avatar {
   id: string;
@@ -92,7 +92,7 @@ export function AvatarModal({
                   gender === 'male' ? 'bg-ms-surface-2 border-foreground/40 text-foreground' : 'border-ms-border text-muted-foreground hover:text-foreground'
                 }`}
               >
-                <Mars className="w-3 h-3" /> Male
+                <User className="w-3 h-3" /> Male
               </button>
               <button
                 onClick={() => setGender(gender === 'female' ? 'all' : 'female')}
@@ -100,7 +100,7 @@ export function AvatarModal({
                   gender === 'female' ? 'bg-ms-surface-2 border-foreground/40 text-foreground' : 'border-ms-border text-muted-foreground hover:text-foreground'
                 }`}
               >
-                <Venus className="w-3 h-3" /> Female
+                <UserRound className="w-3 h-3" /> Female
               </button>
             </div>
           </div>
