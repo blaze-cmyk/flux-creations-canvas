@@ -68,9 +68,43 @@
 }
 .ms-cta {
   background: linear-gradient(135deg, hsl(var(--ms-cta)) 0%, hsl(var(--ms-cta-2)) 100%);
-  box-shadow: 0 10px 30px -10px hsl(var(--ms-cta) / 0.55), inset 0 1px 0 hsl(0 0% 100% / 0.18);
+  box-shadow: 0 10px 30px -10px hsl(var(--ms-cta) / 0.55), inset 0 1px 0 hsl(0 0% 100% / 0.35), inset 0 -1px 0 hsl(0 0% 0% / 0.2);
 }
 .ms-cta:hover { filter: brightness(1.06); }
+
+/* Liquid glass surfaces */
+.ms-glass {
+  background: linear-gradient(180deg, hsl(0 0% 100% / 0.06) 0%, hsl(0 0% 100% / 0.02) 100%);
+  backdrop-filter: blur(22px) saturate(140%);
+  -webkit-backdrop-filter: blur(22px) saturate(140%);
+  border: 1px solid hsl(0 0% 100% / 0.08);
+  box-shadow:
+    inset 0 1px 0 hsl(0 0% 100% / 0.08),
+    inset 0 0 0 1px hsl(0 0% 100% / 0.02),
+    0 20px 50px -20px hsl(0 0% 0% / 0.6);
+}
+.ms-glass-2 {
+  background: linear-gradient(180deg, hsl(0 0% 100% / 0.05) 0%, hsl(0 0% 100% / 0.015) 100%);
+  backdrop-filter: blur(16px) saturate(140%);
+  -webkit-backdrop-filter: blur(16px) saturate(140%);
+  border: 1px solid hsl(0 0% 100% / 0.07);
+  box-shadow: inset 0 1px 0 hsl(0 0% 100% / 0.06);
+}
+.ms-glass-2:hover {
+  background: linear-gradient(180deg, hsl(0 0% 100% / 0.09) 0%, hsl(0 0% 100% / 0.03) 100%);
+  border-color: hsl(0 0% 100% / 0.12);
+}
+.ms-chip-glass {
+  background: hsl(0 0% 100% / 0.04);
+  backdrop-filter: blur(14px) saturate(140%);
+  -webkit-backdrop-filter: blur(14px) saturate(140%);
+  border: 1px solid hsl(0 0% 100% / 0.07);
+  box-shadow: inset 0 1px 0 hsl(0 0% 100% / 0.06);
+}
+.ms-chip-glass:hover {
+  background: hsl(0 0% 100% / 0.07);
+  border-color: hsl(0 0% 100% / 0.12);
+}
 .ms-scroll::-webkit-scrollbar { width: 8px; height: 8px; }
 .ms-scroll::-webkit-scrollbar-thumb { background: hsl(0 0% 18%); border-radius: 8px; }
 .ms-scroll::-webkit-scrollbar-track { background: transparent; }
