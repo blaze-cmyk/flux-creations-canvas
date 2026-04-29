@@ -1,4 +1,4 @@
-import { Bell, Folder, Rocket, Menu, ArrowLeft } from 'lucide-react';
+import { Menu, ArrowLeft, Gem } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 export function TopHeader({
@@ -41,21 +41,19 @@ export function TopHeader({
 
       <div className="flex items-center gap-2 md:gap-3">
         {rightSlot}
-        <button className="hidden sm:flex items-center gap-1.5 px-3 h-8 rounded-full text-xs font-semibold text-foreground bg-ms-surface-2 hover:bg-ms-border border border-ms-border relative">
-          <Rocket className="w-3.5 h-3.5" />
-          Upgrade
-          <span className="absolute -bottom-1 -right-1 text-[9px] font-bold px-1.5 py-px rounded-full bg-gradient-to-r from-ms-cta to-ms-cta-2 text-white">
+        <button className="hidden sm:flex items-center gap-1.5 px-3 h-8 rounded-full text-xs font-semibold text-foreground bg-transparent hover:bg-ms-surface-2 relative">
+          <Gem className="w-3.5 h-3.5 text-ms-cta" />
+          Pricing
+          <span className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 text-[8px] font-bold px-1.5 py-px rounded-full bg-gradient-to-r from-ms-cta to-ms-cta-2 text-white whitespace-nowrap">
             30% OFF
           </span>
         </button>
-        <button className="grid place-items-center w-8 h-8 rounded-full bg-ms-surface-2 hover:bg-ms-border text-muted-foreground border border-ms-border">
-          <Bell className="w-4 h-4" />
+        <button className="text-xs font-semibold text-foreground hover:opacity-80 px-2">
+          Login
         </button>
-        <button className="hidden sm:flex items-center gap-1.5 px-3 h-8 rounded-full text-xs font-semibold text-foreground bg-ms-surface-2 hover:bg-ms-border border border-ms-border">
-          <span className="w-4 h-4 rounded-sm bg-emerald-500/30 border border-emerald-500/60" />
-          Assets
+        <button className="px-4 h-8 rounded-full text-xs font-bold text-black bg-lime-300 hover:brightness-105 transition-all">
+          Sign up
         </button>
-        <div className="w-8 h-8 rounded-full bg-gradient-to-br from-yellow-300 to-lime-300" />
       </div>
     </header>
   );
