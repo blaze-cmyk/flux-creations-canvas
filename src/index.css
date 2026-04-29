@@ -64,7 +64,7 @@
 }
 
 .ms-hero-glow {
-  background: radial-gradient(ellipse 70% 55% at 50% -10%, hsl(var(--ms-glow) / 0.55) 0%, hsl(var(--ms-glow) / 0.18) 30%, transparent 65%);
+  background: radial-gradient(ellipse 55% 45% at 50% -8%, hsl(var(--ms-glow) / 0.7) 0%, hsl(var(--ms-glow) / 0.28) 28%, hsl(var(--ms-glow) / 0.08) 50%, transparent 70%);
 }
 .ms-cta {
   background: linear-gradient(135deg, hsl(var(--ms-cta)) 0%, hsl(var(--ms-cta-2)) 100%);

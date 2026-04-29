@@ -53,7 +53,7 @@ export default function MarketingStudio() {
           {FORMATS.map((f) => (
             <button key={f.id} className="group relative aspect-[3/4] rounded-2xl overflow-hidden bg-ms-surface-2 ring-1 ring-ms-border hover:ring-foreground/30 transition-all">
               <img src={f.img} alt={f.label} className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105" />
-              <div className="absolute top-2 left-1/2 -translate-x-1/2 px-2 py-0.5 rounded-full bg-black/50 backdrop-blur text-[11px] font-medium text-white">
+              <div className="absolute top-3 left-1/2 -translate-x-1/2 text-[12px] font-medium text-white drop-shadow-[0_2px_4px_rgba(0,0,0,0.6)]">
                 {f.label}
               </div>
             </button>
