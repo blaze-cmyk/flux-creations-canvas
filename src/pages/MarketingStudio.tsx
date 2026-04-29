@@ -27,7 +27,10 @@ export default function MarketingStudio() {
             <div className="text-[11px] font-semibold tracking-[0.22em] text-muted-foreground uppercase mb-4">
               Marketing Studio
             </div>
-            <h1 className="text-4xl sm:text-5xl md:text-6xl tracking-tight text-foreground uppercase leading-[1.05] font-semibold font-mono">
+            <h1
+              className="text-4xl sm:text-5xl md:text-6xl tracking-tight text-foreground uppercase leading-[1.05] font-semibold"
+              style={{ fontFamily: '"Bricolage Grotesque", system-ui, sans-serif' }}
+            >
               Turn Any Product
               <br />
               Into a Video Ad
