@@ -225,10 +225,10 @@ function Chip({
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <button className="flex items-center gap-1.5 px-3 h-8 rounded-full bg-ms-surface-2 hover:bg-ms-border border border-ms-border text-xs text-foreground">
+        <button className="ms-chip-glass flex items-center gap-1.5 px-3.5 h-9 rounded-full text-xs text-foreground transition-all">
           <span className="text-muted-foreground">{icon}</span>
           {value}
-          {showChevron && <ChevronDown className="w-3 h-3 text-muted-foreground" />}
+          <ChevronDown className="w-3 h-3 text-muted-foreground/70" />
         </button>
       </DropdownMenuTrigger>
       <DropdownMenuContent className="bg-ms-surface-2 border-ms-border">
