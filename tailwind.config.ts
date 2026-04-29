@@ -55,6 +55,14 @@ export default {
           bg: "hsl(var(--badge-bg))",
           text: "hsl(var(--badge-text))",
         },
+        ms: {
+          bg: "hsl(var(--ms-bg))",
+          surface: "hsl(var(--ms-surface))",
+          "surface-2": "hsl(var(--ms-surface-2))",
+          border: "hsl(var(--ms-border))",
+          cta: "hsl(var(--ms-cta))",
+          "cta-2": "hsl(var(--ms-cta-2))",
+        },
         sidebar: {
           DEFAULT: "hsl(var(--sidebar-background))",
           foreground: "hsl(var(--sidebar-foreground))",

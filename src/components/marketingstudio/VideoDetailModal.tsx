@@ -1,0 +1,113 @@
+import { Dialog, DialogContent } from '@/components/ui/dialog';
+import { Heart, Share2, Download, MoreHorizontal, Pencil, RefreshCw, Send } from 'lucide-react';
+import { MSGeneration, useMarketingStudioStore } from '@/store/marketingStudioStore';
+
+export function VideoDetailModal({
+  open,
+  onOpenChange,
+  generation,
+  projectId,
+}: {
+  open: boolean;
+  onOpenChange: (v: boolean) => void;
+  generation: MSGeneration | null;
+  projectId?: string;
+}) {
+  const toggleLike = useMarketingStudioStore((s) => s.toggleLike);
+  if (!generation) return null;
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-6xl bg-ms-surface border-ms-border p-0 overflow-hidden">
+        <div className="grid md:grid-cols-[1fr_360px] max-h-[85vh]">
+          {/* Media */}
+          <div className="bg-black flex items-center justify-center min-h-[50vh]">
+            <img src={generation.thumbUrl} alt="" className="max-h-[85vh] w-auto object-contain" />
+          </div>
+
+          {/* Right panel */}
+          <div className="flex flex-col bg-ms-surface border-l border-ms-border">
+            <div className="p-4 border-b border-ms-border flex items-center gap-3">
+              <div className="w-9 h-9 rounded-full bg-gradient-to-br from-ms-cta to-ms-cta-2" />
+              <div className="flex-1 min-w-0">
+                <div className="text-sm font-semibold text-foreground truncate">korsola_user</div>
+                <div className="text-xs text-muted-foreground">Author</div>
+              </div>
+            </div>
+
+            <div className="flex border-b border-ms-border">
+              <button className="flex-1 h-10 text-xs font-medium text-foreground bg-ms-surface-2">Details</button>
+              <button className="flex-1 h-10 text-xs font-medium text-muted-foreground hover:text-foreground">Comments</button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto ms-scroll p-4 space-y-5">
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <div className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Prompt</div>
+                  <button className="text-[11px] text-muted-foreground hover:text-foreground">Copy</button>
+                </div>
+                <div className="text-sm text-foreground/90 leading-relaxed bg-ms-surface-2 rounded-lg p-3">
+                  {generation.prompt}
+                </div>
+              </div>
+
+              <div>
+                <div className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-2">
+                  Information
+                </div>
+                <div className="rounded-lg bg-ms-surface-2 divide-y divide-ms-border">
+                  <Row label="Model" value="Marketing Studio" />
+                  <Row label="Type" value={generation.surface} />
+                  <Row label="Mode" value={generation.mode} />
+                  <Row label="Aspect" value={generation.aspect} />
+                  <Row label="Resolution" value={generation.resolution} />
+                  <Row label="Duration" value={generation.duration} />
+                </div>
+              </div>
+            </div>
+
+            <div className="p-3 border-t border-ms-border space-y-2">
+              <button className="w-full h-11 rounded-xl bg-lime-300 text-black text-sm font-semibold hover:brightness-105 flex items-center justify-center gap-2">
+                <RefreshCw className="w-4 h-4" /> Recreate
+              </button>
+              <div className="grid grid-cols-2 gap-2">
+                <button className="h-10 rounded-xl bg-ms-surface-2 hover:bg-ms-border text-sm text-foreground flex items-center justify-center gap-2">
+                  <Send className="w-3.5 h-3.5" /> Publish
+                </button>
+                <button className="h-10 rounded-xl bg-ms-surface-2 hover:bg-ms-border text-sm text-foreground flex items-center justify-center gap-2">
+                  <Pencil className="w-3.5 h-3.5" /> Video edit
+                </button>
+              </div>
+              <div className="flex items-center gap-2">
+                <button className="flex-1 h-10 rounded-xl bg-ms-surface-2 hover:bg-ms-border text-sm text-foreground flex items-center justify-center gap-2">
+                  <Download className="w-3.5 h-3.5" /> Download
+                </button>
+                <button
+                  onClick={() => projectId && toggleLike(projectId, generation.id)}
+                  className="grid place-items-center w-10 h-10 rounded-xl bg-ms-surface-2 hover:bg-ms-border text-foreground"
+                >
+                  <Heart className={`w-4 h-4 ${generation.liked ? 'fill-ms-cta text-ms-cta' : ''}`} />
+                </button>
+                <button className="grid place-items-center w-10 h-10 rounded-xl bg-ms-surface-2 hover:bg-ms-border text-foreground">
+                  <Share2 className="w-4 h-4" />
+                </button>
+                <button className="grid place-items-center w-10 h-10 rounded-xl bg-ms-surface-2 hover:bg-ms-border text-foreground">
+                  <MoreHorizontal className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function Row({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex items-center justify-between px-3 h-10 text-sm">
+      <span className="text-muted-foreground">{label}</span>
+      <span className="text-foreground font-medium">{value}</span>
+    </div>
+  );
+}
