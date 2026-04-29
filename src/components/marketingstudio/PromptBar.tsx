@@ -76,10 +76,10 @@ export function PromptBar({ projectId, projectName }: Props) {
   };
 
   return (
-    <div className="relative w-full max-w-[960px] mx-auto">
-      <div className="relative flex items-stretch">
-        {/* Left vertical pill: Product / App — floats, vertically centered, slightly overlapping the bar */}
-        <div className="hidden md:flex absolute left-0 top-1/2 -translate-y-1/2 -translate-x-[calc(100%+10px)] flex-col gap-1 p-1.5 rounded-2xl bg-ms-surface border border-ms-border shadow-[0_8px_24px_-12px_rgba(0,0,0,0.6)] z-10">
+    <div className="relative w-full max-w-[1100px] mx-auto">
+      <div className="relative flex items-stretch gap-2.5">
+        {/* Left vertical pill: Product / App — liquid glass, floats left */}
+        <div className="hidden md:flex absolute left-0 top-1/2 -translate-y-1/2 -translate-x-[calc(100%+10px)] flex-col gap-1.5 p-1.5 rounded-2xl ms-glass z-10">
           {(['Product', 'App'] as MSSurface[]).map((s) => {
             const active = s === surface;
             const Icon = s === 'Product' ? Package : Smartphone;
@@ -87,29 +87,29 @@ export function PromptBar({ projectId, projectName }: Props) {
               <button
                 key={s}
                 onClick={() => setSurface(s)}
-                className={`flex flex-col items-center justify-center w-[58px] h-[58px] rounded-xl text-[10px] font-medium transition-colors ${
+                className={`flex flex-col items-center justify-center w-[56px] h-[56px] rounded-xl text-[10px] font-medium transition-all ${
                   active
-                    ? 'bg-ms-surface-2 text-foreground ring-1 ring-ms-border'
-                    : 'text-muted-foreground hover:text-foreground hover:bg-ms-surface-2'
+                    ? 'ms-glass-2 text-foreground'
+                    : 'text-muted-foreground hover:text-foreground hover:bg-white/5'
                 }`}
               >
-                <Icon className="w-[18px] h-[18px] mb-1" />
+                <Icon className="w-[18px] h-[18px] mb-1" strokeWidth={1.5} />
                 {s}
               </button>
             );
           })}
         </div>
 
-        {/* Main bar */}
-        <div className="flex-1 rounded-2xl bg-ms-surface border border-ms-border p-2.5 flex flex-col gap-2.5 min-w-0">
+        {/* Main bar — liquid glass */}
+        <div className="flex-1 rounded-[22px] ms-glass p-2.5 flex flex-col gap-2 min-w-0">
           {/* Top row: + + textarea + Product/Avatar/Generate */}
           <div className="flex items-stretch gap-2">
             <button
               onClick={() => setAssetsOpen(true)}
-              className="grid place-items-center w-9 h-9 self-start mt-1 rounded-lg bg-ms-surface-2 hover:bg-ms-border text-foreground shrink-0"
+              className="grid place-items-center w-9 h-9 self-start mt-1 rounded-lg ms-chip-glass text-foreground shrink-0"
               aria-label="Add reference"
             >
-              <Plus className="w-4 h-4" />
+              <Plus className="w-4 h-4" strokeWidth={1.5} />
             </button>
             <input
               value={prompt}
@@ -121,44 +121,48 @@ export function PromptBar({ projectId, projectName }: Props) {
                 }
               }}
               placeholder="Describe what happens in the ad..."
-              className="flex-1 bg-transparent border-0 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none min-w-0 self-center"
+              className="flex-1 bg-transparent border-0 text-sm text-foreground placeholder:text-muted-foreground/70 focus:outline-none min-w-0 self-center px-1"
             />
 
             {/* Right: Product, Avatar, Generate (md+) */}
-            <div className="hidden md:flex items-stretch gap-1.5">
+            <div className="hidden md:flex items-stretch gap-2">
               <button
                 onClick={() => setProductOpen(true)}
-                className="flex flex-col items-center justify-center w-[76px] h-[58px] rounded-xl bg-ms-surface-2 hover:bg-ms-border text-[10px] font-semibold text-foreground/90 border border-ms-border overflow-hidden relative tracking-wide"
+                className="ms-glass-2 flex flex-col items-center justify-center w-[88px] h-[88px] rounded-2xl text-[10px] font-semibold text-foreground/90 overflow-hidden relative tracking-wider transition-all"
               >
                 {productThumb ? (
-                  <img src={productThumb} alt="product" className="absolute inset-0 w-full h-full object-cover opacity-60" />
+                  <img src={productThumb} alt="product" className="absolute inset-0 w-full h-full object-cover opacity-50" />
                 ) : null}
-                <Plus className="w-4 h-4 mb-0.5 relative text-muted-foreground" />
+                <div className="grid place-items-center w-7 h-7 rounded-full bg-white/10 mb-1.5 relative">
+                  <Plus className="w-4 h-4 text-foreground/90" strokeWidth={1.5} />
+                </div>
                 <span className="relative">PRODUCT</span>
               </button>
               <button
                 onClick={() => setAvatarOpen(true)}
-                className="flex flex-col items-center justify-center w-[76px] h-[58px] rounded-xl bg-ms-surface-2 hover:bg-ms-border text-[10px] font-semibold text-foreground/90 border border-ms-border overflow-hidden relative tracking-wide"
+                className="ms-glass-2 flex flex-col items-center justify-center w-[88px] h-[88px] rounded-2xl text-[10px] font-semibold text-foreground/90 overflow-hidden relative tracking-wider transition-all"
               >
                 {avatarThumb ? (
-                  <img src={avatarThumb} alt="avatar" className="absolute inset-0 w-full h-full object-cover opacity-60" />
+                  <img src={avatarThumb} alt="avatar" className="absolute inset-0 w-full h-full object-cover opacity-50" />
                 ) : null}
-                <Plus className="w-4 h-4 mb-0.5 relative text-muted-foreground" />
+                <div className="grid place-items-center w-7 h-7 rounded-full bg-white/10 mb-1.5 relative">
+                  <Plus className="w-4 h-4 text-foreground/90" strokeWidth={1.5} />
+                </div>
                 <span className="relative">AVATAR</span>
               </button>
               <button
                 onClick={handleGenerate}
-                className="ms-cta flex items-center justify-center gap-1.5 w-[132px] h-[58px] rounded-xl text-white text-[11px] font-extrabold tracking-wider"
+                className="ms-cta flex items-center justify-center gap-1.5 w-[170px] h-[88px] rounded-2xl text-white text-[12px] font-extrabold tracking-wider"
               >
                 GENERATE
-                <Sparkles className="w-3 h-3" />
-                <span className="text-[11px] font-bold opacity-95">{(cost / 100).toFixed(2)}</span>
+                <Sparkles className="w-3.5 h-3.5" />
+                <span className="text-[12px] font-bold opacity-95">{(cost / 100).toFixed(2)}</span>
               </button>
             </div>
           </div>
 
           {/* Bottom row: chips */}
-          <div className="flex items-center gap-2 flex-wrap">
+          <div className="flex items-center gap-2 flex-wrap pl-1">
             <Chip
               icon={<ModeIcon />}
               value={mode}
@@ -178,21 +182,21 @@ export function PromptBar({ projectId, projectName }: Props) {
           <div className="flex md:hidden gap-2">
             <button
               onClick={() => setProductOpen(true)}
-              className="flex-1 h-11 rounded-xl bg-ms-surface-2 text-[11px] font-semibold text-foreground border border-ms-border"
+              className="ms-glass-2 flex-1 h-12 rounded-xl text-[11px] font-semibold text-foreground"
             >
               + PRODUCT
             </button>
             <button
               onClick={() => setAvatarOpen(true)}
-              className="flex-1 h-11 rounded-xl bg-ms-surface-2 text-[11px] font-semibold text-foreground border border-ms-border"
+              className="ms-glass-2 flex-1 h-12 rounded-xl text-[11px] font-semibold text-foreground"
             >
               + AVATAR
             </button>
             <button
               onClick={handleGenerate}
-              className="ms-cta flex-1 h-11 rounded-xl text-white text-[11px] font-extrabold"
+              className="ms-cta flex-1 h-12 rounded-xl text-white text-[11px] font-extrabold"
             >
-              GENERATE ✦ {cost.toLocaleString()}
+              GENERATE ✦ {(cost / 100).toFixed(2)}
             </button>
           </div>
         </div>
