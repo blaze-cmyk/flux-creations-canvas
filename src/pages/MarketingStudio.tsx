@@ -20,7 +20,7 @@ export default function MarketingStudio() {
     <MarketingStudioLayout>
       {/* Hero glow */}
       <div className="relative">
-        <div className="absolute inset-x-0 top-0 h-[520px] ms-hero-glow pointer-events-none" />
+        <div className="absolute -top-14 inset-x-0 h-[640px] ms-hero-glow pointer-events-none" />
 
         <section className="relative px-4 md:px-8 pt-10 md:pt-16 pb-8 max-w-6xl mx-auto">
           <div className="text-center">
