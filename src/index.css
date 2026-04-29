@@ -51,8 +51,29 @@
     --sidebar-accent-foreground: 0 0% 100%;
     --sidebar-border: 0 0% 18%;
     --sidebar-ring: 83 74% 55%;
+
+    /* Marketing Studio palette */
+    --ms-bg: 0 0% 3%;
+    --ms-surface: 0 0% 6%;
+    --ms-surface-2: 0 0% 9%;
+    --ms-border: 0 0% 14%;
+    --ms-cta: 346 92% 58%;
+    --ms-cta-2: 322 90% 56%;
+    --ms-glow: 346 92% 45%;
   }
 }
+
+.ms-hero-glow {
+  background: radial-gradient(ellipse 70% 55% at 50% -10%, hsl(var(--ms-glow) / 0.55) 0%, hsl(var(--ms-glow) / 0.18) 30%, transparent 65%);
+}
+.ms-cta {
+  background: linear-gradient(135deg, hsl(var(--ms-cta)) 0%, hsl(var(--ms-cta-2)) 100%);
+  box-shadow: 0 10px 30px -10px hsl(var(--ms-cta) / 0.55), inset 0 1px 0 hsl(0 0% 100% / 0.18);
+}
+.ms-cta:hover { filter: brightness(1.06); }
+.ms-scroll::-webkit-scrollbar { width: 8px; height: 8px; }
+.ms-scroll::-webkit-scrollbar-thumb { background: hsl(0 0% 18%); border-radius: 8px; }
+.ms-scroll::-webkit-scrollbar-track { background: transparent; }
 
 @layer base {
   * {
