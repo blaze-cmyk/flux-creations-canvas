@@ -76,10 +76,10 @@ export function PromptBar({ projectId, projectName }: Props) {
   };
 
   return (
-    <div className="relative w-full max-w-5xl mx-auto">
-      <div className="flex items-stretch gap-3">
-        {/* Left vertical pill: Product / App */}
-        <div className="flex flex-col gap-2 p-2 rounded-2xl bg-ms-surface border border-ms-border shrink-0">
+    <div className="relative w-full max-w-[960px] mx-auto">
+      <div className="relative flex items-stretch">
+        {/* Left vertical pill: Product / App — floats, vertically centered, slightly overlapping the bar */}
+        <div className="hidden md:flex absolute left-0 top-1/2 -translate-y-1/2 -translate-x-[calc(100%+10px)] flex-col gap-1 p-1.5 rounded-2xl bg-ms-surface border border-ms-border shadow-[0_8px_24px_-12px_rgba(0,0,0,0.6)] z-10">
           {(['Product', 'App'] as MSSurface[]).map((s) => {
             const active = s === surface;
             const Icon = s === 'Product' ? Package : Smartphone;
@@ -87,13 +87,13 @@ export function PromptBar({ projectId, projectName }: Props) {
               <button
                 key={s}
                 onClick={() => setSurface(s)}
-                className={`flex flex-col items-center justify-center w-14 h-14 rounded-xl text-[11px] font-medium transition-colors ${
+                className={`flex flex-col items-center justify-center w-[58px] h-[58px] rounded-xl text-[10px] font-medium transition-colors ${
                   active
                     ? 'bg-ms-surface-2 text-foreground ring-1 ring-ms-border'
                     : 'text-muted-foreground hover:text-foreground hover:bg-ms-surface-2'
                 }`}
               >
-                <Icon className="w-4 h-4 mb-1" />
+                <Icon className="w-[18px] h-[18px] mb-1" />
                 {s}
               </button>
             );
@@ -101,12 +101,12 @@ export function PromptBar({ projectId, projectName }: Props) {
         </div>
 
         {/* Main bar */}
-        <div className="flex-1 rounded-2xl bg-ms-surface border border-ms-border p-3 flex flex-col gap-3 min-w-0">
-          {/* Top: + + textarea */}
-          <div className="flex items-center gap-2">
+        <div className="flex-1 rounded-2xl bg-ms-surface border border-ms-border p-2.5 flex flex-col gap-2.5 min-w-0">
+          {/* Top row: + + textarea + Product/Avatar/Generate */}
+          <div className="flex items-stretch gap-2">
             <button
               onClick={() => setAssetsOpen(true)}
-              className="grid place-items-center w-9 h-9 rounded-lg bg-ms-surface-2 hover:bg-ms-border text-foreground shrink-0"
+              className="grid place-items-center w-9 h-9 self-start mt-1 rounded-lg bg-ms-surface-2 hover:bg-ms-border text-foreground shrink-0"
               aria-label="Add reference"
             >
               <Plus className="w-4 h-4" />
@@ -121,39 +121,38 @@ export function PromptBar({ projectId, projectName }: Props) {
                 }
               }}
               placeholder="Describe what happens in the ad..."
-              className="flex-1 bg-transparent border-0 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none min-w-0"
+              className="flex-1 bg-transparent border-0 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none min-w-0 self-center"
             />
 
             {/* Right: Product, Avatar, Generate (md+) */}
-            <div className="hidden md:flex items-stretch gap-2">
+            <div className="hidden md:flex items-stretch gap-1.5">
               <button
                 onClick={() => setProductOpen(true)}
-                className="flex flex-col items-center justify-center w-20 h-14 rounded-xl bg-ms-surface-2 hover:bg-ms-border text-[11px] font-semibold text-foreground border border-ms-border overflow-hidden relative"
+                className="flex flex-col items-center justify-center w-[76px] h-[58px] rounded-xl bg-ms-surface-2 hover:bg-ms-border text-[10px] font-semibold text-foreground/90 border border-ms-border overflow-hidden relative tracking-wide"
               >
                 {productThumb ? (
                   <img src={productThumb} alt="product" className="absolute inset-0 w-full h-full object-cover opacity-60" />
                 ) : null}
-                <Plus className="w-4 h-4 mb-0.5 relative" />
+                <Plus className="w-4 h-4 mb-0.5 relative text-muted-foreground" />
                 <span className="relative">PRODUCT</span>
               </button>
               <button
                 onClick={() => setAvatarOpen(true)}
-                className="flex flex-col items-center justify-center w-20 h-14 rounded-xl bg-ms-surface-2 hover:bg-ms-border text-[11px] font-semibold text-foreground border border-ms-border overflow-hidden relative"
+                className="flex flex-col items-center justify-center w-[76px] h-[58px] rounded-xl bg-ms-surface-2 hover:bg-ms-border text-[10px] font-semibold text-foreground/90 border border-ms-border overflow-hidden relative tracking-wide"
               >
                 {avatarThumb ? (
                   <img src={avatarThumb} alt="avatar" className="absolute inset-0 w-full h-full object-cover opacity-60" />
                 ) : null}
-                <Plus className="w-4 h-4 mb-0.5 relative" />
+                <Plus className="w-4 h-4 mb-0.5 relative text-muted-foreground" />
                 <span className="relative">AVATAR</span>
               </button>
               <button
                 onClick={handleGenerate}
-                className="ms-cta flex flex-col items-center justify-center w-32 h-14 rounded-xl text-white text-xs font-extrabold tracking-wide"
+                className="ms-cta flex items-center justify-center gap-1.5 w-[132px] h-[58px] rounded-xl text-white text-[11px] font-extrabold tracking-wider"
               >
-                <span className="flex items-center gap-1">
-                  GENERATE <Sparkles className="w-3 h-3" />
-                </span>
-                <span className="text-[11px] opacity-90 mt-0.5">{cost.toLocaleString()}</span>
+                GENERATE
+                <Sparkles className="w-3 h-3" />
+                <span className="text-[11px] font-bold opacity-95">{(cost / 100).toFixed(2)}</span>
               </button>
             </div>
           </div>
