@@ -1,7 +1,8 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Sidebar } from './Sidebar';
 import { TopHeader } from './TopHeader';
 import { Sheet, SheetContent } from '@/components/ui/sheet';
+import { hydrateMarketingStudio } from '@/lib/marketingStudioSync';
 
 export function MarketingStudioLayout({
   showBack,
@@ -15,6 +16,11 @@ export function MarketingStudioLayout({
   children: React.ReactNode;
 }) {
   const [mobileOpen, setMobileOpen] = useState(false);
+
+  // Pull projects + generations from the DB on mount so refresh / new device works.
+  useEffect(() => {
+    hydrateMarketingStudio();
+  }, []);
 
   return (
     <div className="h-screen w-screen bg-ms-bg text-foreground flex overflow-hidden">
