@@ -130,13 +130,13 @@ export function useProducts() {
   }, [refresh]);
 
   const uploadProductImages = useCallback(
-    async (files: File[], name: string) => {
+    async (files: File[], name: string, description?: string) => {
       const { data: u } = await supabase.auth.getUser();
       const uid = u?.user?.id ?? null;
       const folder = uid ?? 'anon';
       const { data: prod, error: pErr } = await supabase
         .from('ms_products')
-        .insert({ user_id: uid, name, status: 'ready' })
+        .insert({ user_id: uid, name, description: description ?? null, status: 'ready' })
         .select()
         .single();
       if (pErr || !prod) throw pErr || new Error('Failed to create product');

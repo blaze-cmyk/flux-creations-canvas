@@ -17,6 +17,20 @@ import { toast } from '@/hooks/use-toast';
 
 type View = 'list' | 'create';
 
+function fileToBase64(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = reader.result as string;
+      // result is "data:<mime>;base64,XXXX" — strip the prefix.
+      const idx = result.indexOf(',');
+      resolve(idx >= 0 ? result.slice(idx + 1) : result);
+    };
+    reader.onerror = () => reject(reader.error);
+    reader.readAsDataURL(file);
+  });
+}
+
 const HERO_IMAGES = [
   'https://images.unsplash.com/photo-1522335789203-aaa3e9ee79f9?auto=format&fit=crop&w=400&q=80',
   'https://images.unsplash.com/photo-1556228720-195a672e8a03?auto=format&fit=crop&w=400&q=80',
@@ -39,10 +53,13 @@ export function AddProductModal({
   const [files, setFiles] = useState<File[]>([]);
   const [previews, setPreviews] = useState<string[]>([]);
   const [name, setName] = useState('');
+  const [description, setDescription] = useState('');
   const [url, setUrl] = useState('');
   const [heroUrl, setHeroUrl] = useState('');
   const [busy, setBusy] = useState(false);
+  const [analyzing, setAnalyzing] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
+  const analyzedRef = useRef(false);
 
   useEffect(() => {
     const urls = files.map((f) => URL.createObjectURL(f));
@@ -56,18 +73,43 @@ export function AddProductModal({
       setView('list');
       setFiles([]);
       setName('');
+      setDescription('');
       setUrl('');
       setHeroUrl('');
+      analyzedRef.current = false;
     }
   }, [open, refresh]);
+
+  // Auto-analyze the first uploaded image to fill in name + description.
+  const analyzeFirstImage = async (file: File) => {
+    if (analyzedRef.current) return;
+    analyzedRef.current = true;
+    setAnalyzing(true);
+    try {
+      const b64 = await fileToBase64(file);
+      const { supabase } = await import('@/integrations/supabase/client');
+      const { data, error } = await supabase.functions.invoke('marketing-analyze-product', {
+        body: { image_base64: b64, mime_type: file.type || 'image/jpeg' },
+      });
+      if (error) throw error;
+      if (data?.name && !name.trim()) setName(data.name);
+      if (data?.description && !description.trim()) setDescription(data.description);
+    } catch (e: any) {
+      // Silent fail — user can still type manually.
+      console.warn('analyze-product failed', e?.message);
+    } finally {
+      setAnalyzing(false);
+    }
+  };
 
   const addFiles = (list: FileList | File[]) => {
     const arr = Array.from(list).slice(0, 6 - files.length);
     if (!arr.length) return;
+    const wasEmpty = files.length === 0;
     setFiles((prev) => [...prev, ...arr].slice(0, 6));
-    if (!name) {
-      const guess = arr[0].name.replace(/\.[^.]+$/, '').slice(0, 32);
-      if (guess) setName(guess);
+    if (wasEmpty) {
+      // Kick off auto-analyze on the very first image.
+      analyzeFirstImage(arr[0]);
     }
   };
 
@@ -90,11 +132,12 @@ export function AddProductModal({
       if (files.length === 0 || !name.trim()) return;
       setBusy(true);
       try {
-        await uploadProductImages(files, name.trim());
+        await uploadProductImages(files, name.trim(), description.trim() || undefined);
         toast({ title: 'Product added' });
         setView('list');
         setFiles([]);
         setName('');
+        setDescription('');
       } catch (e: any) {
         toast({ title: 'Upload failed', description: e?.message ?? '', variant: 'destructive' });
       } finally {
@@ -338,7 +381,7 @@ export function AddProductModal({
                       <div className="text-xs text-muted-foreground">This may take a few seconds</div>
                     </div>
                   ) : previews.length > 0 ? (
-                    <div className="rounded-2xl ms-glass-2 p-3">
+                    <div className="rounded-2xl ms-glass-2 p-3 relative">
                       <div className="grid grid-cols-3 gap-2">
                         {previews.map((src, i) => (
                           <div key={i} className="relative aspect-square rounded-lg overflow-hidden bg-white/5">
@@ -368,6 +411,12 @@ export function AddProductModal({
                       <div className="mt-2 text-[11px] text-muted-foreground text-center">
                         {files.length} / 6 images · first image is the cover
                       </div>
+                      {analyzing && (
+                        <div className="absolute inset-x-3 bottom-3 rounded-lg bg-black/70 backdrop-blur px-3 py-2 flex items-center justify-center gap-2">
+                          <Loader2 className="w-3.5 h-3.5 animate-spin text-white" />
+                          <span className="text-xs font-medium text-white">Checking content…</span>
+                        </div>
+                      )}
                     </div>
                   ) : (
                     <button
@@ -397,16 +446,33 @@ export function AddProductModal({
               <div className="flex flex-col">
                 {tab === 'product' ? (
                   <>
-                    <label className="text-sm text-muted-foreground mb-2">Name Product</label>
+                    <label className="text-sm text-muted-foreground mb-2">Product name</label>
                     <div className="relative">
-                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">@</span>
                       <input
                         value={name}
                         onChange={(e) => setName(e.target.value)}
-                        placeholder="Product name"
-                        maxLength={48}
-                        className="w-full h-12 pl-8 pr-3 rounded-xl ms-chip-glass text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-white/25"
+                        placeholder={analyzing ? 'Detecting…' : 'Enter product name'}
+                        maxLength={64}
+                        className="w-full h-12 pl-3 pr-10 rounded-xl ms-chip-glass text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-white/25"
                       />
+                      {analyzing && (
+                        <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 animate-spin text-muted-foreground" />
+                      )}
+                    </div>
+
+                    <label className="text-sm text-muted-foreground mb-2 mt-4">Description</label>
+                    <div className="relative">
+                      <textarea
+                        value={description}
+                        onChange={(e) => setDescription(e.target.value)}
+                        placeholder={analyzing ? 'Detecting…' : 'Describe your product'}
+                        rows={5}
+                        maxLength={400}
+                        className="w-full p-3 rounded-xl ms-chip-glass text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-white/25 resize-none leading-relaxed"
+                      />
+                      {analyzing && (
+                        <Loader2 className="absolute right-3 top-3 w-4 h-4 animate-spin text-muted-foreground" />
+                      )}
                     </div>
                   </>
                 ) : (
