@@ -53,6 +53,7 @@ export type Database = {
       ms_avatars: {
         Row: {
           created_at: string
+          description: string | null
           gender: string | null
           id: string
           is_builtin: boolean
@@ -60,9 +61,13 @@ export type Database = {
           public_url: string | null
           storage_path: string | null
           user_id: string | null
+          voice_id: string | null
+          voice_sample_url: string | null
+          voice_status: string
         }
         Insert: {
           created_at?: string
+          description?: string | null
           gender?: string | null
           id?: string
           is_builtin?: boolean
@@ -70,9 +75,13 @@ export type Database = {
           public_url?: string | null
           storage_path?: string | null
           user_id?: string | null
+          voice_id?: string | null
+          voice_sample_url?: string | null
+          voice_status?: string
         }
         Update: {
           created_at?: string
+          description?: string | null
           gender?: string | null
           id?: string
           is_builtin?: boolean
@@ -80,6 +89,9 @@ export type Database = {
           public_url?: string | null
           storage_path?: string | null
           user_id?: string | null
+          voice_id?: string | null
+          voice_sample_url?: string | null
+          voice_status?: string
         }
         Relationships: []
       }
@@ -93,6 +105,8 @@ export type Database = {
           fal_request_id: string | null
           format: string | null
           id: string
+          keyframe_path: string | null
+          keyframe_url: string | null
           product_id: string | null
           project_id: string | null
           prompt: string
@@ -100,6 +114,8 @@ export type Database = {
           reference_paths: string[] | null
           resolution: string | null
           script: Json | null
+          script_text: string | null
+          stage: string
           status: string
           surface: string | null
           thumb_url: string | null
@@ -116,6 +132,8 @@ export type Database = {
           fal_request_id?: string | null
           format?: string | null
           id?: string
+          keyframe_path?: string | null
+          keyframe_url?: string | null
           product_id?: string | null
           project_id?: string | null
           prompt: string
@@ -123,6 +141,8 @@ export type Database = {
           reference_paths?: string[] | null
           resolution?: string | null
           script?: Json | null
+          script_text?: string | null
+          stage?: string
           status?: string
           surface?: string | null
           thumb_url?: string | null
@@ -139,6 +159,8 @@ export type Database = {
           fal_request_id?: string | null
           format?: string | null
           id?: string
+          keyframe_path?: string | null
+          keyframe_url?: string | null
           product_id?: string | null
           project_id?: string | null
           prompt?: string
@@ -146,6 +168,8 @@ export type Database = {
           reference_paths?: string[] | null
           resolution?: string | null
           script?: Json | null
+          script_text?: string | null
+          stage?: string
           status?: string
           surface?: string | null
           thumb_url?: string | null
