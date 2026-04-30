@@ -6,6 +6,8 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Slider } from '@/components/ui/slider';
 import { AssetsModal } from './AssetsModal';
 import { AddProductModal } from './AddProductModal';
 import { AvatarModal } from './AvatarModal';
@@ -35,7 +37,7 @@ import { toast } from '@/hooks/use-toast';
 
 const ASPECTS: MSAspect[] = ['9:16', '1:1', '16:9'];
 const RESOLUTIONS: MSResolution[] = ['480p', '720p', '1080p'];
-const DURATIONS: MSDuration[] = ['4s', '8s', '12s'];
+
 
 function modeIcon(mode: MSMode) {
   const cls = 'size-3.5';
@@ -201,7 +203,7 @@ export function PromptBar({ projectId }: Props) {
             )}
             <Chip icon={<AspectIcon />} value={aspect} options={ASPECTS} onChange={(v) => setAspect(v as MSAspect)} />
             <Chip icon={<Gem className="w-3.5 h-3.5" />} value={res} options={RESOLUTIONS} onChange={(v) => setRes(v as MSResolution)} />
-            <Chip icon={<Clock className="w-3.5 h-3.5" />} value={duration} options={DURATIONS} onChange={(v) => setDuration(v as MSDuration)} />
+            <DurationChip value={duration} onChange={setDuration} />
           </div>
 
           {/* Mobile generate row */}
@@ -266,3 +268,37 @@ function Chip({
 function AspectIcon() {
   return <div className="w-3 h-3.5 rounded-[3px] border border-current" />;
 }
+
+function DurationChip({ value, onChange }: { value: MSDuration; onChange: (v: MSDuration) => void }) {
+  const num = Math.min(15, Math.max(1, parseInt(value) || 8));
+  return (
+    <Popover>
+      <PopoverTrigger asChild>
+        <button className="ms-chip-glass flex items-center gap-1.5 px-3.5 h-9 rounded-full text-xs text-foreground transition-all">
+          <Clock className="w-3.5 h-3.5 text-muted-foreground" />
+          {num}s
+          <ChevronDownIcon className="size-3.5 text-muted-foreground/70" />
+        </button>
+      </PopoverTrigger>
+      <PopoverContent
+        align="start"
+        sideOffset={10}
+        className="w-[320px] p-4 rounded-2xl border border-white/10 bg-[hsl(0_0%_8%)]/95 backdrop-blur-xl shadow-[0_24px_60px_-20px_rgba(0,0,0,0.7)]"
+      >
+        <div className="text-xs font-medium text-white/60 mb-2.5 px-0.5">Duration</div>
+        <div className="rounded-xl bg-white/[0.04] border border-white/10 px-4 py-3 flex items-center gap-3">
+          <div className="text-base font-semibold text-white tabular-nums w-12 shrink-0">{num}s</div>
+          <Slider
+            value={[num]}
+            min={1}
+            max={15}
+            step={1}
+            onValueChange={(v) => onChange(`${v[0]}s`)}
+            className="flex-1"
+          />
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
