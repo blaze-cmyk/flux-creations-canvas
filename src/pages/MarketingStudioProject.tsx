@@ -30,40 +30,107 @@ function stageLabel(g: MSGeneration): string {
 export default function MarketingStudioProject() {
   const { slug } = useParams();
   const project = useMarketingStudioStore((s) => s.getProjectBySlug(slug || ''));
+  const projects = useMarketingStudioStore((s) => s.projects);
   const toggleLike = useMarketingStudioStore((s) => s.toggleLike);
   const updateGeneration = useMarketingStudioStore((s) => s.updateGeneration);
   const [tab, setTab] = useState<'all' | 'liked'>('all');
   const [selected, setSelected] = useState<MSGeneration | null>(null);
+  const [hydratingProject, setHydratingProject] = useState(false);
   const retrying = useRef<Set<string>>(new Set());
 
-  // Hydrate generations from DB on mount/refresh — keeps history in sync
-  // across reloads and devices (localStorage persistence + DB source of truth).
+  // If the slug isn't in local store (different device / cleared cache),
+  // hydrate the project from DB before redirecting away.
   useEffect(() => {
-    if (!project) return;
-    const ids = project.generations
-      .map((g) => g.id)
-      .filter((id) => /^[0-9a-f-]{36}$/i.test(id));
-    if (ids.length === 0) return;
+    if (project || !slug) return;
     let cancelled = false;
+    setHydratingProject(true);
     (async () => {
-      const { data, error } = await supabase
-        .from('ms_generations')
-        .select('id, status, stage, video_url, thumb_url, error, fal_request_id')
-        .in('id', ids);
-      if (cancelled || error || !data) return;
-      for (const row of data) {
-        updateGeneration(project.id, row.id, {
-          status: row.status as MSGeneration['status'],
-          stage: (row as any).stage as MSGeneration['stage'],
-          videoUrl: row.video_url ?? undefined,
-          thumbUrl: row.thumb_url ?? undefined,
-          error: row.error ?? undefined,
-          falRequestId: row.fal_request_id ?? undefined,
-        });
+      const { data } = await supabase
+        .from('ms_projects')
+        .select('id, slug, name, thumb_url, created_at')
+        .eq('slug', slug)
+        .maybeSingle();
+      if (cancelled) return;
+      if (data) {
+        useMarketingStudioStore.setState((s) => ({
+          projects: [
+            {
+              id: data.id,
+              slug: data.slug,
+              name: data.name,
+              thumbUrl: data.thumb_url ?? undefined,
+              createdAt: new Date(data.created_at as any).getTime(),
+              generations: [],
+            },
+            ...s.projects.filter((p) => p.slug !== data.slug),
+          ],
+        }));
       }
+      setHydratingProject(false);
     })();
     return () => {
       cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [project, slug]);
+
+  const addGeneration = useMarketingStudioStore((s) => s.addGeneration);
+
+  // Hydrate generations from DB on mount/refresh AND every 5s — keeps history in sync
+  // across reloads and devices. Pulls ALL rows for this project_id, not just IDs we
+  // already know about, so newly-created server rows (e.g. from orchestrator) appear.
+  useEffect(() => {
+    if (!project) return;
+    let cancelled = false;
+    const sync = async () => {
+      const { data, error } = await supabase
+        .from('ms_generations')
+        .select(
+          'id, status, stage, video_url, thumb_url, error, fal_request_id, prompt, format, surface, aspect, resolution, duration_seconds, product_id, avatar_id, created_at, keyframe_url',
+        )
+        .eq('project_id', project.id)
+        .order('created_at', { ascending: false })
+        .limit(100);
+      if (cancelled || error || !data) return;
+      const known = new Set(project.generations.map((g) => g.id));
+      for (const row of data) {
+        if (known.has(row.id)) {
+          updateGeneration(project.id, row.id, {
+            status: row.status as MSGeneration['status'],
+            stage: (row as any).stage as MSGeneration['stage'],
+            videoUrl: row.video_url ?? undefined,
+            thumbUrl: row.thumb_url ?? (row as any).keyframe_url ?? undefined,
+            error: row.error ?? undefined,
+            falRequestId: row.fal_request_id ?? undefined,
+          });
+        } else {
+          addGeneration(project.id, {
+            id: row.id,
+            thumbUrl: row.thumb_url ?? (row as any).keyframe_url ?? '',
+            videoUrl: row.video_url ?? undefined,
+            prompt: row.prompt ?? '',
+            mode: ((row as any).format ?? 'UGC') as MSGeneration['mode'],
+            surface: ((row as any).surface ?? 'Product') as MSGeneration['surface'],
+            aspect: ((row as any).aspect ?? '9:16') as MSGeneration['aspect'],
+            resolution: ((row as any).resolution ?? '720p') as MSGeneration['resolution'],
+            duration: `${(row as any).duration_seconds ?? 8}s`,
+            productId: (row as any).product_id ?? undefined,
+            avatarId: (row as any).avatar_id ?? undefined,
+            createdAt: new Date(row.created_at as any).getTime(),
+            submittedAt: new Date(row.created_at as any).getTime(),
+            status: row.status as MSGeneration['status'],
+            stage: (row as any).stage as MSGeneration['stage'],
+            falRequestId: row.fal_request_id ?? undefined,
+            error: row.error ?? undefined,
+          });
+        }
+      }
+    };
+    sync();
+    const t = setInterval(sync, 5000);
+    return () => {
+      cancelled = true;
+      clearInterval(t);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [project?.id]);
@@ -141,7 +208,16 @@ export default function MarketingStudioProject() {
     return () => clearInterval(interval);
   }, [project, updateGeneration]);
 
-  if (!project) return <Navigate to="/marketingstudio" replace />;
+  if (!project) {
+    if (hydratingProject) {
+      return (
+        <div className="min-h-screen grid place-items-center bg-background">
+          <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+        </div>
+      );
+    }
+    return <Navigate to="/marketingstudio" replace />;
+  }
 
   const items = tab === 'all' ? project.generations : project.generations.filter((g) => g.liked);
 

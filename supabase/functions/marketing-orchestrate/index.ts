@@ -104,18 +104,23 @@ Deno.serve(async (req) => {
           })
           .eq('id', generationId);
 
-        // 3) Keyframe (best effort — if it fails we still try video with raw refs)
+        // 3) Keyframe — REQUIRED. If it fails (quota, model error, etc.), surface
+        // the failure to the user instead of submitting a low-quality video off raw refs.
         const kfRes = await invokeFn('marketing-generate-keyframe', {
           generationId, productId, avatarId, prompt: finalPrompt, aspect: ratio, format,
         });
-        let keyframeUrl: string | undefined;
-        if (kfRes.ok && kfRes.json?.keyframeUrl) {
-          keyframeUrl = kfRes.json.keyframeUrl;
+        if (!kfRes.ok || !kfRes.json?.keyframeUrl) {
+          const detail = (kfRes.json?.error?.message || kfRes.json?.error || kfRes.text || 'unknown').toString();
+          const friendly = /quota|insufficient|余额/i.test(detail)
+            ? 'Image model is out of credits. Please top up the keyframe provider (apiyi).'
+            : `Keyframe failed: ${detail.slice(0, 200)}`;
+          throw new Error(friendly);
         }
+        const keyframeUrl: string = kfRes.json.keyframeUrl;
 
         await admin
           .from('ms_generations')
-          .update({ stage: 'videoing' })
+          .update({ stage: 'videoing', thumb_url: keyframeUrl })
           .eq('id', generationId);
 
         // 4) Video submit — but the video function INSERTS its own row.
