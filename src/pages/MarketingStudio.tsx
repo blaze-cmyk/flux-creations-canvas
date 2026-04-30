@@ -1,4 +1,5 @@
-import { useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { Volume2, VolumeX } from 'lucide-react';
 import { MarketingStudioLayout } from '@/components/marketingstudio/MarketingStudioLayout';
 import { PromptBar } from '@/components/marketingstudio/PromptBar';
 
@@ -27,31 +28,86 @@ function BoltIcon({ className = 'w-4 h-4' }: { className?: string }) {
 
 function FormatCard({ label, src }: { label: string; src: string }) {
   const ref = useRef<HTMLVideoElement>(null);
+  const [hovered, setHovered] = useState(false);
+  const [expanded, setExpanded] = useState(false);
+  const [muted, setMuted] = useState(true);
+  const expandTimer = useRef<number | null>(null);
+
+  useEffect(() => {
+    if (hovered) {
+      ref.current?.play().catch(() => {});
+      expandTimer.current = window.setTimeout(() => setExpanded(true), 350);
+    } else {
+      if (expandTimer.current) window.clearTimeout(expandTimer.current);
+      setExpanded(false);
+      if (ref.current) {
+        ref.current.pause();
+        ref.current.currentTime = 0;
+      }
+      setMuted(true);
+    }
+    return () => {
+      if (expandTimer.current) window.clearTimeout(expandTimer.current);
+    };
+  }, [hovered]);
 
   return (
-    <button
-      onMouseEnter={() => ref.current?.play().catch(() => {})}
-      onMouseLeave={() => {
-        if (ref.current) {
-          ref.current.pause();
-          ref.current.currentTime = 0;
-        }
-      }}
-      className="group relative aspect-[2/3] rounded-2xl overflow-hidden bg-ms-surface-2 ring-1 ring-white/5 hover:ring-white/20 transition-all"
+    <div
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      className="relative aspect-[2/3]"
     >
-      <video
-        ref={ref}
-        src={src}
-        muted
-        loop
-        playsInline
-        preload="metadata"
-        className="w-full h-full object-cover"
-      />
-      <div className="absolute top-3 left-1/2 -translate-x-1/2 text-[13px] font-medium text-white drop-shadow-[0_2px_6px_rgba(0,0,0,0.7)] whitespace-nowrap">
-        {label}
+      <div
+        className={`absolute inset-0 rounded-2xl overflow-hidden bg-ms-surface-2 ring-1 ring-white/5 transition-all duration-500 ease-out will-change-transform ${
+          expanded
+            ? 'scale-[1.08] z-30 ring-white/20 shadow-[0_30px_80px_-20px_rgba(0,0,0,0.8)]'
+            : 'scale-100 z-0 hover:ring-white/10'
+        }`}
+      >
+        <video
+          ref={ref}
+          src={src}
+          muted={muted}
+          loop
+          playsInline
+          preload="metadata"
+          className="w-full h-full object-cover"
+        />
+
+        {/* Top gradient + label */}
+        <div className="pointer-events-none absolute inset-x-0 top-0 h-20 bg-gradient-to-b from-black/55 to-transparent" />
+        <div className="absolute top-3 left-0 right-0 px-3 flex items-center justify-center">
+          <span className="text-[13px] font-semibold text-white drop-shadow-[0_2px_6px_rgba(0,0,0,0.8)] whitespace-nowrap">
+            {label}
+          </span>
+        </div>
+
+        {/* Mute toggle — appears on hover */}
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            setMuted((m) => !m);
+          }}
+          className={`absolute top-2.5 right-2.5 grid place-items-center w-8 h-8 rounded-full bg-black/55 backdrop-blur-md text-white transition-all duration-300 ${
+            hovered ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-1 pointer-events-none'
+          }`}
+          aria-label={muted ? 'Unmute' : 'Mute'}
+        >
+          {muted ? <VolumeX className="w-3.5 h-3.5" /> : <Volume2 className="w-3.5 h-3.5" />}
+        </button>
+
+        {/* Recreate button — slides up from bottom on hover */}
+        <div className="absolute inset-x-0 bottom-0 p-2.5 overflow-hidden">
+          <button
+            className={`w-full h-11 rounded-full bg-white text-black text-sm font-semibold shadow-[0_10px_30px_-10px_rgba(0,0,0,0.6)] transition-all duration-300 ease-out ${
+              hovered ? 'translate-y-0 opacity-100' : 'translate-y-[140%] opacity-0'
+            }`}
+          >
+            Recreate
+          </button>
+        </div>
       </div>
-    </button>
+    </div>
   );
 }
 
