@@ -123,39 +123,19 @@ Deno.serve(async (req) => {
             prompt: finalPrompt,
             script_text: finalPrompt,
             reference_paths: refUrls,
-            stage: 'keyframing',
+            stage: 'videoing',
           })
           .eq('id', generationId);
 
-        // 3) Keyframe — REQUIRED. If it fails (quota, model error, etc.), surface
-        // the failure to the user instead of submitting a low-quality video off raw refs.
-        const kfRes = await invokeFn('marketing-generate-keyframe', {
-          generationId, productId, avatarId, prompt: finalPrompt, aspect: ratio, format,
-        });
-        if (!kfRes.ok || !kfRes.json?.keyframeUrl) {
-          const detail = (kfRes.json?.error?.message || kfRes.json?.error || kfRes.text || 'unknown').toString();
-          const friendly = /quota|insufficient|余额/i.test(detail)
-            ? 'Image model is out of credits. Please top up the keyframe provider (apiyi).'
-            : `Keyframe failed: ${detail.slice(0, 200)}`;
-          throw new Error(friendly);
-        }
-        const keyframeUrl: string = kfRes.json.keyframeUrl;
-        const videoRefs = uniqueValidUrls([keyframeUrl, ...refUrls]);
+        // 3) Keyframe step DISABLED — go straight to Seedance using raw product + avatar refs.
+        //    This is faster, cheaper, and avoids Nano Banana Pro identity drift.
+        const videoRefs = uniqueValidUrls(refUrls);
 
-        await admin
-          .from('ms_generations')
-          .update({ stage: 'videoing', thumb_url: keyframeUrl })
-          .eq('id', generationId);
-
-        // 4) Video submit — but the video function INSERTS its own row.
-        // Instead, mirror submit logic here by calling video function with body that uses the existing row.
-        // Simpler: call video function and let it create its own job row; then mark THIS row as 'merged' pointer.
-        // Cleanest: have video function reuse this row by id. We add support via { reuseGenerationId } below.
+        // 4) Video submit (reuse this row)
         const vidRes = await invokeFn('marketing-generate-video', {
           reuseGenerationId: generationId,
           prompt: finalPrompt,
           image_urls: videoRefs,
-          keyframe_url: keyframeUrl,
           aspect: ratio,
           duration_seconds,
           resolution,
