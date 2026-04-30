@@ -134,6 +134,7 @@ export function PromptBar({ projectId }: Props) {
       productId: productId || undefined,
       avatarId: avatarId || undefined,
       createdAt: Date.now(),
+      submittedAt: Date.now(),
       status: 'queued',
     };
     addGeneration(pid, placeholder);
