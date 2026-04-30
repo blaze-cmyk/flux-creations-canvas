@@ -72,6 +72,10 @@ export function PromptBar({ projectId }: Props) {
   const [avatarThumb, setAvatarThumb] = useState<string | null>(null);
   const [productName, setProductName] = useState<string | null>(null);
   const [avatarName, setAvatarName] = useState<string | null>(null);
+  const [productId, setProductId] = useState<string | null>(null);
+  const [avatarId, setAvatarId] = useState<string | null>(null);
+  const [exactVoiceover, setExactVoiceover] = useState(false);
+  const [generating, setGenerating] = useState(false);
 
   const [assetsOpen, setAssetsOpen] = useState(false);
   const [productOpen, setProductOpen] = useState(false);
@@ -85,7 +89,6 @@ export function PromptBar({ projectId }: Props) {
     const handler = (e: Event) => {
       const p = (e as CustomEvent<FormatPreset>).detail;
       if (!p) return;
-      console.log('[recreate] preset received', { mode: p.mode, duration: p.duration, aspect: p.aspect });
       setMode(p.mode);
       const cleaned = p.prompt.replace(/@[A-Za-z0-9_][A-Za-z0-9 _-]*?(?=(\s@|\s|\.|,|$))/g, '').replace(/\s{2,}/g, ' ').trim();
       setPrompt(cleaned);
@@ -102,29 +105,77 @@ export function PromptBar({ projectId }: Props) {
 
   const cost = surface === 'Product' ? 4840 : 16286;
 
-  const handleGenerate = () => {
+  const handleGenerate = async () => {
+    if (!prompt.trim() && !productId) {
+      toast({ title: 'Add a prompt or product', variant: 'destructive' });
+      return;
+    }
+    setGenerating(true);
     let pid = projectId;
     let pslug: string | undefined;
     if (!pid) {
-      const p = createProject(prompt.slice(0, 28) || 'New project');
+      const p = createProject(prompt.slice(0, 28) || productName || 'New project');
       pid = p.id;
       pslug = p.slug;
     }
-    const gen: MSGeneration = {
-      id: crypto.randomUUID(),
-      thumbUrl: productThumb || `https://picsum.photos/seed/gen-${Date.now()}/400/720`,
-      prompt: prompt || 'Untitled ad',
-      mode,
-      surface,
-      aspect,
-      resolution: res,
-      duration,
-      createdAt: Date.now(),
-    };
-    addGeneration(pid, gen);
-    toast({ title: 'Generation started', description: 'Your ad is being created (mock).' });
-    if (pslug) navigate(`/marketingstudio/${pslug}`);
-    setPrompt('');
+    try {
+      // 1. Build the Seedance prompt (or use exact voiceover)
+      const { data: scriptData, error: scriptErr } = await (
+        await import('@/integrations/supabase/client')
+      ).supabase.functions.invoke('marketing-generate-script', {
+        body: {
+          productId,
+          avatarId,
+          format: mode,
+          surface,
+          aspect,
+          duration: parseInt(duration) || 8,
+          userPrompt: prompt,
+          exactVoiceover,
+        },
+      });
+      if (scriptErr) throw scriptErr;
+
+      // 2. Submit to Seedance
+      const { data: vidData, error: vidErr } = await (
+        await import('@/integrations/supabase/client')
+      ).supabase.functions.invoke('marketing-generate-video', {
+        body: {
+          prompt: scriptData?.prompt || prompt,
+          image_urls: scriptData?.reference_urls || [],
+          aspect,
+          duration_seconds: parseInt(duration) || 8,
+          resolution: res,
+          productId,
+          avatarId,
+          format: mode,
+          surface,
+        },
+      });
+      if (vidErr) throw vidErr;
+
+      const gen: MSGeneration = {
+        id: vidData?.id || crypto.randomUUID(),
+        thumbUrl: productThumb || avatarThumb || `https://picsum.photos/seed/gen-${Date.now()}/400/720`,
+        prompt: scriptData?.prompt || prompt,
+        mode,
+        surface,
+        aspect,
+        resolution: res,
+        duration,
+        productId: productId || undefined,
+        avatarId: avatarId || undefined,
+        createdAt: Date.now(),
+      };
+      addGeneration(pid, gen);
+      toast({ title: 'Generation started', description: 'Your ad is rendering on Seedance 2.0.' });
+      if (pslug) navigate(`/marketingstudio/${pslug}`);
+      setPrompt('');
+    } catch (e: any) {
+      toast({ title: 'Generation failed', description: e?.message ?? 'Unknown error', variant: 'destructive' });
+    } finally {
+      setGenerating(false);
+    }
   };
 
   return (
