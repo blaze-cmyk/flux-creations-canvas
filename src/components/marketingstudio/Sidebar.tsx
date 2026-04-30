@@ -11,7 +11,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 
 export function Sidebar({ onClose }: { onClose?: () => void }) {
-  const { sidebarCollapsed, toggleSidebar, projects, createProject, deleteProject } =
+  const { sidebarCollapsed, toggleSidebar, projects, deleteProject } =
     useMarketingStudioStore();
   const navigate = useNavigate();
   const params = useParams();
