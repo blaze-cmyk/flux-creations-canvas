@@ -10,6 +10,23 @@ import { toast } from '@/hooks/use-toast';
 
 const MAX_GEN_DURATION_MS = 12 * 60 * 1000; // 12 minutes
 
+function stageLabel(g: MSGeneration): string {
+  if (g.status === 'failed') return 'Failed';
+  if (g.status === 'done') return 'Ready';
+  switch (g.stage) {
+    case 'scripting': return 'Writing script…';
+    case 'keyframing': return 'Composing scene…';
+    case 'keyframe_ready': return 'Scene ready…';
+    case 'keyframe_failed': return 'Scene fallback…';
+    case 'videoing': return 'Rendering on Seedance 2.0…';
+    case 'done': return 'Ready';
+    default:
+      if (g.status === 'queued_pending_persist') return 'Registering…';
+      if (g.status === 'running') return 'Rendering…';
+      return 'Queued…';
+  }
+}
+
 export default function MarketingStudioProject() {
   const { slug } = useParams();
   const project = useMarketingStudioStore((s) => s.getProjectBySlug(slug || ''));
