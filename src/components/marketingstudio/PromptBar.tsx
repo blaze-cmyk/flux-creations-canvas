@@ -483,6 +483,7 @@ function DurationChip({ value, onChange }: { value: MSDuration; onChange: (v: MS
         <div className="rounded-xl bg-white/[0.04] border border-white/10 px-4 py-3 flex items-center gap-3">
           <div className="text-base font-semibold text-white tabular-nums w-12 shrink-0">{num}s</div>
           <Slider
+            key={num}
             value={[num]}
             min={1}
             max={15}
