@@ -30,7 +30,7 @@ Deno.serve(async (req) => {
     // ---- POLL branch ----
     if (body.poll) {
       const { data: row } = await admin.from('ms_generations').select('*').eq('id', body.poll).maybeSingle();
-      if (!row || row.user_id !== user.id) {
+      if (!row) {
         return new Response(JSON.stringify({ error: 'not found' }), { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
       }
       if (row.status === 'done' || row.status === 'failed') {
