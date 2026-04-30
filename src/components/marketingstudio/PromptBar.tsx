@@ -286,9 +286,10 @@ export function PromptBar({ projectId }: Props) {
               </button>
               <button
                 onClick={handleGenerate}
-                className="ms-cta flex items-center justify-center gap-1.5 w-[170px] h-[88px] rounded-2xl text-white text-[12px] font-extrabold tracking-wider"
+                disabled={generating}
+                className="ms-cta flex items-center justify-center gap-1.5 w-[170px] h-[88px] rounded-2xl text-white text-[12px] font-extrabold tracking-wider disabled:opacity-60"
               >
-                GENERATE
+                {generating ? 'GENERATING…' : 'GENERATE'}
                 <Sparkles className="w-3.5 h-3.5" />
                 <span className="text-[12px] font-bold opacity-95">{(cost / 100).toFixed(2)}</span>
               </button>
