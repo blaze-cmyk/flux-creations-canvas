@@ -50,6 +50,194 @@ export type Database = {
         }
         Relationships: []
       }
+      ms_avatars: {
+        Row: {
+          created_at: string
+          gender: string | null
+          id: string
+          is_builtin: boolean
+          name: string
+          public_url: string | null
+          storage_path: string | null
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          gender?: string | null
+          id?: string
+          is_builtin?: boolean
+          name: string
+          public_url?: string | null
+          storage_path?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          gender?: string | null
+          id?: string
+          is_builtin?: boolean
+          name?: string
+          public_url?: string | null
+          storage_path?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
+      ms_generations: {
+        Row: {
+          aspect: string | null
+          avatar_id: string | null
+          created_at: string
+          duration_seconds: number | null
+          error: string | null
+          fal_request_id: string | null
+          format: string | null
+          id: string
+          product_id: string | null
+          prompt: string
+          reference_paths: string[] | null
+          resolution: string | null
+          script: Json | null
+          status: string
+          surface: string | null
+          thumb_url: string | null
+          updated_at: string
+          user_id: string
+          video_url: string | null
+        }
+        Insert: {
+          aspect?: string | null
+          avatar_id?: string | null
+          created_at?: string
+          duration_seconds?: number | null
+          error?: string | null
+          fal_request_id?: string | null
+          format?: string | null
+          id?: string
+          product_id?: string | null
+          prompt: string
+          reference_paths?: string[] | null
+          resolution?: string | null
+          script?: Json | null
+          status?: string
+          surface?: string | null
+          thumb_url?: string | null
+          updated_at?: string
+          user_id: string
+          video_url?: string | null
+        }
+        Update: {
+          aspect?: string | null
+          avatar_id?: string | null
+          created_at?: string
+          duration_seconds?: number | null
+          error?: string | null
+          fal_request_id?: string | null
+          format?: string | null
+          id?: string
+          product_id?: string | null
+          prompt?: string
+          reference_paths?: string[] | null
+          resolution?: string | null
+          script?: Json | null
+          status?: string
+          surface?: string | null
+          thumb_url?: string | null
+          updated_at?: string
+          user_id?: string
+          video_url?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ms_generations_avatar_id_fkey"
+            columns: ["avatar_id"]
+            isOneToOne: false
+            referencedRelation: "ms_avatars"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ms_generations_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "ms_products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ms_product_images: {
+        Row: {
+          created_at: string
+          id: string
+          is_primary: boolean
+          product_id: string
+          storage_path: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_primary?: boolean
+          product_id: string
+          storage_path: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_primary?: boolean
+          product_id?: string
+          storage_path?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ms_product_images_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "ms_products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ms_products: {
+        Row: {
+          brand_color: string | null
+          created_at: string
+          description: string | null
+          error: string | null
+          id: string
+          name: string
+          source_url: string | null
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          brand_color?: string | null
+          created_at?: string
+          description?: string | null
+          error?: string | null
+          id?: string
+          name?: string
+          source_url?: string | null
+          status?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          brand_color?: string | null
+          created_at?: string
+          description?: string | null
+          error?: string | null
+          id?: string
+          name?: string
+          source_url?: string | null
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       spaces_edges: {
         Row: {
           created_at: string
