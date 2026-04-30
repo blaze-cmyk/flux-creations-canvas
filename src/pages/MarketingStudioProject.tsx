@@ -21,7 +21,10 @@ export default function MarketingStudioProject() {
     if (!project) return;
     const interval = setInterval(async () => {
       const active = project.generations.filter(
-        (g) => (g.status === 'queued' || g.status === 'running') && /^[0-9a-f-]{36}$/i.test(g.id),
+        (g) =>
+          (g.status === 'queued' || g.status === 'running') &&
+          !!g.falRequestId &&
+          /^[0-9a-f-]{36}$/i.test(g.id),
       );
       for (const g of active) {
         try {

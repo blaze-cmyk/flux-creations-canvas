@@ -31,7 +31,8 @@ Deno.serve(async (req) => {
     if (body.poll) {
       const { data: row } = await admin.from('ms_generations').select('*').eq('id', body.poll).maybeSingle();
       if (!row) {
-        return new Response(JSON.stringify({ error: 'not found' }), { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+        // Row not yet persisted (client-side optimistic id). Treat as still queued.
+        return new Response(JSON.stringify({ status: 'queued' }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
       }
       if (row.status === 'done' || row.status === 'failed') {
         return new Response(JSON.stringify(row), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
