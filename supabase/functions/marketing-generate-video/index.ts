@@ -47,6 +47,7 @@ function normalizeRes(r: string) {
 async function submitAtlas(opts: {
   prompt: string;
   image_urls: string[];
+  audio_urls: string[];
   ratio: string;
   duration: number;
   resolution: string;
@@ -64,7 +65,15 @@ async function submitAtlas(opts: {
     generate_audio: true,
     watermark: false,
   };
-  if (hasRefs) body.reference_images = opts.image_urls.slice(0, 9);
+  if (hasRefs) {
+    body.reference_images = opts.image_urls.slice(0, 9);
+    body.image_urls = opts.image_urls.slice(0, 9); // some Atlas builds use this name
+  }
+  if (opts.audio_urls.length > 0 && hasRefs) {
+    // Audio reference requires at least one image reference. Send under both common keys.
+    body.audio_urls = opts.audio_urls.slice(0, 3);
+    body.reference_audio = opts.audio_urls.slice(0, 3);
+  }
 
   const res = await fetch('https://api.atlascloud.ai/api/v1/model/generateVideo', {
     method: 'POST',
@@ -101,6 +110,7 @@ async function pollAtlas(requestId: string): Promise<{
 async function submitFal(opts: {
   prompt: string;
   image_urls: string[];
+  audio_urls: string[];
   ratio: string;
   duration: number;
   resolution: string;
@@ -112,10 +122,18 @@ async function submitFal(opts: {
   const payload: Record<string, unknown> = {
     prompt: opts.prompt,
     aspect_ratio: opts.ratio,
-    duration: opts.duration,
+    duration: String(opts.duration),
     resolution: opts.resolution === '1080p' ? '1080p' : '720p',
+    generate_audio: true,
   };
-  if (hasRefs) payload.reference_image_urls = opts.image_urls.slice(0, 9);
+  if (hasRefs) {
+    // fal Seedance 2.0 schema uses `image_urls` (and historically `reference_image_urls`).
+    payload.image_urls = opts.image_urls.slice(0, 9);
+    payload.reference_image_urls = opts.image_urls.slice(0, 9);
+  }
+  if (opts.audio_urls.length > 0 && hasRefs) {
+    payload.audio_urls = opts.audio_urls.slice(0, 3);
+  }
   const res = await fetch(endpoint, {
     method: 'POST',
     headers: { Authorization: `Key ${FAL_KEY}`, 'Content-Type': 'application/json' },
@@ -154,6 +172,7 @@ async function pollFal(requestId: string): Promise<{
 async function submitWithFallback(opts: {
   prompt: string;
   image_urls: string[];
+  audio_urls: string[];
   ratio: string;
   duration: number;
   resolution: string;
@@ -222,7 +241,7 @@ Deno.serve(async (req) => {
       if (result.status === 'done') {
         const { data: updated } = await admin
           .from('ms_generations')
-          .update({ status: 'done', video_url: result.videoUrl, error: null })
+          .update({ status: 'done', stage: 'done', video_url: result.videoUrl, error: null })
           .eq('id', row.id)
           .select()
           .single();
@@ -233,7 +252,7 @@ Deno.serve(async (req) => {
       if (result.status === 'failed') {
         const { data: updated } = await admin
           .from('ms_generations')
-          .update({ status: 'failed', error: result.error ?? 'failed' })
+          .update({ status: 'failed', stage: 'failed', error: result.error ?? 'failed' })
           .eq('id', row.id)
           .select()
           .single();
@@ -262,10 +281,17 @@ Deno.serve(async (req) => {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
       }
-      const refs: string[] = row.reference_paths || [];
+      // Prefer the composed keyframe if we have one; otherwise fall back to stored refs.
+      const refs: string[] = row.keyframe_url ? [row.keyframe_url] : row.reference_paths || [];
+      const audio_urls: string[] = [];
+      if (row.avatar_id) {
+        const { data: av } = await admin.from('ms_avatars').select('voice_sample_url').eq('id', row.avatar_id).maybeSingle();
+        if (av?.voice_sample_url) audio_urls.push(av.voice_sample_url);
+      }
       const result = await submitWithFallback({
         prompt: row.prompt,
         image_urls: refs,
+        audio_urls,
         ratio: aspectToRatio(row.aspect),
         duration: row.duration_seconds || 8,
         resolution: normalizeRes(row.resolution),
@@ -284,6 +310,7 @@ Deno.serve(async (req) => {
         .from('ms_generations')
         .update({
           status: 'queued',
+          stage: 'videoing',
           provider: result.provider,
           fal_request_id: result.requestId,
           error: null,
@@ -301,6 +328,7 @@ Deno.serve(async (req) => {
     const {
       prompt,
       image_urls = [],
+      keyframe_url,
       aspect = '9:16',
       duration_seconds = 8,
       resolution = '720p',
@@ -309,6 +337,7 @@ Deno.serve(async (req) => {
       format,
       surface,
       projectId,
+      script_text,
     } = body;
 
     if (!prompt || typeof prompt !== 'string') {
@@ -321,6 +350,20 @@ Deno.serve(async (req) => {
     const duration = clampDuration(duration_seconds);
     const resolutionN = normalizeRes(resolution);
     const ratio = aspectToRatio(aspect);
+
+    // Prefer the composed keyframe over raw refs — Seedance gets one clean image.
+    const finalImageUrls: string[] = keyframe_url ? [keyframe_url] : image_urls;
+
+    // Pull the avatar's pre-generated reference voice clip.
+    const audio_urls: string[] = [];
+    if (avatarId) {
+      const { data: av } = await admin
+        .from('ms_avatars')
+        .select('voice_sample_url')
+        .eq('id', avatarId)
+        .maybeSingle();
+      if (av?.voice_sample_url) audio_urls.push(av.voice_sample_url);
+    }
 
     // 1) Persist row immediately (so client polling has a real id)
     const { data: row, error: insErr } = await admin
@@ -336,8 +379,11 @@ Deno.serve(async (req) => {
         duration_seconds: duration,
         resolution: resolutionN,
         prompt,
-        reference_paths: image_urls,
+        script_text: script_text ?? null,
+        keyframe_url: keyframe_url ?? null,
+        reference_paths: finalImageUrls,
         status: 'queued',
+        stage: 'videoing',
       })
       .select()
       .single();
@@ -345,12 +391,17 @@ Deno.serve(async (req) => {
       log('ERROR', 'submit: insert failed', { err: insErr.message });
       throw insErr;
     }
-    log('INFO', 'submit: row persisted', { jobId: row.id, refs: image_urls.length });
+    log('INFO', 'submit: row persisted', {
+      jobId: row.id,
+      refs: finalImageUrls.length,
+      audio: audio_urls.length,
+    });
 
     // 2) Try providers in order
     const result = await submitWithFallback({
       prompt,
-      image_urls,
+      image_urls: finalImageUrls,
+      audio_urls,
       ratio,
       duration,
       resolution: resolutionN,
@@ -359,7 +410,7 @@ Deno.serve(async (req) => {
     if ('error' in result) {
       await admin
         .from('ms_generations')
-        .update({ status: 'failed', error: result.error })
+        .update({ status: 'failed', stage: 'failed', error: result.error })
         .eq('id', row.id);
       return new Response(
         JSON.stringify({ id: row.id, error: result.error, details: result.details }),
