@@ -18,10 +18,10 @@ export function VideoDetailModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-6xl bg-ms-surface border-ms-border p-0 overflow-hidden">
-        <div className="grid md:grid-cols-[1fr_360px] max-h-[85vh]">
+      <DialogContent className="max-w-[min(1200px,96vw)] w-[96vw] h-[92vh] md:h-[88vh] bg-ms-surface border-ms-border p-0 overflow-hidden flex flex-col">
+        <div className="flex-1 min-h-0 grid grid-cols-1 md:grid-cols-[minmax(0,1fr)_minmax(300px,360px)]">
           {/* Media */}
-          <div className="bg-black flex items-center justify-center min-h-[50vh]">
+          <div className="relative bg-black flex items-center justify-center min-h-0 overflow-hidden">
             {generation.videoUrl ? (
               <video
                 key={generation.videoUrl}
@@ -31,17 +31,21 @@ export function VideoDetailModal({
                 autoPlay
                 loop
                 playsInline
-                className="max-h-[85vh] w-auto object-contain"
+                className="max-w-full max-h-full w-auto h-auto object-contain"
               />
             ) : generation.thumbUrl ? (
-              <img src={generation.thumbUrl} alt="" className="max-h-[85vh] w-auto object-contain" />
+              <img
+                src={generation.thumbUrl}
+                alt=""
+                className="max-w-full max-h-full w-auto h-auto object-contain"
+              />
             ) : (
               <div className="text-muted-foreground text-sm">No preview available</div>
             )}
           </div>
 
           {/* Right panel */}
-          <div className="flex flex-col bg-ms-surface border-l border-ms-border">
+          <div className="flex flex-col bg-ms-surface border-t md:border-t-0 md:border-l border-ms-border min-h-0">
             <div className="p-4 border-b border-ms-border flex items-center gap-3">
               <div className="w-9 h-9 rounded-full bg-gradient-to-br from-ms-cta to-ms-cta-2" />
               <div className="flex-1 min-w-0">
