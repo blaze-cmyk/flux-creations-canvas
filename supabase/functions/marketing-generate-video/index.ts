@@ -328,6 +328,7 @@ Deno.serve(async (req) => {
     const {
       prompt,
       image_urls = [],
+      keyframe_url,
       aspect = '9:16',
       duration_seconds = 8,
       resolution = '720p',
@@ -336,6 +337,7 @@ Deno.serve(async (req) => {
       format,
       surface,
       projectId,
+      script_text,
     } = body;
 
     if (!prompt || typeof prompt !== 'string') {
@@ -348,6 +350,20 @@ Deno.serve(async (req) => {
     const duration = clampDuration(duration_seconds);
     const resolutionN = normalizeRes(resolution);
     const ratio = aspectToRatio(aspect);
+
+    // Prefer the composed keyframe over raw refs — Seedance gets one clean image.
+    const finalImageUrls: string[] = keyframe_url ? [keyframe_url] : image_urls;
+
+    // Pull the avatar's pre-generated reference voice clip.
+    const audio_urls: string[] = [];
+    if (avatarId) {
+      const { data: av } = await admin
+        .from('ms_avatars')
+        .select('voice_sample_url')
+        .eq('id', avatarId)
+        .maybeSingle();
+      if (av?.voice_sample_url) audio_urls.push(av.voice_sample_url);
+    }
 
     // 1) Persist row immediately (so client polling has a real id)
     const { data: row, error: insErr } = await admin
@@ -363,8 +379,11 @@ Deno.serve(async (req) => {
         duration_seconds: duration,
         resolution: resolutionN,
         prompt,
-        reference_paths: image_urls,
+        script_text: script_text ?? null,
+        keyframe_url: keyframe_url ?? null,
+        reference_paths: finalImageUrls,
         status: 'queued',
+        stage: 'videoing',
       })
       .select()
       .single();
@@ -372,12 +391,17 @@ Deno.serve(async (req) => {
       log('ERROR', 'submit: insert failed', { err: insErr.message });
       throw insErr;
     }
-    log('INFO', 'submit: row persisted', { jobId: row.id, refs: image_urls.length });
+    log('INFO', 'submit: row persisted', {
+      jobId: row.id,
+      refs: finalImageUrls.length,
+      audio: audio_urls.length,
+    });
 
     // 2) Try providers in order
     const result = await submitWithFallback({
       prompt,
-      image_urls,
+      image_urls: finalImageUrls,
+      audio_urls,
       ratio,
       duration,
       resolution: resolutionN,
@@ -386,7 +410,7 @@ Deno.serve(async (req) => {
     if ('error' in result) {
       await admin
         .from('ms_generations')
-        .update({ status: 'failed', error: result.error })
+        .update({ status: 'failed', stage: 'failed', error: result.error })
         .eq('id', row.id);
       return new Response(
         JSON.stringify({ id: row.id, error: result.error, details: result.details }),
