@@ -331,8 +331,24 @@ export function PromptBar({ projectId }: Props) {
       </div>
 
       <AssetsModal open={assetsOpen} onOpenChange={setAssetsOpen} onSelect={(url) => setProductThumb(url)} />
-      <AddProductModal open={productOpen} onOpenChange={setProductOpen} onSelect={(it) => setProductThumb(it.thumb)} />
-      <AvatarModal open={avatarOpen} onOpenChange={setAvatarOpen} onSelect={(a) => setAvatarThumb(a.thumb)} />
+      <AddProductModal
+        open={productOpen}
+        onOpenChange={setProductOpen}
+        onSelect={(it) => {
+          setProductThumb(it.thumb);
+          setProductName(it.name);
+          setProductId(it.id);
+        }}
+      />
+      <AvatarModal
+        open={avatarOpen}
+        onOpenChange={setAvatarOpen}
+        onSelect={(a) => {
+          setAvatarThumb(a.thumb);
+          setAvatarName(a.name);
+          setAvatarId(a.id);
+        }}
+      />
       <FormatPickerModal
         open={formatOpen}
         onOpenChange={setFormatOpen}
