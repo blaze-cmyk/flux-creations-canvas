@@ -218,11 +218,7 @@ export default function MarketingStudioProject() {
                 {activeJobs.length} generation{activeJobs.length > 1 ? 's' : ''} in progress
               </div>
               <div className="text-xs text-muted-foreground truncate">
-                {activeJobs[0].status === 'queued_pending_persist'
-                  ? 'Waiting for the server to register the job…'
-                  : activeJobs[0].status === 'running'
-                  ? 'Rendering on Seedance 2.0 — usually 1–3 min per clip.'
-                  : 'Queued. Starting shortly…'}
+                {stageLabel(activeJobs[0])}
               </div>
             </div>
           </div>
