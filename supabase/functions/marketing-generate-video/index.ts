@@ -172,6 +172,7 @@ async function pollFal(requestId: string): Promise<{
 async function submitWithFallback(opts: {
   prompt: string;
   image_urls: string[];
+  audio_urls: string[];
   ratio: string;
   duration: number;
   resolution: string;
