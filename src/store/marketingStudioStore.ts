@@ -101,11 +101,18 @@ export const useMarketingStudioStore = create<MSState>()(
       deleteProject: (id) => set({ projects: get().projects.filter((p) => p.id !== id) }),
       addGeneration: (projectId, gen) => {
         set({
-          projects: get().projects.map((p) =>
-            p.id === projectId
-              ? { ...p, generations: [gen, ...p.generations], thumbUrl: p.thumbUrl ?? gen.thumbUrl }
-              : p,
-          ),
+          projects: get().projects.map((p) => {
+            if (p.id !== projectId) return p;
+            // Dedupe: if a generation with the same id already exists, merge instead of duplicating.
+            const existingIdx = p.generations.findIndex((g) => g.id === gen.id);
+            if (existingIdx >= 0) {
+              const merged = { ...p.generations[existingIdx], ...gen };
+              const next = [...p.generations];
+              next[existingIdx] = merged;
+              return { ...p, generations: next, thumbUrl: p.thumbUrl ?? gen.thumbUrl };
+            }
+            return { ...p, generations: [gen, ...p.generations], thumbUrl: p.thumbUrl ?? gen.thumbUrl };
+          }),
         });
       },
       updateGeneration: (projectId, genId, patch) => {
