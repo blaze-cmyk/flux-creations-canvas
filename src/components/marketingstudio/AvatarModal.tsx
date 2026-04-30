@@ -21,7 +21,6 @@ export function AvatarModal({
   const [query, setQuery] = useState('');
   const { avatars, loading, uploadAvatar } = useAvatars();
 
-  // create-view state
   const [file, setFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string>('');
   const [name, setName] = useState('');
@@ -40,7 +39,6 @@ export function AvatarModal({
 
   useEffect(() => {
     if (!open) {
-      // reset on close
       setView('list');
       setFile(null);
       setName('');
@@ -74,10 +72,10 @@ export function AvatarModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-5xl bg-ms-surface border-ms-border p-0 overflow-hidden">
+      <DialogContent className="max-w-5xl ms-glass border-0 p-0 overflow-hidden text-foreground">
         {view === 'list' ? (
           <>
-            <div className="flex items-center justify-between gap-3 p-4 border-b border-ms-border">
+            <div className="flex items-center justify-between gap-3 p-4 border-b border-white/10">
               <div className="text-sm font-semibold text-foreground">Select Avatar</div>
               <div className="relative flex-1 max-w-md">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
@@ -85,13 +83,13 @@ export function AvatarModal({
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
                   placeholder="Search..."
-                  className="w-full pl-9 pr-3 h-9 rounded-full bg-ms-surface-2 border border-ms-border text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-muted-foreground/40"
+                  className="w-full pl-9 pr-3 h-9 rounded-full ms-chip-glass text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-white/20"
                 />
               </div>
             </div>
 
             <div className="grid md:grid-cols-[180px_1fr] max-h-[70vh]">
-              <div className="hidden md:block border-r border-ms-border p-3 space-y-1">
+              <div className="hidden md:block border-r border-white/10 p-3 space-y-1">
                 {([
                   { id: 'all', label: 'All', icon: Sparkles },
                   { id: 'pinned', label: 'Pinned', icon: Pin },
@@ -101,7 +99,7 @@ export function AvatarModal({
                     key={t.id}
                     onClick={() => setTab(t.id)}
                     className={`w-full flex items-center gap-2 px-3 h-9 rounded-lg text-sm transition-colors ${
-                      tab === t.id ? 'bg-ms-surface-2 text-foreground' : 'text-muted-foreground hover:bg-ms-surface-2 hover:text-foreground'
+                      tab === t.id ? 'ms-chip-glass text-foreground' : 'text-muted-foreground hover:bg-white/5 hover:text-foreground'
                     }`}
                   >
                     <t.icon className="w-3.5 h-3.5" />
@@ -112,16 +110,16 @@ export function AvatarModal({
                 <div className="flex gap-2 px-1 mt-1">
                   <button
                     onClick={() => setGender(gender === 'male' ? 'all' : 'male')}
-                    className={`flex items-center gap-1 px-3 h-8 rounded-full text-xs border ${
-                      gender === 'male' ? 'bg-ms-surface-2 border-foreground/40 text-foreground' : 'border-ms-border text-muted-foreground hover:text-foreground'
+                    className={`flex items-center gap-1 px-3 h-8 rounded-full text-xs transition-colors ${
+                      gender === 'male' ? 'ms-chip-glass text-foreground' : 'text-muted-foreground hover:text-foreground'
                     }`}
                   >
                     <User className="w-3 h-3" /> Male
                   </button>
                   <button
                     onClick={() => setGender(gender === 'female' ? 'all' : 'female')}
-                    className={`flex items-center gap-1 px-3 h-8 rounded-full text-xs border ${
-                      gender === 'female' ? 'bg-ms-surface-2 border-foreground/40 text-foreground' : 'border-ms-border text-muted-foreground hover:text-foreground'
+                    className={`flex items-center gap-1 px-3 h-8 rounded-full text-xs transition-colors ${
+                      gender === 'female' ? 'ms-chip-glass text-foreground' : 'text-muted-foreground hover:text-foreground'
                     }`}
                   >
                     <UserRound className="w-3 h-3" /> Female
@@ -133,9 +131,9 @@ export function AvatarModal({
                 <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
                   <button
                     onClick={() => setView('create')}
-                    className="aspect-[4/5] rounded-xl bg-ms-surface-2 border border-dashed border-ms-border hover:border-foreground/40 flex flex-col items-center justify-center gap-2 text-muted-foreground transition-colors"
+                    className="aspect-[4/5] rounded-xl ms-glass-2 border border-dashed border-white/10 hover:border-white/25 flex flex-col items-center justify-center gap-2 text-muted-foreground transition-colors"
                   >
-                    <div className="w-10 h-10 rounded-lg bg-ms-border grid place-items-center">
+                    <div className="w-10 h-10 rounded-lg ms-chip-glass grid place-items-center">
                       <Plus className="w-4 h-4" />
                     </div>
                     <div className="text-xs font-medium text-foreground">Create avatar</div>
@@ -150,12 +148,12 @@ export function AvatarModal({
                           onSelect?.({ id: a.id, name: a.name, thumb: a.thumb });
                           onOpenChange(false);
                         }}
-                        className="group relative aspect-[4/5] rounded-xl overflow-hidden bg-ms-surface-2"
+                        className="group relative aspect-[4/5] rounded-xl overflow-hidden ms-glass-2"
                       >
                         {a.thumb ? (
                           <img src={a.thumb} alt={a.name} className="w-full h-full object-cover transition-transform group-hover:scale-105" />
                         ) : (
-                          <div className="w-full h-full bg-ms-border" />
+                          <div className="w-full h-full bg-white/5" />
                         )}
                         <div className="absolute inset-x-0 bottom-0 p-2 bg-gradient-to-t from-black/80 to-transparent">
                           <div className="text-xs font-semibold text-white">{a.name}</div>
@@ -227,7 +225,7 @@ function CreateAvatarView({
       <div className="flex items-center justify-between mb-5">
         <button
           onClick={onBack}
-          className="w-9 h-9 grid place-items-center rounded-full bg-ms-surface-2 hover:bg-ms-border text-foreground"
+          className="w-9 h-9 grid place-items-center rounded-full ms-chip-glass text-foreground"
           aria-label="Back"
         >
           <ArrowLeft className="w-4 h-4" />
@@ -237,20 +235,19 @@ function CreateAvatarView({
       </div>
 
       <div className="grid md:grid-cols-2 gap-5 min-h-[440px]">
-        {/* Upload zone */}
         <div className="relative">
           {creating ? (
-            <div className="aspect-[4/5] w-full rounded-2xl bg-ms-surface-2 border border-ms-border flex flex-col items-center justify-center gap-3">
+            <div className="aspect-[4/5] w-full rounded-2xl ms-glass-2 flex flex-col items-center justify-center gap-3">
               <Loader2 className="w-8 h-8 animate-spin text-foreground" />
               <div className="text-sm font-semibold text-foreground">Uploading</div>
               <div className="text-xs text-muted-foreground">This may take a few seconds</div>
             </div>
           ) : previewUrl ? (
-            <div className="relative aspect-[4/5] w-full rounded-2xl overflow-hidden bg-ms-surface-2 border border-ms-border">
+            <div className="relative aspect-[4/5] w-full rounded-2xl overflow-hidden ms-glass-2">
               <img src={previewUrl} alt="preview" className="w-full h-full object-cover" />
               <button
                 onClick={onPickFile}
-                className="absolute bottom-3 left-3 inline-flex items-center gap-2 h-9 px-4 rounded-full bg-background/90 backdrop-blur text-foreground text-xs font-semibold hover:bg-background"
+                className="absolute bottom-3 left-3 inline-flex items-center gap-2 h-9 px-4 rounded-full ms-chip-glass text-foreground text-xs font-semibold"
               >
                 <RefreshCw className="w-3.5 h-3.5" /> Replace
               </button>
@@ -258,9 +255,9 @@ function CreateAvatarView({
           ) : (
             <button
               onClick={onPickFile}
-              className="group aspect-[4/5] w-full rounded-2xl bg-ms-surface-2 border border-dashed border-ms-border hover:border-foreground/40 flex flex-col items-center justify-center gap-3 transition-colors"
+              className="group aspect-[4/5] w-full rounded-2xl ms-glass-2 border border-dashed border-white/10 hover:border-white/25 flex flex-col items-center justify-center gap-3 transition-colors"
             >
-              <div className="w-14 h-14 rounded-full border border-ms-border grid place-items-center text-muted-foreground group-hover:text-foreground">
+              <div className="w-14 h-14 rounded-full ms-chip-glass grid place-items-center text-muted-foreground group-hover:text-foreground">
                 <UploadCloud className="w-6 h-6" />
               </div>
               <div className="text-sm font-semibold text-foreground">Upload from device</div>
@@ -269,7 +266,6 @@ function CreateAvatarView({
           )}
         </div>
 
-        {/* Right: name + create */}
         <div className="flex flex-col">
           <label className="text-sm text-muted-foreground mb-2">Name Avatar</label>
           <div className="relative">
@@ -279,7 +275,7 @@ function CreateAvatarView({
               onChange={(e) => onChangeName(e.target.value)}
               placeholder="Avatar name"
               maxLength={32}
-              className="w-full h-12 pl-8 pr-3 rounded-xl bg-ms-surface-2 border border-ms-border text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-foreground/40"
+              className="w-full h-12 pl-8 pr-3 rounded-xl ms-chip-glass text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-white/25"
             />
           </div>
 

@@ -29,7 +29,6 @@ export function AddProductModal({
   const [tab, setTab] = useState<'product' | 'app'>('product');
   const { products, loading, uploadProductImages, createFromUrl } = useProducts();
 
-  // create state
   const [files, setFiles] = useState<File[]>([]);
   const [previews, setPreviews] = useState<string[]>([]);
   const [name, setName] = useState('');
@@ -100,18 +99,18 @@ export function AddProductModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-5xl bg-ms-surface border-ms-border p-0 overflow-hidden">
+      <DialogContent className="max-w-5xl ms-glass border-0 p-0 overflow-hidden text-foreground">
         {view === 'list' ? (
           <div className="p-5">
             <div className="flex items-center justify-between mb-5">
               <div className="text-sm font-semibold text-foreground">Select Product</div>
-              <div className="inline-flex p-1 rounded-full bg-ms-surface-2 border border-ms-border">
+              <div className="inline-flex p-1 rounded-full ms-chip-glass">
                 {(['product', 'app'] as const).map((t) => (
                   <button
                     key={t}
                     onClick={() => setTab(t)}
                     className={`flex items-center gap-1.5 px-4 h-8 rounded-full text-xs font-medium transition-colors ${
-                      tab === t ? 'bg-ms-border text-foreground' : 'text-muted-foreground hover:text-foreground'
+                      tab === t ? 'bg-white/15 text-foreground' : 'text-muted-foreground hover:text-foreground'
                     }`}
                   >
                     {t === 'product' ? <Package className="w-3.5 h-3.5" /> : <Smartphone className="w-3.5 h-3.5" />}
@@ -124,9 +123,9 @@ export function AddProductModal({
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 max-h-[60vh] overflow-y-auto ms-scroll pr-1">
               <button
                 onClick={() => setView('create')}
-                className="aspect-square rounded-xl bg-ms-surface-2 border border-dashed border-ms-border hover:border-foreground/40 flex flex-col items-center justify-center gap-2 text-muted-foreground transition-colors"
+                className="aspect-square rounded-xl ms-glass-2 border border-dashed border-white/10 hover:border-white/25 flex flex-col items-center justify-center gap-2 text-muted-foreground transition-colors"
               >
-                <div className="w-10 h-10 rounded-lg bg-ms-border grid place-items-center">
+                <div className="w-10 h-10 rounded-lg ms-chip-glass grid place-items-center">
                   <Plus className="w-4 h-4" />
                 </div>
                 <div className="text-xs font-medium text-foreground">
@@ -153,7 +152,7 @@ export function AddProductModal({
                   className="group text-left"
                   disabled={p.status === 'failed'}
                 >
-                  <div className="relative aspect-square rounded-xl overflow-hidden bg-ms-surface-2 ring-1 ring-ms-border group-hover:ring-foreground/40 transition-all">
+                  <div className="relative aspect-square rounded-xl overflow-hidden ms-glass-2 group-hover:ring-1 group-hover:ring-white/20 transition-all">
                     {p.primary_thumb ? (
                       <img src={p.primary_thumb} alt={p.name} className="w-full h-full object-cover" />
                     ) : (
@@ -186,7 +185,7 @@ export function AddProductModal({
             <div className="flex items-center justify-between mb-5">
               <button
                 onClick={() => setView('list')}
-                className="w-9 h-9 grid place-items-center rounded-full bg-ms-surface-2 hover:bg-ms-border text-foreground"
+                className="w-9 h-9 grid place-items-center rounded-full ms-chip-glass text-foreground"
                 aria-label="Back"
               >
                 <ArrowLeft className="w-4 h-4" />
@@ -197,15 +196,14 @@ export function AddProductModal({
               <div className="w-9" />
             </div>
 
-            {/* tab toggle inside create view too */}
             <div className="flex justify-center mb-5">
-              <div className="inline-flex p-1 rounded-full bg-ms-surface-2 border border-ms-border">
+              <div className="inline-flex p-1 rounded-full ms-chip-glass">
                 {(['product', 'app'] as const).map((t) => (
                   <button
                     key={t}
                     onClick={() => setTab(t)}
                     className={`flex items-center gap-1.5 px-4 h-8 rounded-full text-xs font-medium transition-colors ${
-                      tab === t ? 'bg-ms-border text-foreground' : 'text-muted-foreground hover:text-foreground'
+                      tab === t ? 'bg-white/15 text-foreground' : 'text-muted-foreground hover:text-foreground'
                     }`}
                   >
                     {t === 'product' ? <Package className="w-3.5 h-3.5" /> : <Smartphone className="w-3.5 h-3.5" />}
@@ -216,20 +214,19 @@ export function AddProductModal({
             </div>
 
             <div className="grid md:grid-cols-2 gap-5 min-h-[440px]">
-              {/* Left: upload area (product) or app preview placeholder */}
               <div className="relative">
                 {tab === 'product' ? (
                   busy ? (
-                    <div className="aspect-square w-full rounded-2xl bg-ms-surface-2 border border-ms-border flex flex-col items-center justify-center gap-3">
+                    <div className="aspect-square w-full rounded-2xl ms-glass-2 flex flex-col items-center justify-center gap-3">
                       <Loader2 className="w-8 h-8 animate-spin text-foreground" />
                       <div className="text-sm font-semibold text-foreground">Uploading</div>
                       <div className="text-xs text-muted-foreground">This may take a few seconds</div>
                     </div>
                   ) : previews.length > 0 ? (
-                    <div className="rounded-2xl bg-ms-surface-2 border border-ms-border p-3">
+                    <div className="rounded-2xl ms-glass-2 p-3">
                       <div className="grid grid-cols-3 gap-2">
                         {previews.map((src, i) => (
-                          <div key={i} className="relative aspect-square rounded-lg overflow-hidden bg-ms-border">
+                          <div key={i} className="relative aspect-square rounded-lg overflow-hidden bg-white/5">
                             <img src={src} alt="" className="w-full h-full object-cover" />
                             <button
                               onClick={() => setFiles((p) => p.filter((_, idx) => idx !== i))}
@@ -247,7 +244,7 @@ export function AddProductModal({
                         {files.length < 6 && (
                           <button
                             onClick={() => fileRef.current?.click()}
-                            className="aspect-square rounded-lg border border-dashed border-ms-border hover:border-foreground/40 flex items-center justify-center text-muted-foreground hover:text-foreground"
+                            className="aspect-square rounded-lg border border-dashed border-white/10 hover:border-white/25 flex items-center justify-center text-muted-foreground hover:text-foreground"
                           >
                             <Plus className="w-5 h-5" />
                           </button>
@@ -260,9 +257,9 @@ export function AddProductModal({
                   ) : (
                     <button
                       onClick={() => fileRef.current?.click()}
-                      className="group aspect-square w-full rounded-2xl bg-ms-surface-2 border border-dashed border-ms-border hover:border-foreground/40 flex flex-col items-center justify-center gap-3 transition-colors"
+                      className="group aspect-square w-full rounded-2xl ms-glass-2 border border-dashed border-white/10 hover:border-white/25 flex flex-col items-center justify-center gap-3 transition-colors"
                     >
-                      <div className="w-14 h-14 rounded-full border border-ms-border grid place-items-center text-muted-foreground group-hover:text-foreground">
+                      <div className="w-14 h-14 rounded-full ms-chip-glass grid place-items-center text-muted-foreground group-hover:text-foreground">
                         <UploadCloud className="w-6 h-6" />
                       </div>
                       <div className="text-sm font-semibold text-foreground">Upload from device</div>
@@ -270,8 +267,8 @@ export function AddProductModal({
                     </button>
                   )
                 ) : (
-                  <div className="aspect-square w-full rounded-2xl bg-ms-surface-2 border border-ms-border flex flex-col items-center justify-center gap-3 text-center px-6">
-                    <div className="w-14 h-14 rounded-full border border-ms-border grid place-items-center text-muted-foreground">
+                  <div className="aspect-square w-full rounded-2xl ms-glass-2 flex flex-col items-center justify-center gap-3 text-center px-6">
+                    <div className="w-14 h-14 rounded-full ms-chip-glass grid place-items-center text-muted-foreground">
                       <Smartphone className="w-6 h-6" />
                     </div>
                     <div className="text-sm font-semibold text-foreground">Paste your app URL</div>
@@ -282,7 +279,6 @@ export function AddProductModal({
                 )}
               </div>
 
-              {/* Right: form */}
               <div className="flex flex-col">
                 {tab === 'product' ? (
                   <>
@@ -294,7 +290,7 @@ export function AddProductModal({
                         onChange={(e) => setName(e.target.value)}
                         placeholder="Product name"
                         maxLength={48}
-                        className="w-full h-12 pl-8 pr-3 rounded-xl bg-ms-surface-2 border border-ms-border text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-foreground/40"
+                        className="w-full h-12 pl-8 pr-3 rounded-xl ms-chip-glass text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-white/25"
                       />
                     </div>
                   </>
@@ -307,7 +303,7 @@ export function AddProductModal({
                         value={url}
                         onChange={(e) => setUrl(e.target.value)}
                         placeholder="www.yourapp.com"
-                        className="w-full h-12 pl-9 pr-3 rounded-xl bg-ms-surface-2 border border-ms-border text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-foreground/40"
+                        className="w-full h-12 pl-9 pr-3 rounded-xl ms-chip-glass text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-white/25"
                       />
                     </div>
                   </>
