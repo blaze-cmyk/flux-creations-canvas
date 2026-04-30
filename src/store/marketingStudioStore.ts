@@ -97,6 +97,24 @@ export const useMarketingStudioStore = create<MSState>()(
           ),
         });
       },
+      updateGeneration: (projectId, genId, patch) => {
+        set({
+          projects: get().projects.map((p) =>
+            p.id === projectId
+              ? { ...p, generations: p.generations.map((g) => (g.id === genId ? { ...g, ...patch } : g)) }
+              : p,
+          ),
+        });
+      },
+      removeGeneration: (projectId, genId) => {
+        set({
+          projects: get().projects.map((p) =>
+            p.id === projectId
+              ? { ...p, generations: p.generations.filter((g) => g.id !== genId) }
+              : p,
+          ),
+        });
+      },
       toggleLike: (projectId, genId) => {
         set({
           projects: get().projects.map((p) =>
