@@ -216,7 +216,26 @@ export default function MarketingStudioProject() {
                   onClick={() => !isPending && !isFailed && setSelected(g)}
                   className="group relative aspect-[9/16] rounded-xl overflow-hidden bg-ms-surface-2 ring-1 ring-ms-border hover:ring-foreground/30 transition-all text-left"
                 >
-                  {g.thumbUrl ? (
+                  {g.videoUrl && !isPending && !isFailed ? (
+                    <video
+                      src={g.videoUrl}
+                      poster={g.thumbUrl}
+                      muted
+                      loop
+                      playsInline
+                      preload="metadata"
+                      onMouseEnter={(e) => {
+                        const v = e.currentTarget;
+                        v.play().catch(() => {});
+                      }}
+                      onMouseLeave={(e) => {
+                        const v = e.currentTarget;
+                        v.pause();
+                        v.currentTime = 0;
+                      }}
+                      className="w-full h-full object-cover"
+                    />
+                  ) : g.thumbUrl ? (
                     <img
                       src={g.thumbUrl}
                       alt=""
