@@ -11,7 +11,7 @@ export type MSMode =
   | 'Wild Card'
   | 'UGC Virtual Try On'
   | 'Pro Virtual Try On';
-export type MSAspect = '9:16' | '1:1' | '16:9';
+export type MSAspect = 'Auto' | '16:9' | '9:16' | '4:3' | '3:4' | '1:1' | '21:9';
 export type MSResolution = '480p' | '720p' | '1080p';
 export type MSDuration = string; // e.g. "8s" — supports 1s..15s
 export type MSSurface = 'Product' | 'App';
