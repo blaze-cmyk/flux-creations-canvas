@@ -19,6 +19,37 @@ export default function MarketingStudioProject() {
   const [selected, setSelected] = useState<MSGeneration | null>(null);
   const retrying = useRef<Set<string>>(new Set());
 
+  // Hydrate generations from DB on mount/refresh — keeps history in sync
+  // across reloads and devices (localStorage persistence + DB source of truth).
+  useEffect(() => {
+    if (!project) return;
+    const ids = project.generations
+      .map((g) => g.id)
+      .filter((id) => /^[0-9a-f-]{36}$/i.test(id));
+    if (ids.length === 0) return;
+    let cancelled = false;
+    (async () => {
+      const { data, error } = await supabase
+        .from('ms_generations')
+        .select('id, status, video_url, thumb_url, error, fal_request_id')
+        .in('id', ids);
+      if (cancelled || error || !data) return;
+      for (const row of data) {
+        updateGeneration(project.id, row.id, {
+          status: row.status as MSGeneration['status'],
+          videoUrl: row.video_url ?? undefined,
+          thumbUrl: row.thumb_url ?? undefined,
+          error: row.error ?? undefined,
+          falRequestId: row.fal_request_id ?? undefined,
+        });
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [project?.id]);
+
   // Poll active generations every 4s, with timeout
   useEffect(() => {
     if (!project) return;
