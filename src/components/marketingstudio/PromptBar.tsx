@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Plus, Sparkles, Package, Smartphone, ChevronDown, Smartphone as PhoneIcon, Gem, Clock } from 'lucide-react';
+import { Plus, Sparkles, Package, Smartphone, Smartphone as PhoneIcon, Gem, Clock } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -9,6 +9,18 @@ import {
 import { AssetsModal } from './AssetsModal';
 import { AddProductModal } from './AddProductModal';
 import { AvatarModal } from './AvatarModal';
+import { FormatPickerModal, FormatId } from './FormatPickerModal';
+import {
+  ChevronDownIcon,
+  HyperMotionIcon,
+  ProductReviewIcon,
+  TVSpotIcon,
+  TryOnIcon,
+  TutorialIcon,
+  UGCIcon,
+  UnboxingIcon,
+  WildCardIcon,
+} from './FormatIcons';
 import {
   MSAspect,
   MSDuration,
@@ -21,17 +33,31 @@ import {
 import { useNavigate } from 'react-router-dom';
 import { toast } from '@/hooks/use-toast';
 
-const MODES: MSMode[] = ['UGC', 'Hyper Motion', 'Unboxing', 'TV Spot', 'UGC Virtual Try On'];
 const ASPECTS: MSAspect[] = ['9:16', '1:1', '16:9'];
 const RESOLUTIONS: MSResolution[] = ['480p', '720p', '1080p'];
 const DURATIONS: MSDuration[] = ['4s', '8s', '12s'];
+
+function modeIcon(mode: MSMode) {
+  const cls = 'size-3.5';
+  switch (mode) {
+    case 'UGC': return <UGCIcon className={cls} />;
+    case 'Tutorial': return <TutorialIcon className={cls} />;
+    case 'Unboxing': return <UnboxingIcon className={cls} />;
+    case 'Hyper Motion': return <HyperMotionIcon className={cls} />;
+    case 'Product Review': return <ProductReviewIcon className={cls} />;
+    case 'TV Spot': return <TVSpotIcon className={cls} />;
+    case 'Wild Card': return <WildCardIcon className={cls} />;
+    case 'UGC Virtual Try On':
+    case 'Pro Virtual Try On': return <TryOnIcon className={cls} />;
+  }
+}
 
 interface Props {
   projectId?: string;
   projectName?: string;
 }
 
-export function PromptBar({ projectId, projectName }: Props) {
+export function PromptBar({ projectId }: Props) {
   const [surface, setSurface] = useState<MSSurface>('Product');
   const [prompt, setPrompt] = useState('');
   const [mode, setMode] = useState<MSMode>('UGC');
@@ -44,6 +70,7 @@ export function PromptBar({ projectId, projectName }: Props) {
   const [assetsOpen, setAssetsOpen] = useState(false);
   const [productOpen, setProductOpen] = useState(false);
   const [avatarOpen, setAvatarOpen] = useState(false);
+  const [formatOpen, setFormatOpen] = useState(false);
 
   const { createProject, addGeneration } = useMarketingStudioStore();
   const navigate = useNavigate();
@@ -78,7 +105,7 @@ export function PromptBar({ projectId, projectName }: Props) {
   return (
     <div className="relative w-full max-w-[1100px] mx-auto">
       <div className="relative flex items-stretch gap-2.5">
-        {/* Left vertical pill: Product / App — liquid glass, floats left */}
+        {/* Left vertical pill: Product / App */}
         <div className="hidden md:flex absolute left-0 top-1/2 -translate-y-1/2 -translate-x-[calc(100%+10px)] flex-col gap-1.5 p-1.5 rounded-2xl ms-glass z-10">
           {(['Product', 'App'] as MSSurface[]).map((s) => {
             const active = s === surface;
@@ -88,9 +115,7 @@ export function PromptBar({ projectId, projectName }: Props) {
                 key={s}
                 onClick={() => setSurface(s)}
                 className={`flex flex-col items-center justify-center w-[56px] h-[56px] rounded-xl text-[10px] font-medium transition-all ${
-                  active
-                    ? 'ms-glass-2 text-foreground'
-                    : 'text-muted-foreground hover:text-foreground hover:bg-white/5'
+                  active ? 'ms-glass-2 text-foreground' : 'text-muted-foreground hover:text-foreground hover:bg-white/5'
                 }`}
               >
                 <Icon className="w-[18px] h-[18px] mb-1" strokeWidth={1.5} />
@@ -100,9 +125,8 @@ export function PromptBar({ projectId, projectName }: Props) {
           })}
         </div>
 
-        {/* Main bar — liquid glass */}
+        {/* Main bar */}
         <div className="flex-1 rounded-[22px] ms-glass p-2.5 flex flex-col gap-2 min-w-0">
-          {/* Top row: + + textarea + Product/Avatar/Generate */}
           <div className="flex items-stretch gap-2">
             <button
               onClick={() => setAssetsOpen(true)}
@@ -124,7 +148,6 @@ export function PromptBar({ projectId, projectName }: Props) {
               className="flex-1 bg-transparent border-0 text-sm text-foreground placeholder:text-muted-foreground/70 focus:outline-none min-w-0 self-center px-1"
             />
 
-            {/* Right: Product, Avatar, Generate (md+) */}
             <div className="hidden md:flex items-stretch gap-2">
               <button
                 onClick={() => setProductOpen(true)}
@@ -163,15 +186,18 @@ export function PromptBar({ projectId, projectName }: Props) {
 
           {/* Bottom row: chips */}
           <div className="flex items-center gap-2 flex-wrap pl-1">
-            <Chip
-              icon={<ModeIcon />}
-              value={mode}
-              options={MODES}
-              onChange={setMode as (v: string) => void}
-              showChevron
-            />
+            {/* Mode chip — opens format picker */}
+            <button
+              onClick={() => setFormatOpen(true)}
+              className="ms-chip-glass flex items-center gap-1.5 px-3.5 h-9 rounded-full text-xs text-foreground transition-all"
+            >
+              <span className="text-muted-foreground">{modeIcon(mode)}</span>
+              {mode}
+              <ChevronDownIcon className="size-3.5 text-muted-foreground/70" />
+            </button>
+
             {surface === 'App' && (
-              <Chip icon={<PhoneIcon className="w-3.5 h-3.5" />} value="Mobile" options={['Mobile', 'Desktop']} onChange={() => {}} showChevron />
+              <Chip icon={<PhoneIcon className="w-3.5 h-3.5" />} value="Mobile" options={['Mobile', 'Desktop']} onChange={() => {}} />
             )}
             <Chip icon={<AspectIcon />} value={aspect} options={ASPECTS} onChange={(v) => setAspect(v as MSAspect)} />
             <Chip icon={<Gem className="w-3.5 h-3.5" />} value={res} options={RESOLUTIONS} onChange={(v) => setRes(v as MSResolution)} />
@@ -180,22 +206,13 @@ export function PromptBar({ projectId, projectName }: Props) {
 
           {/* Mobile generate row */}
           <div className="flex md:hidden gap-2">
-            <button
-              onClick={() => setProductOpen(true)}
-              className="ms-glass-2 flex-1 h-12 rounded-xl text-[11px] font-semibold text-foreground"
-            >
+            <button onClick={() => setProductOpen(true)} className="ms-glass-2 flex-1 h-12 rounded-xl text-[11px] font-semibold text-foreground">
               + PRODUCT
             </button>
-            <button
-              onClick={() => setAvatarOpen(true)}
-              className="ms-glass-2 flex-1 h-12 rounded-xl text-[11px] font-semibold text-foreground"
-            >
+            <button onClick={() => setAvatarOpen(true)} className="ms-glass-2 flex-1 h-12 rounded-xl text-[11px] font-semibold text-foreground">
               + AVATAR
             </button>
-            <button
-              onClick={handleGenerate}
-              className="ms-cta flex-1 h-12 rounded-xl text-white text-[11px] font-extrabold"
-            >
+            <button onClick={handleGenerate} className="ms-cta flex-1 h-12 rounded-xl text-white text-[11px] font-extrabold">
               GENERATE ✦ {(cost / 100).toFixed(2)}
             </button>
           </div>
@@ -205,6 +222,12 @@ export function PromptBar({ projectId, projectName }: Props) {
       <AssetsModal open={assetsOpen} onOpenChange={setAssetsOpen} onSelect={(url) => setProductThumb(url)} />
       <AddProductModal open={productOpen} onOpenChange={setProductOpen} onSelect={(it) => setProductThumb(it.thumb)} />
       <AvatarModal open={avatarOpen} onOpenChange={setAvatarOpen} onSelect={(a) => setAvatarThumb(a.thumb)} />
+      <FormatPickerModal
+        open={formatOpen}
+        onOpenChange={setFormatOpen}
+        selected={mode}
+        onSelect={(id: FormatId) => setMode(id as MSMode)}
+      />
     </div>
   );
 }
@@ -214,13 +237,11 @@ function Chip({
   value,
   options,
   onChange,
-  showChevron = true,
 }: {
   icon: React.ReactNode;
   value: string;
   options: readonly string[];
   onChange: (v: string) => void;
-  showChevron?: boolean;
 }) {
   return (
     <DropdownMenu>
@@ -228,7 +249,7 @@ function Chip({
         <button className="ms-chip-glass flex items-center gap-1.5 px-3.5 h-9 rounded-full text-xs text-foreground transition-all">
           <span className="text-muted-foreground">{icon}</span>
           {value}
-          <ChevronDown className="w-3 h-3 text-muted-foreground/70" />
+          <ChevronDownIcon className="size-3.5 text-muted-foreground/70" />
         </button>
       </DropdownMenuTrigger>
       <DropdownMenuContent className="bg-ms-surface-2 border-ms-border">
@@ -242,13 +263,6 @@ function Chip({
   );
 }
 
-function ModeIcon() {
-  return (
-    <svg viewBox="0 0 24 24" className="w-3.5 h-3.5" fill="currentColor">
-      <path d="M12 2 L14 8 L20 9 L15.5 13 L17 19 L12 16 L7 19 L8.5 13 L4 9 L10 8 Z" />
-    </svg>
-  );
-}
 function AspectIcon() {
   return <div className="w-3 h-3.5 rounded-[3px] border border-current" />;
 }
