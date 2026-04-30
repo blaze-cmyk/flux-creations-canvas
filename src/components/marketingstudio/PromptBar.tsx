@@ -184,17 +184,26 @@ export function PromptBar({ projectId }: Props) {
                 </div>
               )}
               <textarea
+                ref={(el) => {
+                  if (!el) return;
+                  el.style.height = 'auto';
+                  el.style.height = Math.min(el.scrollHeight, 220) + 'px';
+                }}
                 value={prompt}
-                onChange={(e) => setPrompt(e.target.value)}
+                onChange={(e) => {
+                  setPrompt(e.target.value);
+                  e.currentTarget.style.height = 'auto';
+                  e.currentTarget.style.height = Math.min(e.currentTarget.scrollHeight, 220) + 'px';
+                }}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter' && !e.shiftKey && (e.metaKey || e.ctrlKey)) {
                     e.preventDefault();
                     handleGenerate();
                   }
                 }}
-                rows={2}
+                rows={3}
                 placeholder="Describe what happens in the ad..."
-                className="w-full bg-transparent border-0 text-sm leading-[1.55] text-foreground placeholder:text-muted-foreground/70 focus:outline-none resize-none ms-prompt-scroll min-h-[44px] max-h-[160px] overflow-y-auto"
+                className="w-full bg-transparent border-0 text-sm leading-[1.6] text-foreground placeholder:text-muted-foreground/70 focus:outline-none resize-none ms-prompt-scroll min-h-[72px] max-h-[220px] overflow-y-auto"
                 style={{ fontFamily: 'Montserrat, system-ui, sans-serif' }}
               />
             </div>
