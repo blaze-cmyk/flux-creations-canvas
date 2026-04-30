@@ -132,11 +132,12 @@ export function AddProductModal({
       if (files.length === 0 || !name.trim()) return;
       setBusy(true);
       try {
-        await uploadProductImages(files, name.trim());
+        await uploadProductImages(files, name.trim(), description.trim() || undefined);
         toast({ title: 'Product added' });
         setView('list');
         setFiles([]);
         setName('');
+        setDescription('');
       } catch (e: any) {
         toast({ title: 'Upload failed', description: e?.message ?? '', variant: 'destructive' });
       } finally {
