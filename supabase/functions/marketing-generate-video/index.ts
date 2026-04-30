@@ -111,7 +111,7 @@ Deno.serve(async (req) => {
     const { data: row, error: insErr } = await admin
       .from('ms_generations')
       .insert({
-        user_id: user.id,
+        user_id: null,
         product_id: productId ?? null,
         avatar_id: avatarId ?? null,
         format,
