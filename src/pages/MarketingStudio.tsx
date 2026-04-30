@@ -37,7 +37,7 @@ function FormatCard({ label, src }: { label: string; src: string }) {
           ref.current.currentTime = 0;
         }
       }}
-      className="group relative aspect-[9/16] rounded-2xl overflow-hidden bg-ms-surface-2 ring-1 ring-white/5 hover:ring-white/20 transition-all"
+      className="group relative aspect-[2/3] rounded-2xl overflow-hidden bg-ms-surface-2 ring-1 ring-white/5 hover:ring-white/20 transition-all"
     >
       <video
         ref={ref}
