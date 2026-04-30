@@ -16,6 +16,8 @@ export type MSResolution = '480p' | '720p' | '1080p';
 export type MSDuration = string; // e.g. "8s" — supports 1s..15s
 export type MSSurface = 'Product' | 'App';
 
+export type MSGenStatus = 'queued' | 'running' | 'done' | 'failed';
+
 export interface MSGeneration {
   id: string;
   thumbUrl: string;
@@ -30,6 +32,9 @@ export interface MSGeneration {
   avatarId?: string;
   createdAt: number;
   liked?: boolean;
+  status?: MSGenStatus;
+  falRequestId?: string;
+  error?: string;
 }
 
 export interface MSProject {
