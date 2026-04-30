@@ -54,6 +54,8 @@ interface MSState {
   renameProject: (id: string, name: string) => void;
   deleteProject: (id: string) => void;
   addGeneration: (projectId: string, gen: MSGeneration) => void;
+  updateGeneration: (projectId: string, genId: string, patch: Partial<MSGeneration>) => void;
+  removeGeneration: (projectId: string, genId: string) => void;
   toggleLike: (projectId: string, genId: string) => void;
   getProjectBySlug: (slug: string) => MSProject | undefined;
 }
