@@ -134,6 +134,7 @@ export function PromptBar({ projectId }: Props) {
       productId: productId || undefined,
       avatarId: avatarId || undefined,
       createdAt: Date.now(),
+      submittedAt: Date.now(),
       status: 'queued',
     };
     addGeneration(pid, placeholder);
@@ -187,8 +188,9 @@ export function PromptBar({ projectId }: Props) {
 
       updateGeneration(pid, placeholderId, {
         id: vidData?.id || placeholderId,
-        status: 'running',
+        status: 'queued',
         falRequestId: vidData?.fal_request_id,
+        submittedAt: Date.now(),
       });
     } catch (e: any) {
       updateGeneration(pid, placeholderId, { status: 'failed', error: e?.message ?? 'Unknown error' });
