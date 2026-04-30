@@ -381,7 +381,7 @@ export function AddProductModal({
                       <div className="text-xs text-muted-foreground">This may take a few seconds</div>
                     </div>
                   ) : previews.length > 0 ? (
-                    <div className="rounded-2xl ms-glass-2 p-3">
+                    <div className="rounded-2xl ms-glass-2 p-3 relative">
                       <div className="grid grid-cols-3 gap-2">
                         {previews.map((src, i) => (
                           <div key={i} className="relative aspect-square rounded-lg overflow-hidden bg-white/5">
@@ -411,6 +411,12 @@ export function AddProductModal({
                       <div className="mt-2 text-[11px] text-muted-foreground text-center">
                         {files.length} / 6 images · first image is the cover
                       </div>
+                      {analyzing && (
+                        <div className="absolute inset-x-3 bottom-3 rounded-lg bg-black/70 backdrop-blur px-3 py-2 flex items-center justify-center gap-2">
+                          <Loader2 className="w-3.5 h-3.5 animate-spin text-white" />
+                          <span className="text-xs font-medium text-white">Checking content…</span>
+                        </div>
+                      )}
                     </div>
                   ) : (
                     <button
