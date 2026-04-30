@@ -19,6 +19,7 @@ export interface DBProduct {
   brand_color: string | null;
   description: string | null;
   status: string;
+  error: string | null;
   created_at: string;
   primary_thumb: string | null;
   images: { id: string; storage_path: string; signed_url: string; is_primary: boolean }[];
