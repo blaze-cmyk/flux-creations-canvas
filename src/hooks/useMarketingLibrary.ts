@@ -168,5 +168,15 @@ export function useProducts() {
     [refresh],
   );
 
-  return { products, loading, refresh, uploadProductImages, createFromUrl };
+  const deleteProduct = useCallback(
+    async (id: string) => {
+      // best-effort: remove image rows + product row (storage objects left to lifecycle)
+      await supabase.from('ms_product_images').delete().eq('product_id', id);
+      await supabase.from('ms_products').delete().eq('id', id);
+      setProducts((prev) => prev.filter((p) => p.id !== id));
+    },
+    [],
+  );
+
+  return { products, loading, refresh, uploadProductImages, createFromUrl, deleteProduct };
 }
