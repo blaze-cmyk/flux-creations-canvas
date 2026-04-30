@@ -241,7 +241,7 @@ Deno.serve(async (req) => {
       if (result.status === 'done') {
         const { data: updated } = await admin
           .from('ms_generations')
-          .update({ status: 'done', video_url: result.videoUrl, error: null })
+          .update({ status: 'done', stage: 'done', video_url: result.videoUrl, error: null })
           .eq('id', row.id)
           .select()
           .single();
@@ -252,7 +252,7 @@ Deno.serve(async (req) => {
       if (result.status === 'failed') {
         const { data: updated } = await admin
           .from('ms_generations')
-          .update({ status: 'failed', error: result.error ?? 'failed' })
+          .update({ status: 'failed', stage: 'failed', error: result.error ?? 'failed' })
           .eq('id', row.id)
           .select()
           .single();
