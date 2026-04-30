@@ -1,0 +1,1 @@
+UPDATE ms_generations SET status='failed', stage='failed', error='Image model out of credits (apiyi quota). Please top up.' WHERE id='3f56c1e1-7038-4959-a001-20432c527a2c' AND status='queued';
