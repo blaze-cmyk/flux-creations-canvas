@@ -1,9 +1,8 @@
-// Orchestrate the full marketing-video pipeline as one call.
+// Orchestrate the marketing-video pipeline as one call.
 // 1) Create ms_generations row (stage=scripting)
-// 2) Call marketing-generate-script -> save script_text + final prompt (stage=keyframing)
-// 3) Call marketing-generate-keyframe -> writes keyframe_url onto row (stage=videoing)
-// 4) Call marketing-generate-video (submit) -> saves provider/fal_request_id (stage=videoing, status=queued)
-// Client polls marketing-generate-video {poll: id} for completion + reads ms_generations.stage for live label.
+// 2) Call marketing-generate-script -> save script_text + final prompt (stage=videoing)
+// 3) Call marketing-generate-video directly with raw avatar+product refs.
+//    Keyframe step is intentionally skipped — Seedance handles identity from refs (faster + cleaner).
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0';
 
 const corsHeaders = {
@@ -117,45 +116,28 @@ Deno.serve(async (req) => {
         const finalPrompt: string = scriptRes.json.prompt;
         const refUrls = uniqueValidUrls(scriptRes.json.reference_urls || []);
 
+        // Use the first product/avatar image as a placeholder thumb until the video is ready.
+        const placeholderThumb = refUrls[0] ?? null;
         await admin
           .from('ms_generations')
           .update({
             prompt: finalPrompt,
             script_text: finalPrompt,
             reference_paths: refUrls,
-            stage: 'keyframing',
+            stage: 'videoing',
+            thumb_url: placeholderThumb,
           })
           .eq('id', generationId);
 
-        // 3) Keyframe — REQUIRED. If it fails (quota, model error, etc.), surface
-        // the failure to the user instead of submitting a low-quality video off raw refs.
-        const kfRes = await invokeFn('marketing-generate-keyframe', {
-          generationId, productId, avatarId, prompt: finalPrompt, aspect: ratio, format,
-        });
-        if (!kfRes.ok || !kfRes.json?.keyframeUrl) {
-          const detail = (kfRes.json?.error?.message || kfRes.json?.error || kfRes.text || 'unknown').toString();
-          const friendly = /quota|insufficient|余额/i.test(detail)
-            ? 'Image model is out of credits. Please top up the keyframe provider (apiyi).'
-            : `Keyframe failed: ${detail.slice(0, 200)}`;
-          throw new Error(friendly);
-        }
-        const keyframeUrl: string = kfRes.json.keyframeUrl;
-        const videoRefs = uniqueValidUrls([keyframeUrl, ...refUrls]);
+        // 3) Keyframe step DISABLED — go straight to Seedance using raw product + avatar refs.
+        //    This is faster, cheaper, and avoids Nano Banana Pro identity drift.
+        const videoRefs = uniqueValidUrls(refUrls);
 
-        await admin
-          .from('ms_generations')
-          .update({ stage: 'videoing', thumb_url: keyframeUrl })
-          .eq('id', generationId);
-
-        // 4) Video submit — but the video function INSERTS its own row.
-        // Instead, mirror submit logic here by calling video function with body that uses the existing row.
-        // Simpler: call video function and let it create its own job row; then mark THIS row as 'merged' pointer.
-        // Cleanest: have video function reuse this row by id. We add support via { reuseGenerationId } below.
+        // 4) Video submit (reuse this row)
         const vidRes = await invokeFn('marketing-generate-video', {
           reuseGenerationId: generationId,
           prompt: finalPrompt,
           image_urls: videoRefs,
-          keyframe_url: keyframeUrl,
           aspect: ratio,
           duration_seconds,
           resolution,
