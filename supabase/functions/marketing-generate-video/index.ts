@@ -1,9 +1,11 @@
-// Submit a Seedance 2.0 reference-to-video job on fal.ai and persist result.
-// Two routes:
-//   POST {prompt, image_urls, aspect, duration_seconds, resolution, productId, avatarId, format, surface}
-//        -> creates ms_generations row + queues fal job, returns {id, fal_request_id, status}
-//   POST {poll: id} -> checks fal status, updates row, returns row
-//   POST {retry: id} -> re-submits a failed/timeout job using stored params
+// Multi-provider Seedance video generation.
+// Provider chain: AtlasCloud (primary) -> fal.ai (fallback)
+//
+// Routes (POST):
+//   { prompt, image_urls, aspect, duration_seconds, resolution, ... }
+//        -> persists ms_generations row, submits to first available provider, returns {id, provider, status}
+//   { poll: id }   -> polls correct provider, updates row
+//   { retry: id }  -> resubmits using stored params (re-runs provider chain)
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0';
 
 const corsHeaders = {
@@ -12,30 +14,174 @@ const corsHeaders = {
     'authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version',
 };
 
-const FAL_KEY = Deno.env.get('FAL_KEY')!;
+const ATLAS_KEY = Deno.env.get('ATLASCLOUD_API_KEY') ?? '';
+const FAL_KEY = Deno.env.get('FAL_KEY') ?? '';
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+
+type Provider = 'atlascloud' | 'fal';
+
+function log(level: 'INFO' | 'WARN' | 'ERROR' | 'DEBUG', msg: string, ctx: Record<string, unknown> = {}) {
+  console.log(JSON.stringify({ level, msg, ...ctx, ts: new Date().toISOString() }));
+}
 
 function aspectToRatio(a: string) {
   if (!a || a === 'Auto') return '9:16';
   return a;
 }
 
-function log(level: 'INFO' | 'WARN' | 'ERROR' | 'DEBUG', msg: string, ctx: Record<string, unknown> = {}) {
-  console.log(JSON.stringify({ level, msg, ...ctx, ts: new Date().toISOString() }));
+function clampDuration(d: unknown) {
+  const n = Number(d) || 8;
+  return Math.max(3, Math.min(15, n));
 }
 
-async function submitToFal(payload: Record<string, unknown>, hasRefs: boolean) {
+function normalizeRes(r: string) {
+  if (r === '1080p') return '1080p';
+  if (r === '480p') return '480p';
+  return '720p';
+}
+
+// ---------------- AtlasCloud (primary) ----------------
+// Docs: POST https://api.atlascloud.ai/api/v1/model/generateVideo
+// model: bytedance/seedance-2.0/reference-to-video (supports up to 9 reference images)
+async function submitAtlas(opts: {
+  prompt: string;
+  image_urls: string[];
+  ratio: string;
+  duration: number;
+  resolution: string;
+}): Promise<{ ok: boolean; requestId?: string; raw: unknown }> {
+  const hasRefs = opts.image_urls.length > 0;
+  const model = hasRefs
+    ? 'bytedance/seedance-2.0/reference-to-video'
+    : 'bytedance/seedance-2.0/text-to-video';
+  const body: Record<string, unknown> = {
+    model,
+    prompt: opts.prompt,
+    duration: opts.duration,
+    resolution: opts.resolution,
+    ratio: opts.ratio,
+    generate_audio: true,
+    watermark: false,
+  };
+  if (hasRefs) body.reference_images = opts.image_urls.slice(0, 9);
+
+  const res = await fetch('https://api.atlascloud.ai/api/v1/model/generateVideo', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${ATLAS_KEY}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  const json = await res.json().catch(() => ({}));
+  const requestId = json?.data?.id ?? json?.id;
+  return { ok: res.ok && !!requestId, requestId, raw: json };
+}
+
+async function pollAtlas(requestId: string): Promise<{
+  status: 'running' | 'done' | 'failed';
+  videoUrl?: string | null;
+  error?: string;
+}> {
+  const res = await fetch(`https://api.atlascloud.ai/api/v1/model/prediction/${requestId}`, {
+    headers: { Authorization: `Bearer ${ATLAS_KEY}` },
+  });
+  const json = await res.json().catch(() => ({}));
+  const status = json?.data?.status;
+  if (status === 'completed' || status === 'succeeded') {
+    const out = json?.data?.outputs?.[0];
+    const videoUrl = typeof out === 'string' ? out : out?.url ?? null;
+    return videoUrl ? { status: 'done', videoUrl } : { status: 'failed', error: 'No video in outputs' };
+  }
+  if (status === 'failed') {
+    return { status: 'failed', error: json?.data?.error || 'AtlasCloud reported failure' };
+  }
+  return { status: 'running' };
+}
+
+// ---------------- fal.ai (fallback) ----------------
+async function submitFal(opts: {
+  prompt: string;
+  image_urls: string[];
+  ratio: string;
+  duration: number;
+  resolution: string;
+}): Promise<{ ok: boolean; requestId?: string; raw: unknown }> {
+  const hasRefs = opts.image_urls.length > 0;
   const endpoint = hasRefs
     ? 'https://queue.fal.run/bytedance/seedance-2.0/reference-to-video'
     : 'https://queue.fal.run/bytedance/seedance-2.0/text-to-video';
+  const payload: Record<string, unknown> = {
+    prompt: opts.prompt,
+    aspect_ratio: opts.ratio,
+    duration: opts.duration,
+    resolution: opts.resolution === '1080p' ? '1080p' : '720p',
+  };
+  if (hasRefs) payload.reference_image_urls = opts.image_urls.slice(0, 9);
   const res = await fetch(endpoint, {
     method: 'POST',
     headers: { Authorization: `Key ${FAL_KEY}`, 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),
   });
-  const json = await res.json();
-  return { ok: res.ok, json };
+  const json = await res.json().catch(() => ({}));
+  return { ok: res.ok && !!json?.request_id, requestId: json?.request_id, raw: json };
+}
+
+async function pollFal(requestId: string): Promise<{
+  status: 'running' | 'done' | 'failed';
+  videoUrl?: string | null;
+  error?: string;
+}> {
+  const statusRes = await fetch(
+    `https://queue.fal.run/bytedance/seedance-2.0/requests/${requestId}/status`,
+    { headers: { Authorization: `Key ${FAL_KEY}` } },
+  );
+  const status = await statusRes.json().catch(() => ({}));
+  if (status.status === 'COMPLETED') {
+    const respRes = await fetch(
+      `https://queue.fal.run/bytedance/seedance-2.0/requests/${requestId}`,
+      { headers: { Authorization: `Key ${FAL_KEY}` } },
+    );
+    const resp = await respRes.json().catch(() => ({}));
+    const videoUrl = resp?.video?.url || resp?.video_url || resp?.output?.video?.url || null;
+    return videoUrl ? { status: 'done', videoUrl } : { status: 'failed', error: 'No video returned' };
+  }
+  if (status.status === 'FAILED' || status.status === 'ERROR') {
+    return { status: 'failed', error: 'fal reported failure' };
+  }
+  return { status: 'running' };
+}
+
+// ---------------- Provider chain ----------------
+async function submitWithFallback(opts: {
+  prompt: string;
+  image_urls: string[];
+  ratio: string;
+  duration: number;
+  resolution: string;
+}): Promise<{ provider: Provider; requestId: string } | { error: string; details: unknown }> {
+  const chain: Provider[] = [];
+  if (ATLAS_KEY) chain.push('atlascloud');
+  if (FAL_KEY) chain.push('fal');
+  if (chain.length === 0) return { error: 'no_providers_configured', details: null };
+
+  let lastErr: unknown = null;
+  for (const provider of chain) {
+    try {
+      const r = provider === 'atlascloud' ? await submitAtlas(opts) : await submitFal(opts);
+      if (r.ok && r.requestId) {
+        log('INFO', 'submit: provider accepted', { provider, requestId: r.requestId });
+        return { provider, requestId: r.requestId };
+      }
+      log('WARN', 'submit: provider rejected, trying next', { provider, raw: r.raw });
+      lastErr = r.raw;
+    } catch (e) {
+      log('ERROR', 'submit: provider threw, trying next', {
+        provider,
+        err: e instanceof Error ? e.message : String(e),
+      });
+      lastErr = e instanceof Error ? e.message : String(e);
+    }
+  }
+  return { error: 'all_providers_failed', details: lastErr };
 }
 
 Deno.serve(async (req) => {
@@ -44,9 +190,8 @@ Deno.serve(async (req) => {
     const admin = createClient(SUPABASE_URL, SERVICE_KEY);
     const body = await req.json();
 
-    // ---- POLL branch ----
+    // ---- POLL ----
     if (body.poll) {
-      log('DEBUG', 'poll lookup', { jobId: body.poll });
       const { data: row } = await admin
         .from('ms_generations')
         .select('*')
@@ -54,58 +199,49 @@ Deno.serve(async (req) => {
         .maybeSingle();
 
       if (!row) {
-        log('WARN', 'poll: row not found, treating as queued_pending_persist', { jobId: body.poll });
-        return new Response(
-          JSON.stringify({ status: 'queued_pending_persist' }),
-          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
-        );
+        return new Response(JSON.stringify({ status: 'queued_pending_persist' }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
       }
-
       if (row.status === 'done' || row.status === 'failed') {
         return new Response(JSON.stringify(row), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
       }
-
-      if (!row.fal_request_id) {
-        log('WARN', 'poll: row exists but fal_request_id is null', { jobId: row.id });
-        return new Response(
-          JSON.stringify({ ...row, status: 'queued_pending_persist' }),
-          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
-        );
-      }
-
-      // poll fal
-      const statusRes = await fetch(
-        `https://queue.fal.run/bytedance/seedance-2.0/requests/${row.fal_request_id}/status`,
-        { headers: { Authorization: `Key ${FAL_KEY}` } },
-      );
-      const status = await statusRes.json();
-
-      if (status.status === 'COMPLETED') {
-        const respRes = await fetch(
-          `https://queue.fal.run/bytedance/seedance-2.0/requests/${row.fal_request_id}`,
-          { headers: { Authorization: `Key ${FAL_KEY}` } },
-        );
-        const resp = await respRes.json();
-        const videoUrl = resp?.video?.url || resp?.video_url || resp?.output?.video?.url || null;
-        const { data: updated } = await admin
-          .from('ms_generations')
-          .update({
-            status: videoUrl ? 'done' : 'failed',
-            video_url: videoUrl,
-            error: videoUrl ? null : 'No video returned',
-          })
-          .eq('id', row.id)
-          .select()
-          .single();
-        log('INFO', 'poll: completed', { jobId: row.id, hasVideo: !!videoUrl });
-        return new Response(JSON.stringify(updated), {
+      if (!row.fal_request_id || !row.provider) {
+        return new Response(JSON.stringify({ ...row, status: 'queued_pending_persist' }), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
       }
 
-      if (status.status === 'IN_PROGRESS' || status.status === 'IN_QUEUE') {
+      const result =
+        row.provider === 'atlascloud'
+          ? await pollAtlas(row.fal_request_id)
+          : await pollFal(row.fal_request_id);
+
+      if (result.status === 'done') {
+        const { data: updated } = await admin
+          .from('ms_generations')
+          .update({ status: 'done', video_url: result.videoUrl, error: null })
+          .eq('id', row.id)
+          .select()
+          .single();
+        return new Response(JSON.stringify(updated), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+      if (result.status === 'failed') {
+        const { data: updated } = await admin
+          .from('ms_generations')
+          .update({ status: 'failed', error: result.error ?? 'failed' })
+          .eq('id', row.id)
+          .select()
+          .single();
+        return new Response(JSON.stringify(updated), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+      if (row.status !== 'running') {
         await admin.from('ms_generations').update({ status: 'running' }).eq('id', row.id);
       }
       return new Response(JSON.stringify({ ...row, status: 'running' }), {
@@ -113,9 +249,8 @@ Deno.serve(async (req) => {
       });
     }
 
-    // ---- RETRY branch ----
+    // ---- RETRY ----
     if (body.retry) {
-      log('INFO', 'retry requested', { jobId: body.retry });
       const { data: row } = await admin
         .from('ms_generations')
         .select('*')
@@ -127,41 +262,42 @@ Deno.serve(async (req) => {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
       }
-      const refs = row.reference_paths || [];
-      const payload: Record<string, unknown> = {
+      const refs: string[] = row.reference_paths || [];
+      const result = await submitWithFallback({
         prompt: row.prompt,
-        aspect_ratio: aspectToRatio(row.aspect),
+        image_urls: refs,
+        ratio: aspectToRatio(row.aspect),
         duration: row.duration_seconds || 8,
-        resolution: row.resolution === '1080p' ? '1080p' : '720p',
-      };
-      if (refs.length > 0) payload.reference_image_urls = refs.slice(0, 9);
-      const { ok, json } = await submitToFal(payload, refs.length > 0);
-      if (!ok) {
-        log('ERROR', 'retry: fal submit failed', { jobId: row.id, json });
+        resolution: normalizeRes(row.resolution),
+      });
+      if ('error' in result) {
         await admin
           .from('ms_generations')
-          .update({ status: 'failed', error: 'Fal submit failed on retry' })
+          .update({ status: 'failed', error: `Retry failed: ${result.error}` })
           .eq('id', row.id);
-        return new Response(JSON.stringify({ error: 'fal_error', details: json }), {
+        return new Response(JSON.stringify({ error: result.error, details: result.details }), {
           status: 502,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
       }
-      const requestId = json?.request_id;
       const { data: updated } = await admin
         .from('ms_generations')
-        .update({ status: 'queued', fal_request_id: requestId, error: null, video_url: null })
+        .update({
+          status: 'queued',
+          provider: result.provider,
+          fal_request_id: result.requestId,
+          error: null,
+          video_url: null,
+        })
         .eq('id', row.id)
         .select()
         .single();
-      log('INFO', 'retry: re-submitted to fal', { jobId: row.id, falRequestId: requestId });
       return new Response(JSON.stringify(updated), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
-    // ---- SUBMIT branch ----
-    log('INFO', 'submit: received', { hasRefs: (body.image_urls || []).length });
+    // ---- SUBMIT ----
     const {
       prompt,
       image_urls = [],
@@ -181,7 +317,11 @@ Deno.serve(async (req) => {
       });
     }
 
-    // 1) Persist row immediately so the client always has a real DB id to poll.
+    const duration = clampDuration(duration_seconds);
+    const resolutionN = normalizeRes(resolution);
+    const ratio = aspectToRatio(aspect);
+
+    // 1) Persist row immediately (so client polling has a real id)
     const { data: row, error: insErr } = await admin
       .from('ms_generations')
       .insert({
@@ -190,9 +330,9 @@ Deno.serve(async (req) => {
         avatar_id: avatarId ?? null,
         format,
         surface,
-        aspect: aspectToRatio(aspect),
-        duration_seconds: Math.max(3, Math.min(15, Number(duration_seconds) || 8)),
-        resolution: resolution === '1080p' ? '1080p' : '720p',
+        aspect: ratio,
+        duration_seconds: duration,
+        resolution: resolutionN,
         prompt,
         reference_paths: image_urls,
         status: 'queued',
@@ -203,42 +343,44 @@ Deno.serve(async (req) => {
       log('ERROR', 'submit: insert failed', { err: insErr.message });
       throw insErr;
     }
-    log('INFO', 'submit: row persisted', { jobId: row.id });
+    log('INFO', 'submit: row persisted', { jobId: row.id, refs: image_urls.length });
 
-    // 2) Submit to fal
-    const hasRefs = image_urls.length > 0;
-    const payload: Record<string, unknown> = {
+    // 2) Try providers in order
+    const result = await submitWithFallback({
       prompt,
-      aspect_ratio: aspectToRatio(aspect),
-      duration: row.duration_seconds,
-      resolution: row.resolution,
-    };
-    if (hasRefs) payload.reference_image_urls = image_urls.slice(0, 9);
+      image_urls,
+      ratio,
+      duration,
+      resolution: resolutionN,
+    });
 
-    const { ok, json: submitJson } = await submitToFal(payload, hasRefs);
-    if (!ok) {
-      log('ERROR', 'submit: fal_error', { jobId: row.id, submitJson });
+    if ('error' in result) {
       await admin
         .from('ms_generations')
-        .update({ status: 'failed', error: 'Fal submit failed' })
+        .update({ status: 'failed', error: result.error })
         .eq('id', row.id);
       return new Response(
-        JSON.stringify({ id: row.id, error: 'fal_error', details: submitJson }),
+        JSON.stringify({ id: row.id, error: result.error, details: result.details }),
         { status: 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
       );
     }
-    const requestId = submitJson?.request_id;
-    log('INFO', 'submit: fal request created', { jobId: row.id, falRequestId: requestId });
 
     const { data: updated } = await admin
       .from('ms_generations')
-      .update({ fal_request_id: requestId })
+      .update({ provider: result.provider, fal_request_id: result.requestId })
       .eq('id', row.id)
       .select()
       .single();
 
+    log('INFO', 'submit: done', { jobId: row.id, provider: result.provider });
+
     return new Response(
-      JSON.stringify({ id: updated.id, fal_request_id: requestId, status: 'queued' }),
+      JSON.stringify({
+        id: updated.id,
+        provider: result.provider,
+        fal_request_id: result.requestId,
+        status: 'queued',
+      }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
     );
   } catch (e) {

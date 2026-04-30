@@ -95,6 +95,7 @@ export type Database = {
           id: string
           product_id: string | null
           prompt: string
+          provider: string | null
           reference_paths: string[] | null
           resolution: string | null
           script: Json | null
@@ -116,6 +117,7 @@ export type Database = {
           id?: string
           product_id?: string | null
           prompt: string
+          provider?: string | null
           reference_paths?: string[] | null
           resolution?: string | null
           script?: Json | null
@@ -137,6 +139,7 @@ export type Database = {
           id?: string
           product_id?: string | null
           prompt?: string
+          provider?: string | null
           reference_paths?: string[] | null
           resolution?: string | null
           script?: Json | null
