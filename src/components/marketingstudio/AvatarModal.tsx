@@ -1,30 +1,8 @@
 import { Dialog, DialogContent } from '@/components/ui/dialog';
-import { useMemo, useState } from 'react';
-import { Search, Plus, Pin, Sparkles, User, UserRound } from 'lucide-react';
-
-interface Avatar {
-  id: string;
-  name: string;
-  gender: 'male' | 'female';
-  thumb: string;
-  pinned?: boolean;
-  mine?: boolean;
-}
-
-const AVATARS: Avatar[] = [
-  { id: 'av1', name: 'Emily', gender: 'female', thumb: 'https://picsum.photos/seed/av-emily/240/300' },
-  { id: 'av2', name: 'Sofia 4', gender: 'female', thumb: 'https://picsum.photos/seed/av-sofia4/240/300' },
-  { id: 'av3', name: 'sofia 2', gender: 'female', thumb: 'https://picsum.photos/seed/av-sofia2/240/300' },
-  { id: 'av4', name: 'Sofia', gender: 'female', thumb: 'https://picsum.photos/seed/av-sofia/240/300' },
-  { id: 'av5', name: 'Jayden', gender: 'male', thumb: 'https://picsum.photos/seed/av-jayden/240/300' },
-  { id: 'av6', name: 'Stefan', gender: 'male', thumb: 'https://picsum.photos/seed/av-stefan/240/300' },
-  { id: 'av7', name: 'Mei', gender: 'female', thumb: 'https://picsum.photos/seed/av-mei/240/300' },
-  { id: 'av8', name: 'Yuna', gender: 'female', thumb: 'https://picsum.photos/seed/av-yuna/240/300' },
-  { id: 'av9', name: 'Adriana', gender: 'female', thumb: 'https://picsum.photos/seed/av-adriana/240/300' },
-  { id: 'av10', name: 'Nora', gender: 'female', thumb: 'https://picsum.photos/seed/av-nora/240/300' },
-  { id: 'av11', name: 'Luca', gender: 'male', thumb: 'https://picsum.photos/seed/av-luca/240/300' },
-  { id: 'av12', name: 'Ines', gender: 'female', thumb: 'https://picsum.photos/seed/av-ines/240/300' },
-];
+import { useMemo, useRef, useState } from 'react';
+import { Search, Plus, Pin, Sparkles, User, UserRound, Loader2 } from 'lucide-react';
+import { useAvatars, DBAvatar } from '@/hooks/useMarketingLibrary';
+import { toast } from '@/hooks/use-toast';
 
 export function AvatarModal({
   open,
@@ -33,21 +11,36 @@ export function AvatarModal({
 }: {
   open: boolean;
   onOpenChange: (v: boolean) => void;
-  onSelect?: (a: Avatar) => void;
+  onSelect?: (a: { id: string; name: string; thumb: string }) => void;
 }) {
   const [tab, setTab] = useState<'all' | 'pinned' | 'mine'>('all');
   const [gender, setGender] = useState<'all' | 'male' | 'female'>('all');
   const [query, setQuery] = useState('');
+  const { avatars, loading, uploadAvatar } = useAvatars();
+  const [uploading, setUploading] = useState(false);
+  const fileRef = useRef<HTMLInputElement>(null);
 
   const filtered = useMemo(() => {
-    return AVATARS.filter((a) => {
-      if (tab === 'pinned' && !a.pinned) return false;
-      if (tab === 'mine' && !a.mine) return false;
-      if (gender !== 'all' && a.gender !== gender) return false;
+    return avatars.filter((a) => {
+      if (tab === 'mine' && a.is_builtin) return false;
+      if (gender !== 'all' && a.gender && a.gender !== gender) return false;
       if (query && !a.name.toLowerCase().includes(query.toLowerCase())) return false;
       return true;
     });
-  }, [tab, gender, query]);
+  }, [avatars, tab, gender, query]);
+
+  const handleUpload = async (file: File) => {
+    setUploading(true);
+    try {
+      const name = file.name.replace(/\.[^.]+$/, '').slice(0, 24) || 'My avatar';
+      await uploadAvatar(file, name);
+      toast({ title: 'Avatar added' });
+    } catch (e: any) {
+      toast({ title: 'Upload failed', description: e?.message ?? '', variant: 'destructive' });
+    } finally {
+      setUploading(false);
+    }
+  };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -66,7 +59,6 @@ export function AvatarModal({
         </div>
 
         <div className="grid md:grid-cols-[180px_1fr] max-h-[70vh]">
-          {/* Left filter rail */}
           <div className="hidden md:block border-r border-ms-border p-3 space-y-1">
             {([
               { id: 'all', label: 'All', icon: Sparkles },
@@ -105,30 +97,52 @@ export function AvatarModal({
             </div>
           </div>
 
-          {/* Avatar grid */}
           <div className="p-4 overflow-y-auto ms-scroll">
+            <input
+              ref={fileRef}
+              type="file"
+              accept="image/*"
+              hidden
+              onChange={(e) => {
+                const f = e.target.files?.[0];
+                if (f) handleUpload(f);
+                e.target.value = '';
+              }}
+            />
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
-              <button className="aspect-[4/5] rounded-xl bg-ms-surface-2 border border-dashed border-ms-border hover:border-foreground/40 flex flex-col items-center justify-center gap-2 text-muted-foreground">
+              <button
+                onClick={() => fileRef.current?.click()}
+                disabled={uploading}
+                className="aspect-[4/5] rounded-xl bg-ms-surface-2 border border-dashed border-ms-border hover:border-foreground/40 flex flex-col items-center justify-center gap-2 text-muted-foreground"
+              >
                 <div className="w-10 h-10 rounded-lg bg-ms-border grid place-items-center">
-                  <Plus className="w-4 h-4" />
+                  {uploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
                 </div>
-                <div className="text-xs font-medium text-foreground">Create avatar</div>
+                <div className="text-xs font-medium text-foreground">{uploading ? 'Uploading…' : 'Create avatar'}</div>
               </button>
-              {filtered.map((a) => (
-                <button
-                  key={a.id}
-                  onClick={() => {
-                    onSelect?.(a);
-                    onOpenChange(false);
-                  }}
-                  className="group relative aspect-[4/5] rounded-xl overflow-hidden bg-ms-surface-2"
-                >
-                  <img src={a.thumb} alt={a.name} className="w-full h-full object-cover transition-transform group-hover:scale-105" />
-                  <div className="absolute inset-x-0 bottom-0 p-2 bg-gradient-to-t from-black/80 to-transparent">
-                    <div className="text-xs font-semibold text-white">{a.name}</div>
-                  </div>
-                </button>
-              ))}
+              {loading ? (
+                <div className="col-span-full text-center text-muted-foreground py-8 text-sm">Loading…</div>
+              ) : (
+                filtered.map((a) => (
+                  <button
+                    key={a.id}
+                    onClick={() => {
+                      onSelect?.({ id: a.id, name: a.name, thumb: a.thumb });
+                      onOpenChange(false);
+                    }}
+                    className="group relative aspect-[4/5] rounded-xl overflow-hidden bg-ms-surface-2"
+                  >
+                    {a.thumb ? (
+                      <img src={a.thumb} alt={a.name} className="w-full h-full object-cover transition-transform group-hover:scale-105" />
+                    ) : (
+                      <div className="w-full h-full bg-ms-border" />
+                    )}
+                    <div className="absolute inset-x-0 bottom-0 p-2 bg-gradient-to-t from-black/80 to-transparent">
+                      <div className="text-xs font-semibold text-white">{a.name}</div>
+                    </div>
+                  </button>
+                ))
+              )}
             </div>
           </div>
         </div>
