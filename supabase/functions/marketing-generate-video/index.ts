@@ -32,7 +32,35 @@ function aspectToRatio(a: string) {
 
 function clampDuration(d: unknown) {
   const n = Number(d) || 8;
-  return Math.max(3, Math.min(15, n));
+  return Math.max(4, Math.min(15, n));
+}
+
+function isValidHttpUrl(value: unknown) {
+  if (typeof value !== 'string' || !value.trim()) return false;
+  try {
+    const u = new URL(value.trim());
+    return u.protocol === 'http:' || u.protocol === 'https:';
+  } catch {
+    return false;
+  }
+}
+
+function uniqueValidUrls(urls: unknown[], limit = 9) {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const raw of urls) {
+    if (!isValidHttpUrl(raw)) continue;
+    const url = String(raw).trim();
+    if (seen.has(url)) continue;
+    seen.add(url);
+    out.push(url);
+    if (out.length >= limit) break;
+  }
+  return out;
+}
+
+function hasAudioUrlError(raw: unknown) {
+  return /audio_url|reference_audio|reference_audios|invalid url/i.test(JSON.stringify(raw));
 }
 
 function normalizeRes(r: string) {
@@ -67,12 +95,10 @@ async function submitAtlas(opts: {
   };
   if (hasRefs) {
     body.reference_images = opts.image_urls.slice(0, 9);
-    body.image_urls = opts.image_urls.slice(0, 9); // some Atlas builds use this name
   }
   if (opts.audio_urls.length > 0 && hasRefs) {
-    // Audio reference requires at least one image reference. Send under both common keys.
-    body.audio_urls = opts.audio_urls.slice(0, 3);
-    body.reference_audio = opts.audio_urls.slice(0, 3);
+    // Atlas docs require `reference_audios` (not audio_urls/reference_audio).
+    body.reference_audios = opts.audio_urls.slice(0, 3);
   }
 
   const res = await fetch('https://api.atlascloud.ai/api/v1/model/generateVideo', {
