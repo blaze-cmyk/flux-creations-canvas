@@ -1,6 +1,15 @@
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { Heart, Share2, Download, MoreHorizontal, Pencil, RefreshCw, Send } from 'lucide-react';
 import { MSGeneration, useMarketingStudioStore } from '@/store/marketingStudioStore';
+import { toast } from 'sonner';
+
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL as string;
+
+function proxiedVideoUrl(url: string, download?: string) {
+  const qs = new URLSearchParams({ url });
+  if (download) qs.set('download', download);
+  return `${SUPABASE_URL}/functions/v1/marketing-video-proxy?${qs.toString()}`;
+}
 
 export function VideoDetailModal({
   open,
@@ -16,21 +25,45 @@ export function VideoDetailModal({
   const toggleLike = useMarketingStudioStore((s) => s.toggleLike);
   if (!generation) return null;
 
+  const playSrc = generation.videoUrl ? proxiedVideoUrl(generation.videoUrl) : undefined;
+
+  const handleDownload = async () => {
+    if (!generation.videoUrl) return;
+    try {
+      const filename = `${(generation.prompt || 'video').slice(0, 40).replace(/[^a-z0-9]+/gi, '-')}.mp4`;
+      const res = await fetch(proxiedVideoUrl(generation.videoUrl, filename));
+      if (!res.ok) throw new Error('download failed');
+      const blob = await res.blob();
+      const blobUrl = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = blobUrl;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(blobUrl);
+    } catch (e) {
+      toast.error('Download failed');
+      window.open(generation.videoUrl, '_blank');
+    }
+  };
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-[min(1200px,96vw)] w-[96vw] h-[92vh] md:h-[88vh] bg-ms-surface border-ms-border p-0 overflow-hidden flex flex-col">
         <div className="flex-1 min-h-0 grid grid-cols-1 md:grid-cols-[minmax(0,1fr)_minmax(300px,360px)]">
           {/* Media */}
           <div className="relative bg-black flex items-center justify-center min-h-0 overflow-hidden">
-            {generation.videoUrl ? (
+            {playSrc ? (
               <video
-                key={generation.videoUrl}
-                src={generation.videoUrl}
+                key={playSrc}
+                src={playSrc}
                 poster={generation.thumbUrl}
                 controls
                 autoPlay
                 loop
                 playsInline
+                crossOrigin="anonymous"
                 className="max-w-full max-h-full w-auto h-auto object-contain"
               />
             ) : generation.thumbUrl ? (
@@ -98,7 +131,7 @@ export function VideoDetailModal({
                 </button>
               </div>
               <div className="flex items-center gap-2">
-                <button className="flex-1 h-10 rounded-xl bg-ms-surface-2 hover:bg-ms-border text-sm text-foreground flex items-center justify-center gap-2">
+                <button onClick={handleDownload} className="flex-1 h-10 rounded-xl bg-ms-surface-2 hover:bg-ms-border text-sm text-foreground flex items-center justify-center gap-2">
                   <Download className="w-3.5 h-3.5" /> Download
                 </button>
                 <button
