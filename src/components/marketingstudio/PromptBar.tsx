@@ -70,6 +70,8 @@ export function PromptBar({ projectId }: Props) {
   const [duration, setDuration] = useState<MSDuration>('8s');
   const [productThumb, setProductThumb] = useState<string | null>(null);
   const [avatarThumb, setAvatarThumb] = useState<string | null>(null);
+  const [productName, setProductName] = useState<string | null>(null);
+  const [avatarName, setAvatarName] = useState<string | null>(null);
 
   const [assetsOpen, setAssetsOpen] = useState(false);
   const [productOpen, setProductOpen] = useState(false);
