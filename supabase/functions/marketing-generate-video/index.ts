@@ -47,6 +47,7 @@ function normalizeRes(r: string) {
 async function submitAtlas(opts: {
   prompt: string;
   image_urls: string[];
+  audio_urls: string[];
   ratio: string;
   duration: number;
   resolution: string;
@@ -64,7 +65,15 @@ async function submitAtlas(opts: {
     generate_audio: true,
     watermark: false,
   };
-  if (hasRefs) body.reference_images = opts.image_urls.slice(0, 9);
+  if (hasRefs) {
+    body.reference_images = opts.image_urls.slice(0, 9);
+    body.image_urls = opts.image_urls.slice(0, 9); // some Atlas builds use this name
+  }
+  if (opts.audio_urls.length > 0 && hasRefs) {
+    // Audio reference requires at least one image reference. Send under both common keys.
+    body.audio_urls = opts.audio_urls.slice(0, 3);
+    body.reference_audio = opts.audio_urls.slice(0, 3);
+  }
 
   const res = await fetch('https://api.atlascloud.ai/api/v1/model/generateVideo', {
     method: 'POST',
