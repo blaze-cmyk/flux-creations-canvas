@@ -70,6 +70,8 @@ export function PromptBar({ projectId }: Props) {
   const [duration, setDuration] = useState<MSDuration>('8s');
   const [productThumb, setProductThumb] = useState<string | null>(null);
   const [avatarThumb, setAvatarThumb] = useState<string | null>(null);
+  const [productName, setProductName] = useState<string | null>(null);
+  const [avatarName, setAvatarName] = useState<string | null>(null);
 
   const [assetsOpen, setAssetsOpen] = useState(false);
   const [productOpen, setProductOpen] = useState(false);
@@ -84,11 +86,15 @@ export function PromptBar({ projectId }: Props) {
       const p = (e as CustomEvent<FormatPreset>).detail;
       if (!p) return;
       setMode(p.mode);
-      setPrompt(p.prompt);
+      // Strip @tag tokens from visible prompt — they're shown as chips
+      const cleaned = p.prompt.replace(/@[A-Za-z0-9_][A-Za-z0-9 _-]*?(?=(\s@|\s|\.|,|$))/g, '').replace(/\s{2,}/g, ' ').trim();
+      setPrompt(cleaned);
       setDuration(p.duration);
       setAspect(p.aspect);
       setProductThumb(p.productThumb ?? null);
       setAvatarThumb(p.avatarThumb ?? null);
+      setProductName(p.productName ?? null);
+      setAvatarName(p.avatarName ?? null);
     };
     window.addEventListener(RECREATE_EVENT, handler);
     return () => window.removeEventListener(RECREATE_EVENT, handler);
@@ -154,43 +160,69 @@ export function PromptBar({ projectId }: Props) {
             >
               <Plus className="w-4 h-4" strokeWidth={1.5} />
             </button>
-            <input
-              value={prompt}
-              onChange={(e) => setPrompt(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' && !e.shiftKey) {
-                  e.preventDefault();
-                  handleGenerate();
-                }
-              }}
-              placeholder="Describe what happens in the ad..."
-              className="flex-1 bg-transparent border-0 text-sm text-foreground placeholder:text-muted-foreground/70 focus:outline-none min-w-0 self-center px-1"
-            />
 
-            <div className="hidden md:flex items-stretch gap-2">
+            {/* Prompt area: name chips + scrollable textarea */}
+            <div className="flex-1 min-w-0 flex flex-col gap-1.5 py-1 pr-1">
+              {(productName || avatarName) && (
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  {productName && (
+                    <span className="inline-flex items-center gap-1.5 pl-1 pr-2.5 py-1 rounded-full bg-white/[0.06] border border-white/10 text-[12px] font-medium text-foreground/90">
+                      {productThumb && (
+                        <img src={productThumb} alt="" className="w-4 h-4 rounded-full object-cover" />
+                      )}
+                      {productName}
+                    </span>
+                  )}
+                  {avatarName && (
+                    <span className="inline-flex items-center gap-1.5 pl-1 pr-2.5 py-1 rounded-full bg-white/[0.06] border border-white/10 text-[12px] font-medium text-foreground/90">
+                      {avatarThumb && (
+                        <img src={avatarThumb} alt="" className="w-4 h-4 rounded-full object-cover" />
+                      )}
+                      {avatarName}
+                    </span>
+                  )}
+                </div>
+              )}
+              <textarea
+                value={prompt}
+                onChange={(e) => setPrompt(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !e.shiftKey && (e.metaKey || e.ctrlKey)) {
+                    e.preventDefault();
+                    handleGenerate();
+                  }
+                }}
+                rows={2}
+                placeholder="Describe what happens in the ad..."
+                className="w-full bg-transparent border-0 text-sm leading-[1.55] text-foreground placeholder:text-muted-foreground/70 focus:outline-none resize-none ms-prompt-scroll min-h-[44px] max-h-[160px] overflow-y-auto"
+                style={{ fontFamily: 'Montserrat, system-ui, sans-serif' }}
+              />
+            </div>
+
+            <div className="hidden md:flex items-stretch gap-2 self-start">
               <button
                 onClick={() => setProductOpen(true)}
                 className="ms-glass-2 flex flex-col items-center justify-center w-[88px] h-[88px] rounded-2xl text-[10px] font-semibold text-foreground/90 overflow-hidden relative tracking-wider transition-all"
               >
                 {productThumb ? (
-                  <img src={productThumb} alt="product" className="absolute inset-0 w-full h-full object-cover opacity-50" />
+                  <img src={productThumb} alt="product" className="absolute inset-0 w-full h-full object-cover opacity-60" />
                 ) : null}
                 <div className="grid place-items-center w-7 h-7 rounded-full bg-white/10 mb-1.5 relative">
                   <Plus className="w-4 h-4 text-foreground/90" strokeWidth={1.5} />
                 </div>
-                <span className="relative">PRODUCT</span>
+                <span className="relative drop-shadow-[0_1px_3px_rgba(0,0,0,0.8)]">PRODUCT</span>
               </button>
               <button
                 onClick={() => setAvatarOpen(true)}
                 className="ms-glass-2 flex flex-col items-center justify-center w-[88px] h-[88px] rounded-2xl text-[10px] font-semibold text-foreground/90 overflow-hidden relative tracking-wider transition-all"
               >
                 {avatarThumb ? (
-                  <img src={avatarThumb} alt="avatar" className="absolute inset-0 w-full h-full object-cover opacity-50" />
+                  <img src={avatarThumb} alt="avatar" className="absolute inset-0 w-full h-full object-cover opacity-60" />
                 ) : null}
                 <div className="grid place-items-center w-7 h-7 rounded-full bg-white/10 mb-1.5 relative">
                   <Plus className="w-4 h-4 text-foreground/90" strokeWidth={1.5} />
                 </div>
-                <span className="relative">AVATAR</span>
+                <span className="relative drop-shadow-[0_1px_3px_rgba(0,0,0,0.8)]">AVATAR</span>
               </button>
               <button
                 onClick={handleGenerate}
