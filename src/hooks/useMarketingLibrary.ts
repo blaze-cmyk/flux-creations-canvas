@@ -64,10 +64,10 @@ export function useAvatars() {
   const uploadAvatar = useCallback(
     async (file: File, name: string, gender: 'male' | 'female' | 'other' = 'female') => {
       const { data: u } = await supabase.auth.getUser();
-      const uid = u?.user?.id;
-      if (!uid) throw new Error('Sign in required to upload an avatar.');
+      const uid = u?.user?.id ?? null;
+      const folder = uid ?? 'anon';
       const ext = file.name.split('.').pop() || 'png';
-      const path = `${uid}/${crypto.randomUUID()}.${ext}`;
+      const path = `${folder}/${crypto.randomUUID()}.${ext}`;
       const { error: upErr } = await supabase.storage.from('ms-avatars').upload(path, file, { upsert: false });
       if (upErr) throw upErr;
       const { error: insErr } = await supabase
