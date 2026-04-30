@@ -446,16 +446,33 @@ export function AddProductModal({
               <div className="flex flex-col">
                 {tab === 'product' ? (
                   <>
-                    <label className="text-sm text-muted-foreground mb-2">Name Product</label>
+                    <label className="text-sm text-muted-foreground mb-2">Product name</label>
                     <div className="relative">
-                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">@</span>
                       <input
                         value={name}
                         onChange={(e) => setName(e.target.value)}
-                        placeholder="Product name"
-                        maxLength={48}
-                        className="w-full h-12 pl-8 pr-3 rounded-xl ms-chip-glass text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-white/25"
+                        placeholder={analyzing ? 'Detecting…' : 'Enter product name'}
+                        maxLength={64}
+                        className="w-full h-12 pl-3 pr-10 rounded-xl ms-chip-glass text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-white/25"
                       />
+                      {analyzing && (
+                        <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 animate-spin text-muted-foreground" />
+                      )}
+                    </div>
+
+                    <label className="text-sm text-muted-foreground mb-2 mt-4">Description</label>
+                    <div className="relative">
+                      <textarea
+                        value={description}
+                        onChange={(e) => setDescription(e.target.value)}
+                        placeholder={analyzing ? 'Detecting…' : 'Describe your product'}
+                        rows={5}
+                        maxLength={400}
+                        className="w-full p-3 rounded-xl ms-chip-glass text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-white/25 resize-none leading-relaxed"
+                      />
+                      {analyzing && (
+                        <Loader2 className="absolute right-3 top-3 w-4 h-4 animate-spin text-muted-foreground" />
+                      )}
                     </div>
                   </>
                 ) : (
