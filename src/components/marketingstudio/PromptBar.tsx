@@ -35,7 +35,7 @@ import { toast } from '@/hooks/use-toast';
 
 const ASPECTS: MSAspect[] = ['9:16', '1:1', '16:9'];
 const RESOLUTIONS: MSResolution[] = ['480p', '720p', '1080p'];
-const DURATIONS: MSDuration[] = ['4s', '8s', '12s'];
+
 
 function modeIcon(mode: MSMode) {
   const cls = 'size-3.5';
@@ -201,7 +201,7 @@ export function PromptBar({ projectId }: Props) {
             )}
             <Chip icon={<AspectIcon />} value={aspect} options={ASPECTS} onChange={(v) => setAspect(v as MSAspect)} />
             <Chip icon={<Gem className="w-3.5 h-3.5" />} value={res} options={RESOLUTIONS} onChange={(v) => setRes(v as MSResolution)} />
-            <Chip icon={<Clock className="w-3.5 h-3.5" />} value={duration} options={DURATIONS} onChange={(v) => setDuration(v as MSDuration)} />
+            <DurationChip value={duration} onChange={setDuration} />
           </div>
 
           {/* Mobile generate row */}
