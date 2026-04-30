@@ -142,10 +142,14 @@ export function Sidebar({ onClose }: { onClose?: () => void }) {
                       <DropdownMenuContent align="end" className="bg-ms-surface-2 border-ms-border">
                         <DropdownMenuItem
                           className="text-destructive focus:text-destructive"
-                          onClick={(e) => {
+                          onClick={async (e) => {
                             e.stopPropagation();
-                            deleteProject(p.id);
+                            const idToDelete = p.id;
+                            deleteProject(idToDelete);
                             if (active) navigate('/marketingstudio');
+                            // Remove from DB too (cascades to generations)
+                            const { supabase } = await import('@/integrations/supabase/client');
+                            await supabase.from('ms_projects').delete().eq('id', idToDelete);
                           }}
                         >
                           <Trash2 className="w-3.5 h-3.5 mr-2" />
