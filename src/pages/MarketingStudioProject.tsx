@@ -282,12 +282,8 @@ export default function MarketingStudioProject() {
                       <div className="absolute inset-0 ms-shimmer" />
                       <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 text-foreground/90 px-3">
                         <Loader2 className="w-6 h-6 animate-spin" />
-                        <div className="text-[11px] font-medium tracking-wide uppercase">
-                          {g.status === 'queued_pending_persist'
-                            ? 'Registering…'
-                            : g.status === 'running'
-                            ? 'Rendering…'
-                            : 'Queued'}
+                        <div className="text-[11px] font-medium tracking-wide uppercase text-center">
+                          {stageLabel(g)}
                         </div>
                         <div className="w-full h-1 rounded-full bg-white/10 overflow-hidden">
                           <div
