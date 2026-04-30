@@ -116,6 +116,8 @@ Deno.serve(async (req) => {
         const finalPrompt: string = scriptRes.json.prompt;
         const refUrls = uniqueValidUrls(scriptRes.json.reference_urls || []);
 
+        // Use the first product/avatar image as a placeholder thumb until the video is ready.
+        const placeholderThumb = refUrls[0] ?? null;
         await admin
           .from('ms_generations')
           .update({
@@ -123,6 +125,7 @@ Deno.serve(async (req) => {
             script_text: finalPrompt,
             reference_paths: refUrls,
             stage: 'videoing',
+            thumb_url: placeholderThumb,
           })
           .eq('id', generationId);
 
