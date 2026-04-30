@@ -79,6 +79,21 @@ export function PromptBar({ projectId }: Props) {
   const { createProject, addGeneration } = useMarketingStudioStore();
   const navigate = useNavigate();
 
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const p = (e as CustomEvent<FormatPreset>).detail;
+      if (!p) return;
+      setMode(p.mode);
+      setPrompt(p.prompt);
+      setDuration(p.duration);
+      setAspect(p.aspect);
+      setProductThumb(p.productThumb ?? null);
+      setAvatarThumb(p.avatarThumb ?? null);
+    };
+    window.addEventListener(RECREATE_EVENT, handler);
+    return () => window.removeEventListener(RECREATE_EVENT, handler);
+  }, []);
+
   const cost = surface === 'Product' ? 4840 : 16286;
 
   const handleGenerate = () => {
