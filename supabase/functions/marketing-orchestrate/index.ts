@@ -21,6 +21,29 @@ function aspectToRatio(a: string) {
   return a;
 }
 
+function isValidHttpUrl(value: unknown) {
+  if (typeof value !== 'string' || !value.trim()) return false;
+  try {
+    const u = new URL(value.trim());
+    return u.protocol === 'http:' || u.protocol === 'https:';
+  } catch {
+    return false;
+  }
+}
+
+function uniqueValidUrls(urls: unknown[]) {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const raw of urls) {
+    if (!isValidHttpUrl(raw)) continue;
+    const url = String(raw).trim();
+    if (seen.has(url)) continue;
+    seen.add(url);
+    out.push(url);
+  }
+  return out;
+}
+
 async function invokeFn(name: string, body: unknown) {
   const res = await fetch(`${SUPABASE_URL}/functions/v1/${name}`, {
     method: 'POST',
@@ -92,7 +115,7 @@ Deno.serve(async (req) => {
           throw new Error(`script failed: ${scriptRes.text.slice(0, 300)}`);
         }
         const finalPrompt: string = scriptRes.json.prompt;
-        const refUrls: string[] = scriptRes.json.reference_urls || [];
+        const refUrls = uniqueValidUrls(scriptRes.json.reference_urls || []);
 
         await admin
           .from('ms_generations')
@@ -117,6 +140,7 @@ Deno.serve(async (req) => {
           throw new Error(friendly);
         }
         const keyframeUrl: string = kfRes.json.keyframeUrl;
+        const videoRefs = uniqueValidUrls([keyframeUrl, ...refUrls]);
 
         await admin
           .from('ms_generations')
@@ -130,7 +154,7 @@ Deno.serve(async (req) => {
         const vidRes = await invokeFn('marketing-generate-video', {
           reuseGenerationId: generationId,
           prompt: finalPrompt,
-          image_urls: refUrls,
+          image_urls: videoRefs,
           keyframe_url: keyframeUrl,
           aspect: ratio,
           duration_seconds,
