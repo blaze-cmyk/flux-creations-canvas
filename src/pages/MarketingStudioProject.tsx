@@ -30,11 +30,49 @@ function stageLabel(g: MSGeneration): string {
 export default function MarketingStudioProject() {
   const { slug } = useParams();
   const project = useMarketingStudioStore((s) => s.getProjectBySlug(slug || ''));
+  const projects = useMarketingStudioStore((s) => s.projects);
   const toggleLike = useMarketingStudioStore((s) => s.toggleLike);
   const updateGeneration = useMarketingStudioStore((s) => s.updateGeneration);
   const [tab, setTab] = useState<'all' | 'liked'>('all');
   const [selected, setSelected] = useState<MSGeneration | null>(null);
+  const [hydratingProject, setHydratingProject] = useState(false);
   const retrying = useRef<Set<string>>(new Set());
+
+  // If the slug isn't in local store (different device / cleared cache),
+  // hydrate the project from DB before redirecting away.
+  useEffect(() => {
+    if (project || !slug) return;
+    let cancelled = false;
+    setHydratingProject(true);
+    (async () => {
+      const { data } = await supabase
+        .from('ms_projects')
+        .select('id, slug, name, thumb_url, created_at')
+        .eq('slug', slug)
+        .maybeSingle();
+      if (cancelled) return;
+      if (data) {
+        useMarketingStudioStore.setState((s) => ({
+          projects: [
+            {
+              id: data.id,
+              slug: data.slug,
+              name: data.name,
+              thumbUrl: data.thumb_url ?? undefined,
+              createdAt: new Date(data.created_at as any).getTime(),
+              generations: [],
+            },
+            ...s.projects.filter((p) => p.slug !== data.slug),
+          ],
+        }));
+      }
+      setHydratingProject(false);
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [project, slug]);
 
   const addGeneration = useMarketingStudioStore((s) => s.addGeneration);
 
