@@ -106,12 +106,14 @@ export function PromptBar({ projectId }: Props) {
   const cost = surface === 'Product' ? 4840 : 16286;
 
   const handleGenerate = async () => {
+    if (generating) return; // guard against double-clicks / StrictMode double-fire
     if (!prompt.trim() && !productId) {
       toast({ title: 'Add a prompt or product', variant: 'destructive' });
       return;
     }
+    setGenerating(true);
 
-    // 1. Resolve / create project (in DB so it survives refresh) + navigate IMMEDIATELY
+    // 1. Resolve / create project (in DB so it survives refresh)
     let pid = projectId;
     let pslug: string | undefined;
     if (!pid) {
@@ -122,39 +124,16 @@ export function PromptBar({ projectId }: Props) {
         pslug = p.slug;
       } catch (e: any) {
         toast({ title: 'Could not create project', description: e?.message, variant: 'destructive' });
+        setGenerating(false);
         return;
       }
     }
 
-    // 2. Add a placeholder generation so the project page can show "rendering..."
-    const placeholderId = crypto.randomUUID();
-    const placeholder: MSGeneration = {
-      id: placeholderId,
-      thumbUrl: productThumb || avatarThumb || '',
-      prompt,
-      mode,
-      surface,
-      aspect,
-      resolution: res,
-      duration,
-      productId: productId || undefined,
-      avatarId: avatarId || undefined,
-      createdAt: Date.now(),
-      submittedAt: Date.now(),
-      status: 'queued',
-    };
-    addGeneration(pid, placeholder);
-
-    // 3. Navigate to the project page right now
-    if (pslug) navigate(`/marketingstudio/${pslug}`);
-    setPrompt('');
-    toast({ title: 'Generation started', description: 'Rendering on Seedance 2.0…' });
-
-    // 4. Run orchestrator (script + keyframe + video) in the background
-    setGenerating(true);
+    // 2. Call orchestrator FIRST — returns immediately with the real DB id
+    //    while the pipeline runs in the background via EdgeRuntime.waitUntil.
+    //    This avoids placeholder-vs-real-id duplicates in the UI.
     try {
       const { supabase } = await import('@/integrations/supabase/client');
-
       const { data: orch, error: orchErr } = await supabase.functions.invoke(
         'marketing-orchestrate',
         {
@@ -173,16 +152,32 @@ export function PromptBar({ projectId }: Props) {
         },
       );
       if (orchErr) throw orchErr;
+      const realId: string | undefined = orch?.id;
+      if (!realId) throw new Error('Orchestrator did not return an id');
 
-      // Swap the placeholder id for the real generation id so polling works.
-      updateGeneration(pid, placeholderId, {
-        id: orch?.id || placeholderId,
-        status: 'running',
-        stage: orch?.stage || 'scripting',
+      // 3. Add the generation to the local store using the REAL id.
+      addGeneration(pid, {
+        id: realId,
+        thumbUrl: productThumb || avatarThumb || '',
+        prompt,
+        mode,
+        surface,
+        aspect,
+        resolution: res,
+        duration,
+        productId: productId || undefined,
+        avatarId: avatarId || undefined,
+        createdAt: Date.now(),
         submittedAt: Date.now(),
+        status: 'queued',
+        stage: orch?.stage || 'scripting',
       });
+
+      // 4. Navigate now (only if we created a new project here)
+      if (pslug) navigate(`/marketingstudio/${pslug}`);
+      setPrompt('');
+      toast({ title: 'Generation started', description: 'Writing script…' });
     } catch (e: any) {
-      updateGeneration(pid, placeholderId, { status: 'failed', error: e?.message ?? 'Unknown error' });
       toast({ title: 'Generation failed', description: e?.message ?? 'Unknown error', variant: 'destructive' });
     } finally {
       setGenerating(false);
