@@ -315,8 +315,8 @@ Deno.serve(async (req) => {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
       }
-      // Prefer the composed keyframe if we have one; otherwise fall back to stored refs.
-      const refs = uniqueValidUrls(row.keyframe_url ? [row.keyframe_url] : (row.reference_paths || []), 9);
+      // Send the composed keyframe first, then the raw product/avatar refs so identity stays locked.
+      const refs = uniqueValidUrls(row.keyframe_url ? [row.keyframe_url, ...(row.reference_paths || [])] : (row.reference_paths || []), 9);
       const audio_urls: string[] = [];
       if (row.avatar_id) {
         const { data: av } = await admin.from('ms_avatars').select('voice_sample_url').eq('id', row.avatar_id).maybeSingle();
@@ -386,8 +386,8 @@ Deno.serve(async (req) => {
     const resolutionN = normalizeRes(resolution);
     const ratio = aspectToRatio(aspect);
 
-    // Prefer the composed keyframe over raw refs — Seedance gets one clean image.
-    const finalImageUrls = uniqueValidUrls(keyframe_url ? [keyframe_url] : image_urls, 9);
+    // Send the composed keyframe first, then the raw product/avatar refs so Seedance keeps identity and product fidelity.
+    const finalImageUrls = uniqueValidUrls(keyframe_url ? [keyframe_url, ...image_urls] : image_urls, 9);
 
     // Pull the avatar's pre-generated reference voice clip.
     const audio_urls: string[] = [];
