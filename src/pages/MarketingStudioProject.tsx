@@ -74,8 +74,24 @@ export default function MarketingStudioProject() {
           continue;
         }
 
-        // Skip if no fal request id yet AND status is still optimistic queued (script step still running)
-        if (!g.falRequestId && g.status === 'queued') continue;
+        // If video hasn't been submitted yet (still scripting/keyframing), refresh the row to update `stage`.
+        if (!g.falRequestId) {
+          const { data: row } = await supabase
+            .from('ms_generations')
+            .select('id, status, stage, video_url, error, fal_request_id')
+            .eq('id', g.id)
+            .maybeSingle();
+          if (row) {
+            updateGeneration(project.id, g.id, {
+              status: row.status as MSGeneration['status'],
+              stage: (row as any).stage as MSGeneration['stage'],
+              falRequestId: row.fal_request_id ?? undefined,
+              videoUrl: row.video_url ?? undefined,
+              error: row.error ?? undefined,
+            });
+          }
+          continue;
+        }
 
         try {
           const { data } = await supabase.functions.invoke('marketing-generate-video', {
@@ -85,18 +101,20 @@ export default function MarketingStudioProject() {
           if (data.status === 'done') {
             updateGeneration(project.id, g.id, {
               status: 'done',
+              stage: 'done',
               videoUrl: data.video_url,
               thumbUrl: data.thumb_url || g.thumbUrl,
             });
           } else if (data.status === 'failed') {
             updateGeneration(project.id, g.id, {
               status: 'failed',
+              stage: 'failed',
               error: data.error || 'Generation failed',
             });
           } else if (data.status === 'queued_pending_persist') {
             updateGeneration(project.id, g.id, { status: 'queued_pending_persist' });
           } else if (data.status === 'running') {
-            updateGeneration(project.id, g.id, { status: 'running' });
+            updateGeneration(project.id, g.id, { status: 'running', stage: 'videoing' });
           }
         } catch (_) {
           /* swallow transient network errors */
