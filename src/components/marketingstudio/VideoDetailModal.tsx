@@ -131,7 +131,7 @@ export function VideoDetailModal({
                 </button>
               </div>
               <div className="flex items-center gap-2">
-                <button className="flex-1 h-10 rounded-xl bg-ms-surface-2 hover:bg-ms-border text-sm text-foreground flex items-center justify-center gap-2">
+                <button onClick={handleDownload} className="flex-1 h-10 rounded-xl bg-ms-surface-2 hover:bg-ms-border text-sm text-foreground flex items-center justify-center gap-2">
                   <Download className="w-3.5 h-3.5" /> Download
                 </button>
                 <button
