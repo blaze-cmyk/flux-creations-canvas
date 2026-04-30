@@ -120,8 +120,8 @@ export function useProducts() {
   const uploadProductImages = useCallback(
     async (files: File[], name: string) => {
       const { data: u } = await supabase.auth.getUser();
-      const uid = u?.user?.id;
-      if (!uid) throw new Error('Sign in required to add a product.');
+      const uid = u?.user?.id ?? null;
+      const folder = uid ?? 'anon';
       const { data: prod, error: pErr } = await supabase
         .from('ms_products')
         .insert({ user_id: uid, name, status: 'ready' })
@@ -131,7 +131,7 @@ export function useProducts() {
       for (let i = 0; i < files.length; i++) {
         const f = files[i];
         const ext = f.name.split('.').pop() || 'png';
-        const path = `${uid}/${prod.id}/${crypto.randomUUID()}.${ext}`;
+        const path = `${folder}/${prod.id}/${crypto.randomUUID()}.${ext}`;
         const { error: upErr } = await supabase.storage.from('ms-products').upload(path, f);
         if (upErr) throw upErr;
         await supabase
