@@ -366,31 +366,54 @@ Deno.serve(async (req) => {
       if (av?.voice_sample_url) audio_urls.push(av.voice_sample_url);
     }
 
-    // 1) Persist row immediately (so client polling has a real id)
-    const { data: row, error: insErr } = await admin
-      .from('ms_generations')
-      .insert({
-        user_id: null,
-        project_id: projectId ?? null,
-        product_id: productId ?? null,
-        avatar_id: avatarId ?? null,
-        format,
-        surface,
-        aspect: ratio,
-        duration_seconds: duration,
-        resolution: resolutionN,
-        prompt,
-        script_text: script_text ?? null,
-        keyframe_url: keyframe_url ?? null,
-        reference_paths: finalImageUrls,
-        status: 'queued',
-        stage: 'videoing',
-      })
-      .select()
-      .single();
-    if (insErr) {
-      log('ERROR', 'submit: insert failed', { err: insErr.message });
-      throw insErr;
+    // 1) Persist row immediately (so client polling has a real id) — or reuse one created by the orchestrator
+    let row: any;
+    if (reuseGenerationId) {
+      const { data: updated, error: updErr } = await admin
+        .from('ms_generations')
+        .update({
+          prompt,
+          script_text: script_text ?? null,
+          keyframe_url: keyframe_url ?? null,
+          reference_paths: finalImageUrls,
+          status: 'queued',
+          stage: 'videoing',
+          aspect: ratio,
+          duration_seconds: duration,
+          resolution: resolutionN,
+        })
+        .eq('id', reuseGenerationId)
+        .select()
+        .single();
+      if (updErr) throw updErr;
+      row = updated;
+    } else {
+      const { data: inserted, error: insErr } = await admin
+        .from('ms_generations')
+        .insert({
+          user_id: null,
+          project_id: projectId ?? null,
+          product_id: productId ?? null,
+          avatar_id: avatarId ?? null,
+          format,
+          surface,
+          aspect: ratio,
+          duration_seconds: duration,
+          resolution: resolutionN,
+          prompt,
+          script_text: script_text ?? null,
+          keyframe_url: keyframe_url ?? null,
+          reference_paths: finalImageUrls,
+          status: 'queued',
+          stage: 'videoing',
+        })
+        .select()
+        .single();
+      if (insErr) {
+        log('ERROR', 'submit: insert failed', { err: insErr.message });
+        throw insErr;
+      }
+      row = inserted;
     }
     log('INFO', 'submit: row persisted', {
       jobId: row.id,
