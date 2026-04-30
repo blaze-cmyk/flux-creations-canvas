@@ -32,7 +32,35 @@ function aspectToRatio(a: string) {
 
 function clampDuration(d: unknown) {
   const n = Number(d) || 8;
-  return Math.max(3, Math.min(15, n));
+  return Math.max(4, Math.min(15, n));
+}
+
+function isValidHttpUrl(value: unknown) {
+  if (typeof value !== 'string' || !value.trim()) return false;
+  try {
+    const u = new URL(value.trim());
+    return u.protocol === 'http:' || u.protocol === 'https:';
+  } catch {
+    return false;
+  }
+}
+
+function uniqueValidUrls(urls: unknown[], limit = 9) {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const raw of urls) {
+    if (!isValidHttpUrl(raw)) continue;
+    const url = String(raw).trim();
+    if (seen.has(url)) continue;
+    seen.add(url);
+    out.push(url);
+    if (out.length >= limit) break;
+  }
+  return out;
+}
+
+function hasAudioUrlError(raw: unknown) {
+  return /audio_url|reference_audio|reference_audios|invalid url/i.test(JSON.stringify(raw));
 }
 
 function normalizeRes(r: string) {
@@ -67,13 +95,10 @@ async function submitAtlas(opts: {
   };
   if (hasRefs) {
     body.reference_images = opts.image_urls.slice(0, 9);
-    body.image_urls = opts.image_urls.slice(0, 9); // some Atlas builds use this name
   }
-  if (opts.audio_urls.length > 0 && hasRefs) {
-    // Audio reference requires at least one image reference. Send under both common keys.
-    body.audio_urls = opts.audio_urls.slice(0, 3);
-    body.reference_audio = opts.audio_urls.slice(0, 3);
-  }
+  // Do not send avatar voice samples to Atlas here: Seedance/Atlas currently
+  // rejects signed audio URLs during processing. Avatar identity is locked via
+  // image references; audio is generated from the prompt.
 
   const res = await fetch('https://api.atlascloud.ai/api/v1/model/generateVideo', {
     method: 'POST',
@@ -130,9 +155,6 @@ async function submitFal(opts: {
     // fal Seedance 2.0 schema uses `image_urls` (and historically `reference_image_urls`).
     payload.image_urls = opts.image_urls.slice(0, 9);
     payload.reference_image_urls = opts.image_urls.slice(0, 9);
-  }
-  if (opts.audio_urls.length > 0 && hasRefs) {
-    payload.audio_urls = opts.audio_urls.slice(0, 3);
   }
   const res = await fetch(endpoint, {
     method: 'POST',
@@ -192,6 +214,14 @@ async function submitWithFallback(opts: {
       }
       log('WARN', 'submit: provider rejected, trying next', { provider, raw: r.raw });
       lastErr = r.raw;
+      if (provider === 'atlascloud' && opts.audio_urls.length > 0 && hasAudioUrlError(r.raw)) {
+        const retry = await submitAtlas({ ...opts, audio_urls: [] });
+        if (retry.ok && retry.requestId) {
+          log('INFO', 'submit: provider accepted without audio ref', { provider, requestId: retry.requestId });
+          return { provider, requestId: retry.requestId };
+        }
+        lastErr = retry.raw;
+      }
     } catch (e) {
       log('ERROR', 'submit: provider threw, trying next', {
         provider,
@@ -281,12 +311,12 @@ Deno.serve(async (req) => {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
       }
-      // Prefer the composed keyframe if we have one; otherwise fall back to stored refs.
-      const refs: string[] = row.keyframe_url ? [row.keyframe_url] : row.reference_paths || [];
+      // Send the composed keyframe first, then the raw product/avatar refs so identity stays locked.
+      const refs = uniqueValidUrls(row.keyframe_url ? [row.keyframe_url, ...(row.reference_paths || [])] : (row.reference_paths || []), 9);
       const audio_urls: string[] = [];
       if (row.avatar_id) {
         const { data: av } = await admin.from('ms_avatars').select('voice_sample_url').eq('id', row.avatar_id).maybeSingle();
-        if (av?.voice_sample_url) audio_urls.push(av.voice_sample_url);
+        if (isValidHttpUrl(av?.voice_sample_url)) audio_urls.push(av.voice_sample_url.trim());
       }
       const result = await submitWithFallback({
         prompt: row.prompt,
@@ -352,8 +382,8 @@ Deno.serve(async (req) => {
     const resolutionN = normalizeRes(resolution);
     const ratio = aspectToRatio(aspect);
 
-    // Prefer the composed keyframe over raw refs — Seedance gets one clean image.
-    const finalImageUrls: string[] = keyframe_url ? [keyframe_url] : image_urls;
+    // Send the composed keyframe first, then the raw product/avatar refs so Seedance keeps identity and product fidelity.
+    const finalImageUrls = uniqueValidUrls(keyframe_url ? [keyframe_url, ...image_urls] : image_urls, 9);
 
     // Pull the avatar's pre-generated reference voice clip.
     const audio_urls: string[] = [];
@@ -363,7 +393,7 @@ Deno.serve(async (req) => {
         .select('voice_sample_url')
         .eq('id', avatarId)
         .maybeSingle();
-      if (av?.voice_sample_url) audio_urls.push(av.voice_sample_url);
+      if (isValidHttpUrl(av?.voice_sample_url)) audio_urls.push(av.voice_sample_url.trim());
     }
 
     // 1) Persist row immediately (so client polling has a real id) — or reuse one created by the orchestrator
