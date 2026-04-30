@@ -82,7 +82,7 @@ export function PromptBar({ projectId }: Props) {
   const [avatarOpen, setAvatarOpen] = useState(false);
   const [formatOpen, setFormatOpen] = useState(false);
 
-  const { createProject, addGeneration } = useMarketingStudioStore();
+  const { createProject, addGeneration, updateGeneration, removeGeneration } = useMarketingStudioStore();
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -110,7 +110,8 @@ export function PromptBar({ projectId }: Props) {
       toast({ title: 'Add a prompt or product', variant: 'destructive' });
       return;
     }
-    setGenerating(true);
+
+    // 1. Resolve / create project + navigate IMMEDIATELY
     let pid = projectId;
     let pslug: string | undefined;
     if (!pid) {
@@ -118,60 +119,79 @@ export function PromptBar({ projectId }: Props) {
       pid = p.id;
       pslug = p.slug;
     }
+
+    // 2. Add a placeholder generation so the project page can show "rendering..."
+    const placeholderId = crypto.randomUUID();
+    const placeholder: MSGeneration = {
+      id: placeholderId,
+      thumbUrl: productThumb || avatarThumb || '',
+      prompt,
+      mode,
+      surface,
+      aspect,
+      resolution: res,
+      duration,
+      productId: productId || undefined,
+      avatarId: avatarId || undefined,
+      createdAt: Date.now(),
+      status: 'queued',
+    };
+    addGeneration(pid, placeholder);
+
+    // 3. Navigate to the project page right now
+    if (pslug) navigate(`/marketingstudio/${pslug}`);
+    setPrompt('');
+    toast({ title: 'Generation started', description: 'Rendering on Seedance 2.0…' });
+
+    // 4. Run script + video calls in the background
+    setGenerating(true);
     try {
-      // 1. Build the Seedance prompt (or use exact voiceover)
-      const { data: scriptData, error: scriptErr } = await (
-        await import('@/integrations/supabase/client')
-      ).supabase.functions.invoke('marketing-generate-script', {
-        body: {
-          productId,
-          avatarId,
-          format: mode,
-          surface,
-          aspect,
-          duration: parseInt(duration) || 8,
-          userPrompt: prompt,
-          exactVoiceover,
+      const { supabase } = await import('@/integrations/supabase/client');
+
+      const { data: scriptData, error: scriptErr } = await supabase.functions.invoke(
+        'marketing-generate-script',
+        {
+          body: {
+            productId,
+            avatarId,
+            format: mode,
+            surface,
+            aspect,
+            duration: parseInt(duration) || 8,
+            userPrompt: prompt,
+            exactVoiceover,
+          },
         },
-      });
+      );
       if (scriptErr) throw scriptErr;
 
-      // 2. Submit to Seedance
-      const { data: vidData, error: vidErr } = await (
-        await import('@/integrations/supabase/client')
-      ).supabase.functions.invoke('marketing-generate-video', {
-        body: {
-          prompt: scriptData?.prompt || prompt,
-          image_urls: scriptData?.reference_urls || [],
-          aspect,
-          duration_seconds: parseInt(duration) || 8,
-          resolution: res,
-          productId,
-          avatarId,
-          format: mode,
-          surface,
+      updateGeneration(pid, placeholderId, { status: 'running' });
+
+      const { data: vidData, error: vidErr } = await supabase.functions.invoke(
+        'marketing-generate-video',
+        {
+          body: {
+            prompt: scriptData?.prompt || prompt,
+            image_urls: scriptData?.reference_urls || [],
+            aspect,
+            duration_seconds: parseInt(duration) || 8,
+            resolution: res,
+            productId,
+            avatarId,
+            format: mode,
+            surface,
+          },
         },
-      });
+      );
       if (vidErr) throw vidErr;
 
-      const gen: MSGeneration = {
-        id: vidData?.id || crypto.randomUUID(),
-        thumbUrl: productThumb || avatarThumb || `https://picsum.photos/seed/gen-${Date.now()}/400/720`,
-        prompt: scriptData?.prompt || prompt,
-        mode,
-        surface,
-        aspect,
-        resolution: res,
-        duration,
-        productId: productId || undefined,
-        avatarId: avatarId || undefined,
-        createdAt: Date.now(),
-      };
-      addGeneration(pid, gen);
-      toast({ title: 'Generation started', description: 'Your ad is rendering on Seedance 2.0.' });
-      if (pslug) navigate(`/marketingstudio/${pslug}`);
-      setPrompt('');
+      updateGeneration(pid, placeholderId, {
+        id: vidData?.id || placeholderId,
+        status: 'running',
+        falRequestId: vidData?.fal_request_id,
+      });
     } catch (e: any) {
+      updateGeneration(pid, placeholderId, { status: 'failed', error: e?.message ?? 'Unknown error' });
       toast({ title: 'Generation failed', description: e?.message ?? 'Unknown error', variant: 'destructive' });
     } finally {
       setGenerating(false);

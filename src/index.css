@@ -115,6 +115,16 @@
 .ms-prompt-scroll::-webkit-scrollbar-track { background: transparent; margin: 6px 0; }
 .ms-prompt-scroll { scrollbar-width: thin; scrollbar-color: hsl(0 0% 100% / 0.14) transparent; }
 
+.ms-shimmer {
+  background: linear-gradient(110deg, hsl(0 0% 100% / 0) 30%, hsl(0 0% 100% / 0.08) 50%, hsl(0 0% 100% / 0) 70%);
+  background-size: 200% 100%;
+  animation: ms-shimmer-anim 1.6s linear infinite;
+}
+@keyframes ms-shimmer-anim {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
 @layer base {
   * {
     @apply border-border;

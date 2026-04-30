@@ -16,6 +16,8 @@ export type MSResolution = '480p' | '720p' | '1080p';
 export type MSDuration = string; // e.g. "8s" — supports 1s..15s
 export type MSSurface = 'Product' | 'App';
 
+export type MSGenStatus = 'queued' | 'running' | 'done' | 'failed';
+
 export interface MSGeneration {
   id: string;
   thumbUrl: string;
@@ -30,6 +32,9 @@ export interface MSGeneration {
   avatarId?: string;
   createdAt: number;
   liked?: boolean;
+  status?: MSGenStatus;
+  falRequestId?: string;
+  error?: string;
 }
 
 export interface MSProject {
@@ -49,6 +54,8 @@ interface MSState {
   renameProject: (id: string, name: string) => void;
   deleteProject: (id: string) => void;
   addGeneration: (projectId: string, gen: MSGeneration) => void;
+  updateGeneration: (projectId: string, genId: string, patch: Partial<MSGeneration>) => void;
+  removeGeneration: (projectId: string, genId: string) => void;
   toggleLike: (projectId: string, genId: string) => void;
   getProjectBySlug: (slug: string) => MSProject | undefined;
 }
@@ -86,6 +93,24 @@ export const useMarketingStudioStore = create<MSState>()(
           projects: get().projects.map((p) =>
             p.id === projectId
               ? { ...p, generations: [gen, ...p.generations], thumbUrl: p.thumbUrl ?? gen.thumbUrl }
+              : p,
+          ),
+        });
+      },
+      updateGeneration: (projectId, genId, patch) => {
+        set({
+          projects: get().projects.map((p) =>
+            p.id === projectId
+              ? { ...p, generations: p.generations.map((g) => (g.id === genId ? { ...g, ...patch } : g)) }
+              : p,
+          ),
+        });
+      },
+      removeGeneration: (projectId, genId) => {
+        set({
+          projects: get().projects.map((p) =>
+            p.id === projectId
+              ? { ...p, generations: p.generations.filter((g) => g.id !== genId) }
               : p,
           ),
         });
