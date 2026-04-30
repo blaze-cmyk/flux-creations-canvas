@@ -1,17 +1,48 @@
 import { useParams, Navigate } from 'react-router-dom';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { MarketingStudioLayout } from '@/components/marketingstudio/MarketingStudioLayout';
 import { PromptBar } from '@/components/marketingstudio/PromptBar';
 import { useMarketingStudioStore, MSGeneration } from '@/store/marketingStudioStore';
-import { Heart, Maximize2, Play } from 'lucide-react';
+import { Heart, Maximize2, Play, Loader2, AlertCircle } from 'lucide-react';
 import { VideoDetailModal } from '@/components/marketingstudio/VideoDetailModal';
+import { supabase } from '@/integrations/supabase/client';
 
 export default function MarketingStudioProject() {
   const { slug } = useParams();
   const project = useMarketingStudioStore((s) => s.getProjectBySlug(slug || ''));
   const toggleLike = useMarketingStudioStore((s) => s.toggleLike);
+  const updateGeneration = useMarketingStudioStore((s) => s.updateGeneration);
   const [tab, setTab] = useState<'all' | 'liked'>('all');
   const [selected, setSelected] = useState<MSGeneration | null>(null);
+  const polled = useRef<Set<string>>(new Set());
+
+  // Poll active generations every 4s
+  useEffect(() => {
+    if (!project) return;
+    const interval = setInterval(async () => {
+      const active = project.generations.filter(
+        (g) => (g.status === 'queued' || g.status === 'running') && /^[0-9a-f-]{36}$/i.test(g.id),
+      );
+      for (const g of active) {
+        try {
+          const { data } = await supabase.functions.invoke('marketing-generate-video', {
+            body: { poll: g.id },
+          });
+          if (!data) continue;
+          if (data.status === 'done') {
+            updateGeneration(project.id, g.id, {
+              status: 'done',
+              videoUrl: data.video_url,
+              thumbUrl: data.thumb_url || g.thumbUrl,
+            });
+          } else if (data.status === 'failed') {
+            updateGeneration(project.id, g.id, { status: 'failed', error: data.error });
+          }
+        } catch (_) {}
+      }
+    }, 4000);
+    return () => clearInterval(interval);
+  }, [project, updateGeneration]);
 
   if (!project) return <Navigate to="/marketingstudio" replace />;
 
@@ -54,29 +85,70 @@ export default function MarketingStudioProject() {
           </div>
         ) : (
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
-            {items.map((g) => (
-              <button
-                key={g.id}
-                onClick={() => setSelected(g)}
-                className="group relative aspect-[9/16] rounded-xl overflow-hidden bg-ms-surface-2 ring-1 ring-ms-border hover:ring-foreground/30 transition-all"
-              >
-                <img src={g.thumbUrl} alt="" className="w-full h-full object-cover" />
-                <div className="absolute inset-0 grid place-items-center opacity-0 group-hover:opacity-100 bg-black/30 transition-opacity">
-                  <div className="grid place-items-center w-12 h-12 rounded-full bg-white/90">
-                    <Play className="w-5 h-5 text-black fill-black" />
-                  </div>
-                </div>
+            {items.map((g) => {
+              const isPending = g.status === 'queued' || g.status === 'running';
+              const isFailed = g.status === 'failed';
+              return (
                 <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    toggleLike(project.id, g.id);
-                  }}
-                  className="absolute bottom-2 right-2 grid place-items-center w-8 h-8 rounded-full bg-black/40 text-white hover:bg-black/60"
+                  key={g.id}
+                  onClick={() => !isPending && !isFailed && setSelected(g)}
+                  className="group relative aspect-[9/16] rounded-xl overflow-hidden bg-ms-surface-2 ring-1 ring-ms-border hover:ring-foreground/30 transition-all text-left"
                 >
-                  <Heart className={`w-3.5 h-3.5 ${g.liked ? 'fill-ms-cta text-ms-cta' : ''}`} />
+                  {g.thumbUrl ? (
+                    <img
+                      src={g.thumbUrl}
+                      alt=""
+                      className={`w-full h-full object-cover ${isPending ? 'opacity-30 blur-sm' : ''}`}
+                    />
+                  ) : (
+                    <div className="absolute inset-0 bg-gradient-to-br from-ms-surface-2 to-ms-surface" />
+                  )}
+
+                  {isPending && (
+                    <>
+                      <div className="absolute inset-0 ms-shimmer" />
+                      <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 text-foreground/90">
+                        <Loader2 className="w-6 h-6 animate-spin" />
+                        <div className="text-[11px] font-medium tracking-wide uppercase">
+                          {g.status === 'queued' ? 'Queued' : 'Rendering…'}
+                        </div>
+                        <div className="px-3 text-[10px] text-muted-foreground line-clamp-2 text-center">
+                          {g.prompt}
+                        </div>
+                      </div>
+                    </>
+                  )}
+
+                  {isFailed && (
+                    <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-black/60 text-foreground/90 px-3 text-center">
+                      <AlertCircle className="w-6 h-6 text-destructive" />
+                      <div className="text-[11px] font-semibold">Generation failed</div>
+                      <div className="text-[10px] text-muted-foreground line-clamp-3">
+                        {g.error || 'Try again'}
+                      </div>
+                    </div>
+                  )}
+
+                  {!isPending && !isFailed && (
+                    <div className="absolute inset-0 grid place-items-center opacity-0 group-hover:opacity-100 bg-black/30 transition-opacity">
+                      <div className="grid place-items-center w-12 h-12 rounded-full bg-white/90">
+                        <Play className="w-5 h-5 text-black fill-black" />
+                      </div>
+                    </div>
+                  )}
+
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      toggleLike(project.id, g.id);
+                    }}
+                    className="absolute bottom-2 right-2 grid place-items-center w-8 h-8 rounded-full bg-black/40 text-white hover:bg-black/60"
+                  >
+                    <Heart className={`w-3.5 h-3.5 ${g.liked ? 'fill-ms-cta text-ms-cta' : ''}`} />
+                  </button>
                 </button>
-              </button>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>
