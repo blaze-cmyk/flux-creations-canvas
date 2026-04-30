@@ -1,9 +1,8 @@
-// Orchestrate the full marketing-video pipeline as one call.
+// Orchestrate the marketing-video pipeline as one call.
 // 1) Create ms_generations row (stage=scripting)
-// 2) Call marketing-generate-script -> save script_text + final prompt (stage=keyframing)
-// 3) Call marketing-generate-keyframe -> writes keyframe_url onto row (stage=videoing)
-// 4) Call marketing-generate-video (submit) -> saves provider/fal_request_id (stage=videoing, status=queued)
-// Client polls marketing-generate-video {poll: id} for completion + reads ms_generations.stage for live label.
+// 2) Call marketing-generate-script -> save script_text + final prompt (stage=videoing)
+// 3) Call marketing-generate-video directly with raw avatar+product refs.
+//    Keyframe step is intentionally skipped — Seedance handles identity from refs (faster + cleaner).
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0';
 
 const corsHeaders = {
