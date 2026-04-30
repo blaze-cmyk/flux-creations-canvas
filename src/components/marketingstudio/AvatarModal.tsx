@@ -1,10 +1,11 @@
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { useMemo, useRef, useState, useEffect } from 'react';
-import { Search, Plus, Pin, Sparkles, User, UserRound, Loader2, ArrowLeft, UploadCloud, RefreshCw } from 'lucide-react';
+import { Search, Plus, Pin, Sparkles, User, UserRound, Loader2, ArrowLeft, UploadCloud, RefreshCw, ArrowDownAZ } from 'lucide-react';
 import { useAvatars } from '@/hooks/useMarketingLibrary';
-import { toast } from '@/hooks/use-toast';
+import { toast } from 'sonner';
 
 type View = 'list' | 'create';
+type SortMode = 'newest' | 'oldest' | 'name';
 
 export function AvatarModal({
   open,
@@ -19,7 +20,8 @@ export function AvatarModal({
   const [tab, setTab] = useState<'all' | 'pinned' | 'mine'>('all');
   const [gender, setGender] = useState<'all' | 'male' | 'female'>('all');
   const [query, setQuery] = useState('');
-  const { avatars, loading, uploadAvatar } = useAvatars();
+  const [sortMode, setSortMode] = useState<SortMode>('newest');
+  const { avatars, loading, refresh, uploadAvatar } = useAvatars();
 
   const [file, setFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string>('');
@@ -46,26 +48,37 @@ export function AvatarModal({
   }, [open]);
 
   const filtered = useMemo(() => {
-    return avatars.filter((a) => {
+    const result = avatars.filter((a) => {
       if (tab === 'mine' && a.is_builtin) return false;
+      if (tab === 'pinned' && !a.is_builtin) return false;
       if (gender !== 'all' && a.gender && a.gender !== gender) return false;
       if (query && !a.name.toLowerCase().includes(query.toLowerCase())) return false;
       return true;
     });
-  }, [avatars, tab, gender, query]);
+
+    return [...result].sort((a, b) => {
+      if (sortMode === 'name') return a.name.localeCompare(b.name);
+      const aTime = new Date(a.created_at).getTime();
+      const bTime = new Date(b.created_at).getTime();
+      return sortMode === 'oldest' ? aTime - bTime : bTime - aTime;
+    });
+  }, [avatars, tab, gender, query, sortMode]);
 
   const handleCreate = async () => {
     if (!file || !name.trim()) return;
     setCreating(true);
     try {
-      await uploadAvatar(file, name.trim());
-      toast({ title: 'Avatar created' });
+      const created = await uploadAvatar(file, name.trim());
+      toast.success(`Avatar created: ${created.name}`, {
+        description: `ID ${created.id}. It appears in All and My avatars, sorted at the top when Newest is selected.`,
+      });
       setView('list');
+      setSortMode('newest');
       setTab('mine');
       setFile(null);
       setName('');
     } catch (e: any) {
-      toast({ title: 'Upload failed', description: e?.message ?? '', variant: 'destructive' });
+      toast.error('Upload failed', { description: e?.message ?? '' });
     } finally {
       setCreating(false);
     }
