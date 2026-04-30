@@ -218,6 +218,14 @@ async function submitWithFallback(opts: {
       }
       log('WARN', 'submit: provider rejected, trying next', { provider, raw: r.raw });
       lastErr = r.raw;
+      if (provider === 'atlascloud' && opts.audio_urls.length > 0 && hasAudioUrlError(r.raw)) {
+        const retry = await submitAtlas({ ...opts, audio_urls: [] });
+        if (retry.ok && retry.requestId) {
+          log('INFO', 'submit: provider accepted without audio ref', { provider, requestId: retry.requestId });
+          return { provider, requestId: retry.requestId };
+        }
+        lastErr = retry.raw;
+      }
     } catch (e) {
       log('ERROR', 'submit: provider threw, trying next', {
         provider,
@@ -308,11 +316,11 @@ Deno.serve(async (req) => {
         });
       }
       // Prefer the composed keyframe if we have one; otherwise fall back to stored refs.
-      const refs: string[] = row.keyframe_url ? [row.keyframe_url] : row.reference_paths || [];
+      const refs = uniqueValidUrls(row.keyframe_url ? [row.keyframe_url] : (row.reference_paths || []), 9);
       const audio_urls: string[] = [];
       if (row.avatar_id) {
         const { data: av } = await admin.from('ms_avatars').select('voice_sample_url').eq('id', row.avatar_id).maybeSingle();
-        if (av?.voice_sample_url) audio_urls.push(av.voice_sample_url);
+        if (isValidHttpUrl(av?.voice_sample_url)) audio_urls.push(av.voice_sample_url.trim());
       }
       const result = await submitWithFallback({
         prompt: row.prompt,
@@ -379,7 +387,7 @@ Deno.serve(async (req) => {
     const ratio = aspectToRatio(aspect);
 
     // Prefer the composed keyframe over raw refs — Seedance gets one clean image.
-    const finalImageUrls: string[] = keyframe_url ? [keyframe_url] : image_urls;
+    const finalImageUrls = uniqueValidUrls(keyframe_url ? [keyframe_url] : image_urls, 9);
 
     // Pull the avatar's pre-generated reference voice clip.
     const audio_urls: string[] = [];
@@ -389,7 +397,7 @@ Deno.serve(async (req) => {
         .select('voice_sample_url')
         .eq('id', avatarId)
         .maybeSingle();
-      if (av?.voice_sample_url) audio_urls.push(av.voice_sample_url);
+      if (isValidHttpUrl(av?.voice_sample_url)) audio_urls.push(av.voice_sample_url.trim());
     }
 
     // 1) Persist row immediately (so client polling has a real id) — or reuse one created by the orchestrator
