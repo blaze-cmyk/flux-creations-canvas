@@ -36,34 +36,63 @@ export default function MarketingStudioProject() {
   const [selected, setSelected] = useState<MSGeneration | null>(null);
   const retrying = useRef<Set<string>>(new Set());
 
-  // Hydrate generations from DB on mount/refresh — keeps history in sync
-  // across reloads and devices (localStorage persistence + DB source of truth).
+  const addGeneration = useMarketingStudioStore((s) => s.addGeneration);
+
+  // Hydrate generations from DB on mount/refresh AND every 5s — keeps history in sync
+  // across reloads and devices. Pulls ALL rows for this project_id, not just IDs we
+  // already know about, so newly-created server rows (e.g. from orchestrator) appear.
   useEffect(() => {
     if (!project) return;
-    const ids = project.generations
-      .map((g) => g.id)
-      .filter((id) => /^[0-9a-f-]{36}$/i.test(id));
-    if (ids.length === 0) return;
     let cancelled = false;
-    (async () => {
+    const sync = async () => {
       const { data, error } = await supabase
         .from('ms_generations')
-        .select('id, status, stage, video_url, thumb_url, error, fal_request_id')
-        .in('id', ids);
+        .select(
+          'id, status, stage, video_url, thumb_url, error, fal_request_id, prompt, format, surface, aspect, resolution, duration_seconds, product_id, avatar_id, created_at, keyframe_url',
+        )
+        .eq('project_id', project.id)
+        .order('created_at', { ascending: false })
+        .limit(100);
       if (cancelled || error || !data) return;
+      const known = new Set(project.generations.map((g) => g.id));
       for (const row of data) {
-        updateGeneration(project.id, row.id, {
-          status: row.status as MSGeneration['status'],
-          stage: (row as any).stage as MSGeneration['stage'],
-          videoUrl: row.video_url ?? undefined,
-          thumbUrl: row.thumb_url ?? undefined,
-          error: row.error ?? undefined,
-          falRequestId: row.fal_request_id ?? undefined,
-        });
+        if (known.has(row.id)) {
+          updateGeneration(project.id, row.id, {
+            status: row.status as MSGeneration['status'],
+            stage: (row as any).stage as MSGeneration['stage'],
+            videoUrl: row.video_url ?? undefined,
+            thumbUrl: row.thumb_url ?? (row as any).keyframe_url ?? undefined,
+            error: row.error ?? undefined,
+            falRequestId: row.fal_request_id ?? undefined,
+          });
+        } else {
+          addGeneration(project.id, {
+            id: row.id,
+            thumbUrl: row.thumb_url ?? (row as any).keyframe_url ?? '',
+            videoUrl: row.video_url ?? undefined,
+            prompt: row.prompt ?? '',
+            mode: ((row as any).format ?? 'UGC') as MSGeneration['mode'],
+            surface: ((row as any).surface ?? 'Product') as MSGeneration['surface'],
+            aspect: ((row as any).aspect ?? '9:16') as MSGeneration['aspect'],
+            resolution: ((row as any).resolution ?? '720p') as MSGeneration['resolution'],
+            duration: `${(row as any).duration_seconds ?? 8}s`,
+            productId: (row as any).product_id ?? undefined,
+            avatarId: (row as any).avatar_id ?? undefined,
+            createdAt: new Date(row.created_at as any).getTime(),
+            submittedAt: new Date(row.created_at as any).getTime(),
+            status: row.status as MSGeneration['status'],
+            stage: (row as any).stage as MSGeneration['stage'],
+            falRequestId: row.fal_request_id ?? undefined,
+            error: row.error ?? undefined,
+          });
+        }
       }
-    })();
+    };
+    sync();
+    const t = setInterval(sync, 5000);
     return () => {
       cancelled = true;
+      clearInterval(t);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [project?.id]);
