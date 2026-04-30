@@ -281,10 +281,17 @@ Deno.serve(async (req) => {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
       }
-      const refs: string[] = row.reference_paths || [];
+      // Prefer the composed keyframe if we have one; otherwise fall back to stored refs.
+      const refs: string[] = row.keyframe_url ? [row.keyframe_url] : row.reference_paths || [];
+      const audio_urls: string[] = [];
+      if (row.avatar_id) {
+        const { data: av } = await admin.from('ms_avatars').select('voice_sample_url').eq('id', row.avatar_id).maybeSingle();
+        if (av?.voice_sample_url) audio_urls.push(av.voice_sample_url);
+      }
       const result = await submitWithFallback({
         prompt: row.prompt,
         image_urls: refs,
+        audio_urls,
         ratio: aspectToRatio(row.aspect),
         duration: row.duration_seconds || 8,
         resolution: normalizeRes(row.resolution),
@@ -303,6 +310,7 @@ Deno.serve(async (req) => {
         .from('ms_generations')
         .update({
           status: 'queued',
+          stage: 'videoing',
           provider: result.provider,
           fal_request_id: result.requestId,
           error: null,
