@@ -4,7 +4,7 @@ import { supabase } from '@/integrations/supabase/client';
 export interface DBAvatar {
   id: string;
   name: string;
-  gender: 'male' | 'female' | 'other' | null;
+  gender: string | null;
   storage_path: string | null;
   public_url: string | null;
   is_builtin: boolean;
@@ -82,7 +82,7 @@ export function useAvatars() {
       const resolvedCreated: DBAvatar = {
         ...created,
         thumb: created.public_url || (created.storage_path ? await signed(created.storage_path, 'ms-avatars') : ''),
-      };
+      } as DBAvatar;
 
       setAvatars((current) => [resolvedCreated, ...current.filter((avatar) => avatar.id !== resolvedCreated.id)]);
       await refresh();
