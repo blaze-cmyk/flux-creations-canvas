@@ -208,7 +208,16 @@ export default function MarketingStudioProject() {
     return () => clearInterval(interval);
   }, [project, updateGeneration]);
 
-  if (!project) return <Navigate to="/marketingstudio" replace />;
+  if (!project) {
+    if (hydratingProject) {
+      return (
+        <div className="min-h-screen grid place-items-center bg-background">
+          <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+        </div>
+      );
+    }
+    return <Navigate to="/marketingstudio" replace />;
+  }
 
   const items = tab === 'all' ? project.generations : project.generations.filter((g) => g.liked);
 
