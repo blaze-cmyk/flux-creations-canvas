@@ -81,6 +81,19 @@ export default function MarketingStudioProject() {
   // already know about, so newly-created server rows (e.g. from orchestrator) appear.
   useEffect(() => {
     if (!project) return;
+    // One-time cleanup: remove any non-UUID placeholder generations left in
+    // localStorage by previous (buggy) versions of the prompt bar — these caused
+    // duplicate cards alongside DB-hydrated rows.
+    const stale = project.generations.filter((g) => !/^[0-9a-f-]{36}$/i.test(g.id));
+    if (stale.length > 0) {
+      useMarketingStudioStore.setState((s) => ({
+        projects: s.projects.map((p) =>
+          p.id === project.id
+            ? { ...p, generations: p.generations.filter((g) => /^[0-9a-f-]{36}$/i.test(g.id)) }
+            : p,
+        ),
+      }));
+    }
     let cancelled = false;
     const sync = async () => {
       const { data, error } = await supabase
