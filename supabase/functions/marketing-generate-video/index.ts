@@ -110,6 +110,7 @@ async function pollAtlas(requestId: string): Promise<{
 async function submitFal(opts: {
   prompt: string;
   image_urls: string[];
+  audio_urls: string[];
   ratio: string;
   duration: number;
   resolution: string;
@@ -121,10 +122,18 @@ async function submitFal(opts: {
   const payload: Record<string, unknown> = {
     prompt: opts.prompt,
     aspect_ratio: opts.ratio,
-    duration: opts.duration,
+    duration: String(opts.duration),
     resolution: opts.resolution === '1080p' ? '1080p' : '720p',
+    generate_audio: true,
   };
-  if (hasRefs) payload.reference_image_urls = opts.image_urls.slice(0, 9);
+  if (hasRefs) {
+    // fal Seedance 2.0 schema uses `image_urls` (and historically `reference_image_urls`).
+    payload.image_urls = opts.image_urls.slice(0, 9);
+    payload.reference_image_urls = opts.image_urls.slice(0, 9);
+  }
+  if (opts.audio_urls.length > 0 && hasRefs) {
+    payload.audio_urls = opts.audio_urls.slice(0, 3);
+  }
   const res = await fetch(endpoint, {
     method: 'POST',
     headers: { Authorization: `Key ${FAL_KEY}`, 'Content-Type': 'application/json' },
