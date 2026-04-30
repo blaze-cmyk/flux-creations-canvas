@@ -102,7 +102,7 @@ export type Database = {
           surface: string | null
           thumb_url: string | null
           updated_at: string
-          user_id: string
+          user_id: string | null
           video_url: string | null
         }
         Insert: {
@@ -123,7 +123,7 @@ export type Database = {
           surface?: string | null
           thumb_url?: string | null
           updated_at?: string
-          user_id: string
+          user_id?: string | null
           video_url?: string | null
         }
         Update: {
@@ -144,7 +144,7 @@ export type Database = {
           surface?: string | null
           thumb_url?: string | null
           updated_at?: string
-          user_id?: string
+          user_id?: string | null
           video_url?: string | null
         }
         Relationships: [
@@ -171,7 +171,7 @@ export type Database = {
           is_primary: boolean
           product_id: string
           storage_path: string
-          user_id: string
+          user_id: string | null
         }
         Insert: {
           created_at?: string
@@ -179,7 +179,7 @@ export type Database = {
           is_primary?: boolean
           product_id: string
           storage_path: string
-          user_id: string
+          user_id?: string | null
         }
         Update: {
           created_at?: string
@@ -187,7 +187,7 @@ export type Database = {
           is_primary?: boolean
           product_id?: string
           storage_path?: string
-          user_id?: string
+          user_id?: string | null
         }
         Relationships: [
           {
@@ -210,7 +210,7 @@ export type Database = {
           source_url: string | null
           status: string
           updated_at: string
-          user_id: string
+          user_id: string | null
         }
         Insert: {
           brand_color?: string | null
@@ -222,7 +222,7 @@ export type Database = {
           source_url?: string | null
           status?: string
           updated_at?: string
-          user_id: string
+          user_id?: string | null
         }
         Update: {
           brand_color?: string | null
@@ -234,7 +234,7 @@ export type Database = {
           source_url?: string | null
           status?: string
           updated_at?: string
-          user_id?: string
+          user_id?: string | null
         }
         Relationships: []
       }
