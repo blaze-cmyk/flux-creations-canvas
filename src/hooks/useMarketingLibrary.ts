@@ -39,7 +39,8 @@ export function useAvatars() {
     const { data, error } = await supabase
       .from('ms_avatars')
       .select('*')
-      .order('is_builtin', { ascending: false })
+      // user-created avatars first, newest at the top, then builtins
+      .order('is_builtin', { ascending: true })
       .order('created_at', { ascending: false });
     if (error || !data) {
       setAvatars([]);

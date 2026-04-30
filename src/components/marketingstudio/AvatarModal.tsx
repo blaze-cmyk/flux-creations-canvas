@@ -61,6 +61,7 @@ export function AvatarModal({
       await uploadAvatar(file, name.trim());
       toast({ title: 'Avatar created' });
       setView('list');
+      setTab('mine');
       setFile(null);
       setName('');
     } catch (e: any) {
