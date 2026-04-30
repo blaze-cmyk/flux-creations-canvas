@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Volume2, VolumeX } from 'lucide-react';
 import { MarketingStudioLayout } from '@/components/marketingstudio/MarketingStudioLayout';
 import { PromptBar } from '@/components/marketingstudio/PromptBar';
+import { FORMAT_PRESETS, dispatchRecreate } from '@/components/marketingstudio/formatPresets';
 
 const FORMATS = [
   { id: 'f1', label: 'Hyper Motion', src: '/formats/hyper-motion-1.mp4' },
@@ -30,7 +31,7 @@ function BoltIcon({ className = 'w-4 h-4' }: { className?: string }) {
   );
 }
 
-function FormatCard({ label, src }: { label: string; src: string }) {
+function FormatCard({ id, label, src }: { id: string; label: string; src: string }) {
   const ref = useRef<HTMLVideoElement>(null);
   const [hovered, setHovered] = useState(false);
   const [expanded, setExpanded] = useState(false);
@@ -103,6 +104,13 @@ function FormatCard({ label, src }: { label: string; src: string }) {
         {/* Recreate button — slides up from bottom on hover */}
         <div className="absolute inset-x-0 bottom-0 p-2.5 overflow-hidden">
           <button
+            onClick={(e) => {
+              e.stopPropagation();
+              const preset = FORMAT_PRESETS[id];
+              if (!preset) return;
+              dispatchRecreate(preset);
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+            }}
             className={`w-full h-11 rounded-full bg-white text-black text-sm font-semibold shadow-[0_10px_30px_-10px_rgba(0,0,0,0.6)] transition-all duration-300 ease-out ${
               hovered ? 'translate-y-0 opacity-100' : 'translate-y-[140%] opacity-0'
             }`}
@@ -151,7 +159,7 @@ export default function MarketingStudio() {
         </div>
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
           {FORMATS.map((f) => (
-            <FormatCard key={f.id} label={f.label} src={f.src} />
+            <FormatCard key={f.id} id={f.id} label={f.label} src={f.src} />
           ))}
         </div>
       </section>
