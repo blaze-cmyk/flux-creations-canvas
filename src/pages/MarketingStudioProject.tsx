@@ -10,6 +10,23 @@ import { toast } from '@/hooks/use-toast';
 
 const MAX_GEN_DURATION_MS = 12 * 60 * 1000; // 12 minutes
 
+function stageLabel(g: MSGeneration): string {
+  if (g.status === 'failed') return 'Failed';
+  if (g.status === 'done') return 'Ready';
+  switch (g.stage) {
+    case 'scripting': return 'Writing script…';
+    case 'keyframing': return 'Composing scene…';
+    case 'keyframe_ready': return 'Scene ready…';
+    case 'keyframe_failed': return 'Scene fallback…';
+    case 'videoing': return 'Rendering on Seedance 2.0…';
+    case 'done': return 'Ready';
+    default:
+      if (g.status === 'queued_pending_persist') return 'Registering…';
+      if (g.status === 'running') return 'Rendering…';
+      return 'Queued…';
+  }
+}
+
 export default function MarketingStudioProject() {
   const { slug } = useParams();
   const project = useMarketingStudioStore((s) => s.getProjectBySlug(slug || ''));
@@ -31,12 +48,13 @@ export default function MarketingStudioProject() {
     (async () => {
       const { data, error } = await supabase
         .from('ms_generations')
-        .select('id, status, video_url, thumb_url, error, fal_request_id')
+        .select('id, status, stage, video_url, thumb_url, error, fal_request_id')
         .in('id', ids);
       if (cancelled || error || !data) return;
       for (const row of data) {
         updateGeneration(project.id, row.id, {
           status: row.status as MSGeneration['status'],
+          stage: (row as any).stage as MSGeneration['stage'],
           videoUrl: row.video_url ?? undefined,
           thumbUrl: row.thumb_url ?? undefined,
           error: row.error ?? undefined,
@@ -73,8 +91,24 @@ export default function MarketingStudioProject() {
           continue;
         }
 
-        // Skip if no fal request id yet AND status is still optimistic queued (script step still running)
-        if (!g.falRequestId && g.status === 'queued') continue;
+        // If video hasn't been submitted yet (still scripting/keyframing), refresh the row to update `stage`.
+        if (!g.falRequestId) {
+          const { data: row } = await supabase
+            .from('ms_generations')
+            .select('id, status, stage, video_url, error, fal_request_id')
+            .eq('id', g.id)
+            .maybeSingle();
+          if (row) {
+            updateGeneration(project.id, g.id, {
+              status: row.status as MSGeneration['status'],
+              stage: (row as any).stage as MSGeneration['stage'],
+              falRequestId: row.fal_request_id ?? undefined,
+              videoUrl: row.video_url ?? undefined,
+              error: row.error ?? undefined,
+            });
+          }
+          continue;
+        }
 
         try {
           const { data } = await supabase.functions.invoke('marketing-generate-video', {
@@ -84,18 +118,20 @@ export default function MarketingStudioProject() {
           if (data.status === 'done') {
             updateGeneration(project.id, g.id, {
               status: 'done',
+              stage: 'done',
               videoUrl: data.video_url,
               thumbUrl: data.thumb_url || g.thumbUrl,
             });
           } else if (data.status === 'failed') {
             updateGeneration(project.id, g.id, {
               status: 'failed',
+              stage: 'failed',
               error: data.error || 'Generation failed',
             });
           } else if (data.status === 'queued_pending_persist') {
             updateGeneration(project.id, g.id, { status: 'queued_pending_persist' });
           } else if (data.status === 'running') {
-            updateGeneration(project.id, g.id, { status: 'running' });
+            updateGeneration(project.id, g.id, { status: 'running', stage: 'videoing' });
           }
         } catch (_) {
           /* swallow transient network errors */
@@ -182,11 +218,7 @@ export default function MarketingStudioProject() {
                 {activeJobs.length} generation{activeJobs.length > 1 ? 's' : ''} in progress
               </div>
               <div className="text-xs text-muted-foreground truncate">
-                {activeJobs[0].status === 'queued_pending_persist'
-                  ? 'Waiting for the server to register the job…'
-                  : activeJobs[0].status === 'running'
-                  ? 'Rendering on Seedance 2.0 — usually 1–3 min per clip.'
-                  : 'Queued. Starting shortly…'}
+                {stageLabel(activeJobs[0])}
               </div>
             </div>
           </div>
@@ -250,12 +282,8 @@ export default function MarketingStudioProject() {
                       <div className="absolute inset-0 ms-shimmer" />
                       <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 text-foreground/90 px-3">
                         <Loader2 className="w-6 h-6 animate-spin" />
-                        <div className="text-[11px] font-medium tracking-wide uppercase">
-                          {g.status === 'queued_pending_persist'
-                            ? 'Registering…'
-                            : g.status === 'running'
-                            ? 'Rendering…'
-                            : 'Queued'}
+                        <div className="text-[11px] font-medium tracking-wide uppercase text-center">
+                          {stageLabel(g)}
                         </div>
                         <div className="w-full h-1 rounded-full bg-white/10 overflow-hidden">
                           <div

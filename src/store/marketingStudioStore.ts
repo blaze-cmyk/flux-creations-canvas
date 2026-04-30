@@ -17,6 +17,15 @@ export type MSDuration = string; // e.g. "8s" — supports 1s..15s
 export type MSSurface = 'Product' | 'App';
 
 export type MSGenStatus = 'queued' | 'queued_pending_persist' | 'running' | 'done' | 'failed';
+export type MSStage =
+  | 'queued'
+  | 'scripting'
+  | 'keyframing'
+  | 'keyframe_ready'
+  | 'keyframe_failed'
+  | 'videoing'
+  | 'done'
+  | 'failed';
 
 export interface MSGeneration {
   id: string;
@@ -34,6 +43,7 @@ export interface MSGeneration {
   submittedAt?: number;
   liked?: boolean;
   status?: MSGenStatus;
+  stage?: MSStage;
   falRequestId?: string;
   error?: string;
 }

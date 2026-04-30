@@ -150,53 +150,35 @@ export function PromptBar({ projectId }: Props) {
     setPrompt('');
     toast({ title: 'Generation started', description: 'Rendering on Seedance 2.0…' });
 
-    // 4. Run script + video calls in the background
+    // 4. Run orchestrator (script + keyframe + video) in the background
     setGenerating(true);
     try {
       const { supabase } = await import('@/integrations/supabase/client');
 
-      const { data: scriptData, error: scriptErr } = await supabase.functions.invoke(
-        'marketing-generate-script',
+      const { data: orch, error: orchErr } = await supabase.functions.invoke(
+        'marketing-orchestrate',
         {
           body: {
             productId,
             avatarId,
             format: mode,
             surface,
-            aspect,
-            duration: parseInt(duration) || 8,
-            userPrompt: prompt,
-            exactVoiceover,
-          },
-        },
-      );
-      if (scriptErr) throw scriptErr;
-
-      updateGeneration(pid, placeholderId, { status: 'running' });
-
-      const { data: vidData, error: vidErr } = await supabase.functions.invoke(
-        'marketing-generate-video',
-        {
-          body: {
-            prompt: scriptData?.prompt || prompt,
-            image_urls: scriptData?.reference_urls || [],
             aspect,
             duration_seconds: parseInt(duration) || 8,
             resolution: res,
-            productId,
-            avatarId,
-            format: mode,
-            surface,
+            userPrompt: prompt,
+            exactVoiceover,
             projectId: pid,
           },
         },
       );
-      if (vidErr) throw vidErr;
+      if (orchErr) throw orchErr;
 
+      // Swap the placeholder id for the real generation id so polling works.
       updateGeneration(pid, placeholderId, {
-        id: vidData?.id || placeholderId,
-        status: 'queued',
-        falRequestId: vidData?.fal_request_id,
+        id: orch?.id || placeholderId,
+        status: 'running',
+        stage: orch?.stage || 'scripting',
         submittedAt: Date.now(),
       });
     } catch (e: any) {
