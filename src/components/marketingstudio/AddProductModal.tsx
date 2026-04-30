@@ -39,10 +39,13 @@ export function AddProductModal({
   const [files, setFiles] = useState<File[]>([]);
   const [previews, setPreviews] = useState<string[]>([]);
   const [name, setName] = useState('');
+  const [description, setDescription] = useState('');
   const [url, setUrl] = useState('');
   const [heroUrl, setHeroUrl] = useState('');
   const [busy, setBusy] = useState(false);
+  const [analyzing, setAnalyzing] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
+  const analyzedRef = useRef(false);
 
   useEffect(() => {
     const urls = files.map((f) => URL.createObjectURL(f));
@@ -56,18 +59,43 @@ export function AddProductModal({
       setView('list');
       setFiles([]);
       setName('');
+      setDescription('');
       setUrl('');
       setHeroUrl('');
+      analyzedRef.current = false;
     }
   }, [open, refresh]);
+
+  // Auto-analyze the first uploaded image to fill in name + description.
+  const analyzeFirstImage = async (file: File) => {
+    if (analyzedRef.current) return;
+    analyzedRef.current = true;
+    setAnalyzing(true);
+    try {
+      const b64 = await fileToBase64(file);
+      const { supabase } = await import('@/integrations/supabase/client');
+      const { data, error } = await supabase.functions.invoke('marketing-analyze-product', {
+        body: { image_base64: b64, mime_type: file.type || 'image/jpeg' },
+      });
+      if (error) throw error;
+      if (data?.name && !name.trim()) setName(data.name);
+      if (data?.description && !description.trim()) setDescription(data.description);
+    } catch (e: any) {
+      // Silent fail — user can still type manually.
+      console.warn('analyze-product failed', e?.message);
+    } finally {
+      setAnalyzing(false);
+    }
+  };
 
   const addFiles = (list: FileList | File[]) => {
     const arr = Array.from(list).slice(0, 6 - files.length);
     if (!arr.length) return;
+    const wasEmpty = files.length === 0;
     setFiles((prev) => [...prev, ...arr].slice(0, 6));
-    if (!name) {
-      const guess = arr[0].name.replace(/\.[^.]+$/, '').slice(0, 32);
-      if (guess) setName(guess);
+    if (wasEmpty) {
+      // Kick off auto-analyze on the very first image.
+      analyzeFirstImage(arr[0]);
     }
   };
 
