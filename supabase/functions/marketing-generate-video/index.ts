@@ -348,8 +348,8 @@ Deno.serve(async (req) => {
           .from('ms_generations')
           .update({ status: 'failed', error: `Retry failed: ${result.error}` })
           .eq('id', row.id);
-        return new Response(JSON.stringify({ error: result.error, details: result.details }), {
-          status: 502,
+        return new Response(JSON.stringify({ id: row.id, status: 'failed', error: result.error, details: result.details, fallback: true }), {
+          status: 200,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
       }
@@ -484,8 +484,8 @@ Deno.serve(async (req) => {
         .update({ status: 'failed', stage: 'failed', error: result.error })
         .eq('id', row.id);
       return new Response(
-        JSON.stringify({ id: row.id, error: result.error, details: result.details }),
-        { status: 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+        JSON.stringify({ id: row.id, status: 'failed', error: result.error, details: result.details, fallback: true }),
+        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
       );
     }
 
