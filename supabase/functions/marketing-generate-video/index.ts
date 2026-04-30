@@ -212,6 +212,7 @@ async function submitWithFallback(opts: {
   if (chain.length === 0) return { error: 'no_providers_configured', details: null };
 
   let lastErr: unknown = null;
+  const reasons: string[] = [];
   for (const provider of chain) {
     try {
       const r = provider === 'atlascloud' ? await submitAtlas(opts) : await submitFal(opts);
@@ -221,6 +222,14 @@ async function submitWithFallback(opts: {
       }
       log('WARN', 'submit: provider rejected, trying next', { provider, raw: r.raw });
       lastErr = r.raw;
+      const raw: any = r.raw;
+      if (provider === 'atlascloud' && raw?.code === 402) {
+        reasons.push('AtlasCloud: insufficient balance — top up at atlascloud.ai to continue.');
+      } else if (provider === 'fal' && Array.isArray(raw?.detail) && raw.detail[0]?.type === 'content_policy_violation') {
+        reasons.push('fal: avatar image blocked (real-person likeness). Use AtlasCloud instead.');
+      } else {
+        reasons.push(`${provider}: ${raw?.msg || raw?.detail?.[0]?.msg || 'rejected'}`);
+      }
       if (provider === 'atlascloud' && opts.audio_urls.length > 0 && hasAudioUrlError(r.raw)) {
         const retry = await submitAtlas({ ...opts, audio_urls: [] });
         if (retry.ok && retry.requestId) {
@@ -235,9 +244,10 @@ async function submitWithFallback(opts: {
         err: e instanceof Error ? e.message : String(e),
       });
       lastErr = e instanceof Error ? e.message : String(e);
+      reasons.push(`${provider}: ${e instanceof Error ? e.message : 'threw'}`);
     }
   }
-  return { error: 'all_providers_failed', details: lastErr };
+  return { error: reasons.join(' | ') || 'all_providers_failed', details: lastErr };
 }
 
 Deno.serve(async (req) => {
