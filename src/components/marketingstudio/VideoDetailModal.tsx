@@ -22,7 +22,22 @@ export function VideoDetailModal({
         <div className="grid md:grid-cols-[1fr_360px] max-h-[85vh]">
           {/* Media */}
           <div className="bg-black flex items-center justify-center min-h-[50vh]">
-            <img src={generation.thumbUrl} alt="" className="max-h-[85vh] w-auto object-contain" />
+            {generation.videoUrl ? (
+              <video
+                key={generation.videoUrl}
+                src={generation.videoUrl}
+                poster={generation.thumbUrl}
+                controls
+                autoPlay
+                loop
+                playsInline
+                className="max-h-[85vh] w-auto object-contain"
+              />
+            ) : generation.thumbUrl ? (
+              <img src={generation.thumbUrl} alt="" className="max-h-[85vh] w-auto object-contain" />
+            ) : (
+              <div className="text-muted-foreground text-sm">No preview available</div>
+            )}
           </div>
 
           {/* Right panel */}
