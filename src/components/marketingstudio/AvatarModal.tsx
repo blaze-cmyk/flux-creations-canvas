@@ -1,10 +1,11 @@
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { useMemo, useRef, useState, useEffect } from 'react';
-import { Search, Plus, Pin, Sparkles, User, UserRound, Loader2, ArrowLeft, UploadCloud, RefreshCw } from 'lucide-react';
+import { Search, Plus, Pin, Sparkles, User, UserRound, Loader2, ArrowLeft, UploadCloud, RefreshCw, ArrowDownAZ } from 'lucide-react';
 import { useAvatars } from '@/hooks/useMarketingLibrary';
-import { toast } from '@/hooks/use-toast';
+import { toast } from 'sonner';
 
 type View = 'list' | 'create';
+type SortMode = 'newest' | 'oldest' | 'name';
 
 export function AvatarModal({
   open,
@@ -19,7 +20,8 @@ export function AvatarModal({
   const [tab, setTab] = useState<'all' | 'pinned' | 'mine'>('all');
   const [gender, setGender] = useState<'all' | 'male' | 'female'>('all');
   const [query, setQuery] = useState('');
-  const { avatars, loading, uploadAvatar } = useAvatars();
+  const [sortMode, setSortMode] = useState<SortMode>('newest');
+  const { avatars, loading, refresh, uploadAvatar } = useAvatars();
 
   const [file, setFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string>('');
@@ -42,30 +44,43 @@ export function AvatarModal({
       setView('list');
       setFile(null);
       setName('');
+      return;
     }
-  }, [open]);
+    refresh();
+  }, [open, refresh]);
 
   const filtered = useMemo(() => {
-    return avatars.filter((a) => {
+    const result = avatars.filter((a) => {
       if (tab === 'mine' && a.is_builtin) return false;
+      if (tab === 'pinned' && !a.is_builtin) return false;
       if (gender !== 'all' && a.gender && a.gender !== gender) return false;
       if (query && !a.name.toLowerCase().includes(query.toLowerCase())) return false;
       return true;
     });
-  }, [avatars, tab, gender, query]);
+
+    return [...result].sort((a, b) => {
+      if (sortMode === 'name') return a.name.localeCompare(b.name);
+      const aTime = new Date(a.created_at).getTime();
+      const bTime = new Date(b.created_at).getTime();
+      return sortMode === 'oldest' ? aTime - bTime : bTime - aTime;
+    });
+  }, [avatars, tab, gender, query, sortMode]);
 
   const handleCreate = async () => {
     if (!file || !name.trim()) return;
     setCreating(true);
     try {
-      await uploadAvatar(file, name.trim());
-      toast({ title: 'Avatar created' });
+      const created = await uploadAvatar(file, name.trim());
+      toast.success(`Avatar created: ${created.name}`, {
+        description: `ID ${created.id}. It appears in All and My avatars, sorted at the top when Newest is selected.`,
+      });
       setView('list');
+      setSortMode('newest');
       setTab('mine');
       setFile(null);
       setName('');
     } catch (e: any) {
-      toast({ title: 'Upload failed', description: e?.message ?? '', variant: 'destructive' });
+      toast.error('Upload failed', { description: e?.message ?? '' });
     } finally {
       setCreating(false);
     }
@@ -78,19 +93,34 @@ export function AvatarModal({
           <>
             <div className="flex items-center justify-between gap-3 p-4 border-b border-white/10">
               <div className="text-sm font-semibold text-foreground">Select Avatar</div>
-              <div className="relative flex-1 max-w-md">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                <input
-                  value={query}
-                  onChange={(e) => setQuery(e.target.value)}
-                  placeholder="Search..."
-                  className="w-full pl-9 pr-3 h-9 rounded-full ms-chip-glass text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-white/20"
-                />
+              <div className="flex flex-1 max-w-2xl items-center gap-2">
+                <div className="relative flex-1 min-w-0">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                  <input
+                    value={query}
+                    onChange={(e) => setQuery(e.target.value)}
+                    placeholder="Search avatars..."
+                    className="w-full pl-9 pr-3 h-9 rounded-full ms-chip-glass text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-white/20"
+                  />
+                </div>
+                <div className="relative shrink-0">
+                  <ArrowDownAZ className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground pointer-events-none" />
+                  <select
+                    value={sortMode}
+                    onChange={(e) => setSortMode(e.target.value as SortMode)}
+                    className="h-9 pl-8 pr-8 rounded-full ms-chip-glass text-xs text-foreground bg-transparent focus:outline-none focus:border-white/20"
+                  >
+                    <option value="newest">Newest</option>
+                    <option value="oldest">Oldest</option>
+                    <option value="name">Name</option>
+                  </select>
+                </div>
               </div>
             </div>
 
             <div className="grid md:grid-cols-[180px_1fr] max-h-[70vh]">
-              <div className="hidden md:block border-r border-white/10 p-3 space-y-1">
+              <div className="hidden md:flex border-r border-white/10 p-3 flex-col gap-3">
+                <div className="space-y-1">
                 {([
                   { id: 'all', label: 'All', icon: Sparkles },
                   { id: 'pinned', label: 'Pinned', icon: Pin },
@@ -107,6 +137,7 @@ export function AvatarModal({
                     {t.label}
                   </button>
                 ))}
+                </div>
                 <div className="mt-4 px-3 text-[11px] uppercase tracking-wider text-muted-foreground">Gender</div>
                 <div className="flex gap-2 px-1 mt-1">
                   <button
@@ -124,6 +155,17 @@ export function AvatarModal({
                     }`}
                   >
                     <UserRound className="w-3 h-3" /> Female
+                  </button>
+                </div>
+                <div className="mt-auto rounded-xl ms-glass-2 p-3 text-[11px] leading-relaxed text-muted-foreground">
+                  <div className="mb-1 font-semibold uppercase tracking-wider text-foreground/80">Debug</div>
+                  <div>Tab: {tab}</div>
+                  <div>Gender: {gender}</div>
+                  <div>Search: {query || 'none'}</div>
+                  <div>Sort: {sortMode}</div>
+                  <div>Result: {filtered.length}/{avatars.length}</div>
+                  <button onClick={refresh} className="mt-2 inline-flex h-7 items-center gap-1.5 rounded-full ms-chip-glass px-3 text-foreground">
+                    <RefreshCw className="w-3 h-3" /> Refresh
                   </button>
                 </div>
               </div>

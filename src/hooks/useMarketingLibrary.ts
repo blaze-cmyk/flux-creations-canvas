@@ -4,11 +4,12 @@ import { supabase } from '@/integrations/supabase/client';
 export interface DBAvatar {
   id: string;
   name: string;
-  gender: 'male' | 'female' | 'other' | null;
+  gender: string | null;
   storage_path: string | null;
   public_url: string | null;
   is_builtin: boolean;
   user_id: string | null;
+  created_at: string;
   thumb: string; // resolved url
 }
 
@@ -71,11 +72,21 @@ export function useAvatars() {
       const path = `${folder}/${crypto.randomUUID()}.${ext}`;
       const { error: upErr } = await supabase.storage.from('ms-avatars').upload(path, file, { upsert: false });
       if (upErr) throw upErr;
-      const { error: insErr } = await supabase
+      const { data: created, error: insErr } = await supabase
         .from('ms_avatars')
-        .insert({ name, gender, storage_path: path, user_id: uid, is_builtin: false });
+        .insert({ name, gender, storage_path: path, user_id: uid, is_builtin: false })
+        .select('*')
+        .single();
       if (insErr) throw insErr;
+
+      const resolvedCreated: DBAvatar = {
+        ...created,
+        thumb: created.public_url || (created.storage_path ? await signed(created.storage_path, 'ms-avatars') : ''),
+      } as DBAvatar;
+
+      setAvatars((current) => [resolvedCreated, ...current.filter((avatar) => avatar.id !== resolvedCreated.id)]);
       await refresh();
+      return resolvedCreated;
     },
     [refresh],
   );
