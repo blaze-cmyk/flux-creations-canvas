@@ -182,7 +182,14 @@ async function pollFal(requestId: string): Promise<{
     );
     const resp = await respRes.json().catch(() => ({}));
     const videoUrl = resp?.video?.url || resp?.video_url || resp?.output?.video?.url || null;
-    return videoUrl ? { status: 'done', videoUrl } : { status: 'failed', error: 'No video returned' };
+    if (videoUrl) return { status: 'done', videoUrl };
+    // fal returns 200 COMPLETED even when the response body is a content-policy error.
+    const detail = Array.isArray(resp?.detail) ? resp.detail[0] : null;
+    if (detail?.type === 'content_policy_violation') {
+      return { status: 'failed', error: 'fal blocked the avatar image (likeness of a real person). Use AtlasCloud (top up balance) — fal Seedance does not allow human reference images.' };
+    }
+    if (detail?.msg) return { status: 'failed', error: `fal: ${detail.msg}` };
+    return { status: 'failed', error: 'No video returned' };
   }
   if (status.status === 'FAILED' || status.status === 'ERROR') {
     return { status: 'failed', error: 'fal reported failure' };
