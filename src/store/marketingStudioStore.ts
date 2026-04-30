@@ -1,7 +1,16 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 
-export type MSMode = 'UGC' | 'Hyper Motion' | 'Unboxing' | 'TV Spot' | 'UGC Virtual Try On';
+export type MSMode =
+  | 'UGC'
+  | 'Tutorial'
+  | 'Unboxing'
+  | 'Hyper Motion'
+  | 'Product Review'
+  | 'TV Spot'
+  | 'Wild Card'
+  | 'UGC Virtual Try On'
+  | 'Pro Virtual Try On';
 export type MSAspect = '9:16' | '1:1' | '16:9';
 export type MSResolution = '480p' | '720p' | '1080p';
 export type MSDuration = '4s' | '8s' | '12s';
