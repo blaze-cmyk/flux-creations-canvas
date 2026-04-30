@@ -1,0 +1,159 @@
+import { useCallback, useEffect, useState } from 'react';
+import { supabase } from '@/integrations/supabase/client';
+
+export interface DBAvatar {
+  id: string;
+  name: string;
+  gender: 'male' | 'female' | 'other' | null;
+  storage_path: string | null;
+  public_url: string | null;
+  is_builtin: boolean;
+  user_id: string | null;
+  thumb: string; // resolved url
+}
+
+export interface DBProduct {
+  id: string;
+  name: string;
+  source_url: string | null;
+  brand_color: string | null;
+  description: string | null;
+  status: string;
+  created_at: string;
+  primary_thumb: string | null;
+  images: { id: string; storage_path: string; signed_url: string; is_primary: boolean }[];
+}
+
+async function signed(path: string, bucket: string) {
+  const { data } = await supabase.storage.from(bucket).createSignedUrl(path, 60 * 60);
+  return data?.signedUrl ?? '';
+}
+
+export function useAvatars() {
+  const [avatars, setAvatars] = useState<DBAvatar[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const refresh = useCallback(async () => {
+    setLoading(true);
+    const { data, error } = await supabase
+      .from('ms_avatars')
+      .select('*')
+      .order('is_builtin', { ascending: false })
+      .order('created_at', { ascending: false });
+    if (error || !data) {
+      setAvatars([]);
+      setLoading(false);
+      return;
+    }
+    const resolved: DBAvatar[] = await Promise.all(
+      data.map(async (a: any) => {
+        let thumb = a.public_url || '';
+        if (!thumb && a.storage_path) thumb = await signed(a.storage_path, 'ms-avatars');
+        return { ...a, thumb };
+      }),
+    );
+    setAvatars(resolved);
+    setLoading(false);
+  }, []);
+
+  useEffect(() => {
+    refresh();
+  }, [refresh]);
+
+  const uploadAvatar = useCallback(
+    async (file: File, name: string, gender: 'male' | 'female' | 'other' = 'female') => {
+      const { data: u } = await supabase.auth.getUser();
+      const uid = u?.user?.id;
+      if (!uid) throw new Error('Sign in required to upload an avatar.');
+      const ext = file.name.split('.').pop() || 'png';
+      const path = `${uid}/${crypto.randomUUID()}.${ext}`;
+      const { error: upErr } = await supabase.storage.from('ms-avatars').upload(path, file, { upsert: false });
+      if (upErr) throw upErr;
+      const { error: insErr } = await supabase
+        .from('ms_avatars')
+        .insert({ name, gender, storage_path: path, user_id: uid, is_builtin: false });
+      if (insErr) throw insErr;
+      await refresh();
+    },
+    [refresh],
+  );
+
+  return { avatars, loading, refresh, uploadAvatar };
+}
+
+export function useProducts() {
+  const [products, setProducts] = useState<DBProduct[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const refresh = useCallback(async () => {
+    setLoading(true);
+    const { data: prods } = await supabase
+      .from('ms_products')
+      .select('*')
+      .order('created_at', { ascending: false });
+    const list: DBProduct[] = [];
+    for (const p of prods ?? []) {
+      const { data: imgs } = await supabase
+        .from('ms_product_images')
+        .select('*')
+        .eq('product_id', p.id);
+      const resolved = await Promise.all(
+        (imgs ?? []).map(async (i: any) => ({
+          id: i.id,
+          storage_path: i.storage_path,
+          is_primary: i.is_primary,
+          signed_url: await signed(i.storage_path, 'ms-products'),
+        })),
+      );
+      const primary = resolved.find((r) => r.is_primary) || resolved[0];
+      list.push({ ...p, images: resolved, primary_thumb: primary?.signed_url ?? null });
+    }
+    setProducts(list);
+    setLoading(false);
+  }, []);
+
+  useEffect(() => {
+    refresh();
+  }, [refresh]);
+
+  const uploadProductImages = useCallback(
+    async (files: File[], name: string) => {
+      const { data: u } = await supabase.auth.getUser();
+      const uid = u?.user?.id;
+      if (!uid) throw new Error('Sign in required to add a product.');
+      const { data: prod, error: pErr } = await supabase
+        .from('ms_products')
+        .insert({ user_id: uid, name, status: 'ready' })
+        .select()
+        .single();
+      if (pErr || !prod) throw pErr || new Error('Failed to create product');
+      for (let i = 0; i < files.length; i++) {
+        const f = files[i];
+        const ext = f.name.split('.').pop() || 'png';
+        const path = `${uid}/${prod.id}/${crypto.randomUUID()}.${ext}`;
+        const { error: upErr } = await supabase.storage.from('ms-products').upload(path, f);
+        if (upErr) throw upErr;
+        await supabase
+          .from('ms_product_images')
+          .insert({ product_id: prod.id, user_id: uid, storage_path: path, is_primary: i === 0 });
+      }
+      await refresh();
+      return prod.id as string;
+    },
+    [refresh],
+  );
+
+  const createFromUrl = useCallback(
+    async (url: string) => {
+      const { data, error } = await supabase.functions.invoke('marketing-url-to-brief', {
+        body: { url },
+      });
+      if (error) throw error;
+      await refresh();
+      return data?.product_id as string | undefined;
+    },
+    [refresh],
+  );
+
+  return { products, loading, refresh, uploadProductImages, createFromUrl };
+}
