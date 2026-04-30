@@ -31,12 +31,13 @@ export default function MarketingStudioProject() {
     (async () => {
       const { data, error } = await supabase
         .from('ms_generations')
-        .select('id, status, video_url, thumb_url, error, fal_request_id')
+        .select('id, status, stage, video_url, thumb_url, error, fal_request_id')
         .in('id', ids);
       if (cancelled || error || !data) return;
       for (const row of data) {
         updateGeneration(project.id, row.id, {
           status: row.status as MSGeneration['status'],
+          stage: (row as any).stage as MSGeneration['stage'],
           videoUrl: row.video_url ?? undefined,
           thumbUrl: row.thumb_url ?? undefined,
           error: row.error ?? undefined,
