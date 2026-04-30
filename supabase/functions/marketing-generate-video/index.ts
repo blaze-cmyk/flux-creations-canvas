@@ -338,6 +338,7 @@ Deno.serve(async (req) => {
       surface,
       projectId,
       script_text,
+      reuseGenerationId,
     } = body;
 
     if (!prompt || typeof prompt !== 'string') {
