@@ -124,7 +124,7 @@ Deno.serve(async (req) => {
     const { data: prod, error: pErr } = await admin
       .from('ms_products')
       .insert({
-        user_id: user.id,
+        user_id: null,
         name: brief.name,
         source_url: url,
         brand_color: brief.brand_colors?.[0] ?? meta.brand_color ?? null,
@@ -144,12 +144,12 @@ Deno.serve(async (req) => {
         const ct = r.headers.get('content-type') || 'image/jpeg';
         const ext = ct.includes('png') ? 'png' : ct.includes('webp') ? 'webp' : 'jpg';
         const buf = new Uint8Array(await r.arrayBuffer());
-        const path = `${user.id}/${prod.id}/${crypto.randomUUID()}.${ext}`;
+        const path = `anon/${prod.id}/${crypto.randomUUID()}.${ext}`;
         const { error: upErr } = await admin.storage.from('ms-products').upload(path, buf, { contentType: ct });
         if (upErr) continue;
         await admin.from('ms_product_images').insert({
           product_id: prod.id,
-          user_id: user.id,
+          user_id: null,
           storage_path: path,
           is_primary: savedImages === 0,
         });
