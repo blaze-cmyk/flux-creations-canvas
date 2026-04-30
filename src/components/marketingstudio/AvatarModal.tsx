@@ -44,8 +44,10 @@ export function AvatarModal({
       setView('list');
       setFile(null);
       setName('');
+      return;
     }
-  }, [open]);
+    refresh();
+  }, [open, refresh]);
 
   const filtered = useMemo(() => {
     const result = avatars.filter((a) => {
