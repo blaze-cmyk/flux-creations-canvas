@@ -308,6 +308,7 @@ Deno.serve(async (req) => {
       avatarId,
       format,
       surface,
+      projectId,
     } = body;
 
     if (!prompt || typeof prompt !== 'string') {
@@ -326,6 +327,7 @@ Deno.serve(async (req) => {
       .from('ms_generations')
       .insert({
         user_id: null,
+        project_id: projectId ?? null,
         product_id: productId ?? null,
         avatar_id: avatarId ?? null,
         format,
