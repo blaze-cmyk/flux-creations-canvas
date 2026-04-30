@@ -85,8 +85,8 @@ export function PromptBar({ projectId }: Props) {
     const handler = (e: Event) => {
       const p = (e as CustomEvent<FormatPreset>).detail;
       if (!p) return;
+      console.log('[recreate] preset received', { mode: p.mode, duration: p.duration, aspect: p.aspect });
       setMode(p.mode);
-      // Strip @tag tokens from visible prompt — they're shown as chips
       const cleaned = p.prompt.replace(/@[A-Za-z0-9_][A-Za-z0-9 _-]*?(?=(\s@|\s|\.|,|$))/g, '').replace(/\s{2,}/g, ' ').trim();
       setPrompt(cleaned);
       setDuration(p.duration);
