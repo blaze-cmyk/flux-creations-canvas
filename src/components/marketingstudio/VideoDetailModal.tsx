@@ -54,15 +54,16 @@ export function VideoDetailModal({
         <div className="flex-1 min-h-0 grid grid-cols-1 md:grid-cols-[minmax(0,1fr)_minmax(300px,360px)]">
           {/* Media */}
           <div className="relative bg-black flex items-center justify-center min-h-0 overflow-hidden">
-            {generation.videoUrl ? (
+            {playSrc ? (
               <video
-                key={generation.videoUrl}
-                src={generation.videoUrl}
+                key={playSrc}
+                src={playSrc}
                 poster={generation.thumbUrl}
                 controls
                 autoPlay
                 loop
                 playsInline
+                crossOrigin="anonymous"
                 className="max-w-full max-h-full w-auto h-auto object-contain"
               />
             ) : generation.thumbUrl ? (
