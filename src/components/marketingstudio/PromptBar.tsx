@@ -82,7 +82,7 @@ export function PromptBar({ projectId }: Props) {
   const [avatarOpen, setAvatarOpen] = useState(false);
   const [formatOpen, setFormatOpen] = useState(false);
 
-  const { createProject, addGeneration } = useMarketingStudioStore();
+  const { createProject, addGeneration, updateGeneration, removeGeneration } = useMarketingStudioStore();
   const navigate = useNavigate();
 
   useEffect(() => {
