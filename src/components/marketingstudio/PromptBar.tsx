@@ -82,7 +82,7 @@ export function PromptBar({ projectId }: Props) {
   const [avatarOpen, setAvatarOpen] = useState(false);
   const [formatOpen, setFormatOpen] = useState(false);
 
-  const { createProject, addGeneration, updateGeneration, removeGeneration } = useMarketingStudioStore();
+  const { addGeneration, updateGeneration } = useMarketingStudioStore();
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -111,13 +111,19 @@ export function PromptBar({ projectId }: Props) {
       return;
     }
 
-    // 1. Resolve / create project + navigate IMMEDIATELY
+    // 1. Resolve / create project (in DB so it survives refresh) + navigate IMMEDIATELY
     let pid = projectId;
     let pslug: string | undefined;
     if (!pid) {
-      const p = createProject(prompt.slice(0, 28) || productName || 'New project');
-      pid = p.id;
-      pslug = p.slug;
+      try {
+        const { createProjectDB } = await import('@/lib/marketingStudioSync');
+        const p = await createProjectDB(prompt.slice(0, 28) || productName || 'New project');
+        pid = p.id;
+        pslug = p.slug;
+      } catch (e: any) {
+        toast({ title: 'Could not create project', description: e?.message, variant: 'destructive' });
+        return;
+      }
     }
 
     // 2. Add a placeholder generation so the project page can show "rendering..."
@@ -181,6 +187,7 @@ export function PromptBar({ projectId }: Props) {
             avatarId,
             format: mode,
             surface,
+            projectId: pid,
           },
         },
       );

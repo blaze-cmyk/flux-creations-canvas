@@ -94,6 +94,7 @@ export type Database = {
           format: string | null
           id: string
           product_id: string | null
+          project_id: string | null
           prompt: string
           provider: string | null
           reference_paths: string[] | null
@@ -116,6 +117,7 @@ export type Database = {
           format?: string | null
           id?: string
           product_id?: string | null
+          project_id?: string | null
           prompt: string
           provider?: string | null
           reference_paths?: string[] | null
@@ -138,6 +140,7 @@ export type Database = {
           format?: string | null
           id?: string
           product_id?: string | null
+          project_id?: string | null
           prompt?: string
           provider?: string | null
           reference_paths?: string[] | null
@@ -163,6 +166,13 @@ export type Database = {
             columns: ["product_id"]
             isOneToOne: false
             referencedRelation: "ms_products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ms_generations_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "ms_projects"
             referencedColumns: ["id"]
           },
         ]
@@ -236,6 +246,36 @@ export type Database = {
           name?: string
           source_url?: string | null
           status?: string
+          updated_at?: string
+          user_id?: string | null
+        }
+        Relationships: []
+      }
+      ms_projects: {
+        Row: {
+          created_at: string
+          id: string
+          name: string
+          slug: string
+          thumb_url: string | null
+          updated_at: string
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          name?: string
+          slug: string
+          thumb_url?: string | null
+          updated_at?: string
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          name?: string
+          slug?: string
+          thumb_url?: string | null
           updated_at?: string
           user_id?: string | null
         }
