@@ -3,9 +3,12 @@ import { useEffect, useRef, useState } from 'react';
 import { MarketingStudioLayout } from '@/components/marketingstudio/MarketingStudioLayout';
 import { PromptBar } from '@/components/marketingstudio/PromptBar';
 import { useMarketingStudioStore, MSGeneration } from '@/store/marketingStudioStore';
-import { Heart, Maximize2, Play, Loader2, AlertCircle } from 'lucide-react';
+import { Heart, Maximize2, Play, Loader2, AlertCircle, RefreshCw } from 'lucide-react';
 import { VideoDetailModal } from '@/components/marketingstudio/VideoDetailModal';
 import { supabase } from '@/integrations/supabase/client';
+import { toast } from '@/hooks/use-toast';
+
+const MAX_GEN_DURATION_MS = 12 * 60 * 1000; // 12 minutes
 
 export default function MarketingStudioProject() {
   const { slug } = useParams();
@@ -14,19 +17,34 @@ export default function MarketingStudioProject() {
   const updateGeneration = useMarketingStudioStore((s) => s.updateGeneration);
   const [tab, setTab] = useState<'all' | 'liked'>('all');
   const [selected, setSelected] = useState<MSGeneration | null>(null);
-  const polled = useRef<Set<string>>(new Set());
+  const retrying = useRef<Set<string>>(new Set());
 
-  // Poll active generations every 4s
+  // Poll active generations every 4s, with timeout
   useEffect(() => {
     if (!project) return;
     const interval = setInterval(async () => {
       const active = project.generations.filter(
         (g) =>
-          (g.status === 'queued' || g.status === 'running') &&
-          !!g.falRequestId &&
+          (g.status === 'queued' ||
+            g.status === 'queued_pending_persist' ||
+            g.status === 'running') &&
           /^[0-9a-f-]{36}$/i.test(g.id),
       );
+
       for (const g of active) {
+        // Client-side timeout
+        const started = g.submittedAt || g.createdAt;
+        if (Date.now() - started > MAX_GEN_DURATION_MS) {
+          updateGeneration(project.id, g.id, {
+            status: 'failed',
+            error: 'Timed out after 12 minutes. Try again.',
+          });
+          continue;
+        }
+
+        // Skip if no fal request id yet AND status is still optimistic queued (script step still running)
+        if (!g.falRequestId && g.status === 'queued') continue;
+
         try {
           const { data } = await supabase.functions.invoke('marketing-generate-video', {
             body: { poll: g.id },
@@ -39,9 +57,18 @@ export default function MarketingStudioProject() {
               thumbUrl: data.thumb_url || g.thumbUrl,
             });
           } else if (data.status === 'failed') {
-            updateGeneration(project.id, g.id, { status: 'failed', error: data.error });
+            updateGeneration(project.id, g.id, {
+              status: 'failed',
+              error: data.error || 'Generation failed',
+            });
+          } else if (data.status === 'queued_pending_persist') {
+            updateGeneration(project.id, g.id, { status: 'queued_pending_persist' });
+          } else if (data.status === 'running') {
+            updateGeneration(project.id, g.id, { status: 'running' });
           }
-        } catch (_) {}
+        } catch (_) {
+          /* swallow transient network errors */
+        }
       }
     }, 4000);
     return () => clearInterval(interval);
@@ -50,6 +77,36 @@ export default function MarketingStudioProject() {
   if (!project) return <Navigate to="/marketingstudio" replace />;
 
   const items = tab === 'all' ? project.generations : project.generations.filter((g) => g.liked);
+
+  const handleRetry = async (g: MSGeneration) => {
+    if (retrying.current.has(g.id)) return;
+    retrying.current.add(g.id);
+    updateGeneration(project.id, g.id, {
+      status: 'queued',
+      error: undefined,
+      submittedAt: Date.now(),
+    });
+    try {
+      const { data, error } = await supabase.functions.invoke('marketing-generate-video', {
+        body: { retry: g.id },
+      });
+      if (error) throw error;
+      updateGeneration(project.id, g.id, {
+        falRequestId: data?.fal_request_id,
+        status: 'queued',
+        submittedAt: Date.now(),
+      });
+      toast({ title: 'Retrying generation' });
+    } catch (e: any) {
+      updateGeneration(project.id, g.id, {
+        status: 'failed',
+        error: e?.message ?? 'Retry failed',
+      });
+      toast({ title: 'Retry failed', description: e?.message, variant: 'destructive' });
+    } finally {
+      retrying.current.delete(g.id);
+    }
+  };
 
   const tabsRight = (
     <div className="flex items-center gap-1 p-1 rounded-full bg-ms-surface-2 border border-ms-border">
@@ -75,9 +132,35 @@ export default function MarketingStudioProject() {
     </div>
   );
 
+  // Active jobs panel summary
+  const activeJobs = project.generations.filter(
+    (g) =>
+      g.status === 'queued' ||
+      g.status === 'queued_pending_persist' ||
+      g.status === 'running',
+  );
+
   return (
     <MarketingStudioLayout showBack title={project.name} rightSlot={tabsRight}>
       <div className="px-3 md:px-5 pb-44">
+        {activeJobs.length > 0 && (
+          <div className="mb-3 rounded-2xl ms-glass p-3 flex items-center gap-3">
+            <Loader2 className="w-4 h-4 animate-spin text-foreground" />
+            <div className="flex-1 min-w-0">
+              <div className="text-sm font-medium text-foreground">
+                {activeJobs.length} generation{activeJobs.length > 1 ? 's' : ''} in progress
+              </div>
+              <div className="text-xs text-muted-foreground truncate">
+                {activeJobs[0].status === 'queued_pending_persist'
+                  ? 'Waiting for the server to register the job…'
+                  : activeJobs[0].status === 'running'
+                  ? 'Rendering on Seedance 2.0 — usually 1–3 min per clip.'
+                  : 'Queued. Starting shortly…'}
+              </div>
+            </div>
+          </div>
+        )}
+
         {items.length === 0 ? (
           <div className="min-h-[60vh] flex flex-col items-center justify-center text-center">
             <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-ms-cta to-ms-cta-2 grid place-items-center mb-4 shadow-[0_10px_30px_-10px_hsl(var(--ms-cta)/0.6)]">
@@ -89,8 +172,13 @@ export default function MarketingStudioProject() {
         ) : (
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
             {items.map((g) => {
-              const isPending = g.status === 'queued' || g.status === 'running';
+              const isPending =
+                g.status === 'queued' ||
+                g.status === 'queued_pending_persist' ||
+                g.status === 'running';
               const isFailed = g.status === 'failed';
+              const elapsed = Math.floor((Date.now() - (g.submittedAt || g.createdAt)) / 1000);
+              const pct = Math.min(95, Math.floor((elapsed / 120) * 100)); // fake progress to 95% over 2min
               return (
                 <button
                   key={g.id}
@@ -110,12 +198,23 @@ export default function MarketingStudioProject() {
                   {isPending && (
                     <>
                       <div className="absolute inset-0 ms-shimmer" />
-                      <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 text-foreground/90">
+                      <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 text-foreground/90 px-3">
                         <Loader2 className="w-6 h-6 animate-spin" />
                         <div className="text-[11px] font-medium tracking-wide uppercase">
-                          {g.status === 'queued' ? 'Queued' : 'Rendering…'}
+                          {g.status === 'queued_pending_persist'
+                            ? 'Registering…'
+                            : g.status === 'running'
+                            ? 'Rendering…'
+                            : 'Queued'}
                         </div>
-                        <div className="px-3 text-[10px] text-muted-foreground line-clamp-2 text-center">
+                        <div className="w-full h-1 rounded-full bg-white/10 overflow-hidden">
+                          <div
+                            className="h-full bg-foreground/80 transition-all"
+                            style={{ width: `${pct}%` }}
+                          />
+                        </div>
+                        <div className="text-[10px] text-muted-foreground">{elapsed}s</div>
+                        <div className="text-[10px] text-muted-foreground line-clamp-2 text-center">
                           {g.prompt}
                         </div>
                       </div>
@@ -129,6 +228,18 @@ export default function MarketingStudioProject() {
                       <div className="text-[10px] text-muted-foreground line-clamp-3">
                         {g.error || 'Try again'}
                       </div>
+                      {/^[0-9a-f-]{36}$/i.test(g.id) && (
+                        <span
+                          role="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleRetry(g);
+                          }}
+                          className="mt-1 inline-flex items-center gap-1 px-2.5 h-7 rounded-full bg-white/10 hover:bg-white/20 text-[11px] font-medium cursor-pointer"
+                        >
+                          <RefreshCw className="w-3 h-3" /> Retry
+                        </span>
+                      )}
                     </div>
                   )}
 
