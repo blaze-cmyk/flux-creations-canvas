@@ -86,11 +86,15 @@ export function PromptBar({ projectId }: Props) {
       const p = (e as CustomEvent<FormatPreset>).detail;
       if (!p) return;
       setMode(p.mode);
-      setPrompt(p.prompt);
+      // Strip @tag tokens from visible prompt — they're shown as chips
+      const cleaned = p.prompt.replace(/@[A-Za-z0-9_][A-Za-z0-9 _-]*?(?=(\s@|\s|\.|,|$))/g, '').replace(/\s{2,}/g, ' ').trim();
+      setPrompt(cleaned);
       setDuration(p.duration);
       setAspect(p.aspect);
       setProductThumb(p.productThumb ?? null);
       setAvatarThumb(p.avatarThumb ?? null);
+      setProductName(p.productName ?? null);
+      setAvatarName(p.avatarName ?? null);
     };
     window.addEventListener(RECREATE_EVENT, handler);
     return () => window.removeEventListener(RECREATE_EVENT, handler);
