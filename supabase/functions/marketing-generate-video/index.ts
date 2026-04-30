@@ -156,9 +156,6 @@ async function submitFal(opts: {
     payload.image_urls = opts.image_urls.slice(0, 9);
     payload.reference_image_urls = opts.image_urls.slice(0, 9);
   }
-  if (opts.audio_urls.length > 0 && hasRefs) {
-    payload.audio_urls = opts.audio_urls.slice(0, 3);
-  }
   const res = await fetch(endpoint, {
     method: 'POST',
     headers: { Authorization: `Key ${FAL_KEY}`, 'Content-Type': 'application/json' },
