@@ -96,10 +96,9 @@ async function submitAtlas(opts: {
   if (hasRefs) {
     body.reference_images = opts.image_urls.slice(0, 9);
   }
-  if (opts.audio_urls.length > 0 && hasRefs) {
-    // Atlas docs require `reference_audios` (not audio_urls/reference_audio).
-    body.reference_audios = opts.audio_urls.slice(0, 3);
-  }
+  // Do not send avatar voice samples to Atlas here: Seedance/Atlas currently
+  // rejects signed audio URLs during processing. Avatar identity is locked via
+  // image references; audio is generated from the prompt.
 
   const res = await fetch('https://api.atlascloud.ai/api/v1/model/generateVideo', {
     method: 'POST',
