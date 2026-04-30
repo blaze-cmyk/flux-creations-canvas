@@ -108,8 +108,9 @@ function FormatCard({ id, label, src }: { id: string; label: string; src: string
               e.stopPropagation();
               const preset = FORMAT_PRESETS[id];
               if (!preset) return;
-              dispatchRecreate(preset);
               window.scrollTo({ top: 0, behavior: 'smooth' });
+              // Defer so listener is mounted & after scroll begins
+              requestAnimationFrame(() => dispatchRecreate(preset));
             }}
             className={`w-full h-11 rounded-full bg-white text-black text-sm font-semibold shadow-[0_10px_30px_-10px_rgba(0,0,0,0.6)] transition-all duration-300 ease-out ${
               hovered ? 'translate-y-0 opacity-100' : 'translate-y-[140%] opacity-0'
