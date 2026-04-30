@@ -188,8 +188,9 @@ export function PromptBar({ projectId }: Props) {
 
       updateGeneration(pid, placeholderId, {
         id: vidData?.id || placeholderId,
-        status: 'running',
+        status: 'queued',
         falRequestId: vidData?.fal_request_id,
+        submittedAt: Date.now(),
       });
     } catch (e: any) {
       updateGeneration(pid, placeholderId, { status: 'failed', error: e?.message ?? 'Unknown error' });
