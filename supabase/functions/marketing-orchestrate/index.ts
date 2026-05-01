@@ -360,6 +360,7 @@ Deno.serve(async (req) => {
           })
         : String(candidate).trim();
     }
+    finalPrompt = applyAntiReplicationDirective(finalPrompt, { hasAvatar: !!avatarId, hasProduct: !!productId });
     const voiceoverText = scriptPayload?.voiceover_script || extractSpokenLines(finalPrompt);
 
     // 2) Persist row immediately at stage=videoing — no scripting step anymore.
