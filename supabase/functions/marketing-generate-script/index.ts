@@ -109,12 +109,22 @@ Hard rules that override every format below:
 - The concrete_product_details array MUST contain at least 4 items extracted from the actual product images (color names, materials, hardware pieces, printed text, distinctive features). Do not invent details that aren't visible.
 - READABLE TEXT RULE: any printed text, lettering, numbers, slogans, or logos visible on the product, garment, or packaging MUST be described as facing the camera and reading FORWARD — perfectly legible. NEVER use mirror reflections, mirror selfies, or any framing where on-product text would appear reversed/flipped/mirrored. If the camera angle would mirror the text, change the camera angle. State explicitly inside the prompt that the text reads forward.`;
 
-const CREATIFY_RUNTIME_DIRECTIVE = `CREATIFY STRATEGY PASS (mandatory before writing final_prompt):
-- Pick ONE hook formula from the Creatify skill that fits the product: Pattern Interrupt, POV Hook, Bold Claim, Before/After, Day-in-the-Life, or Social Proof Stack.
-- Pick ONE body structure: Problem-Agitate-Solve, Feature Cascade, Before/After, Day-in-the-Life, or Social Proof Stack.
-- Turn that strategy into visible UGC actions, not marketing words: an opening physical interruption, a tactile proof beat, a product-use or styling beat, and a payoff/reaction beat.
-- No generic CTA copy in the generated video. The payoff can be a quiet human line, but never "shop now" or polished ad narration.
-- The creative concept must be different from the avatar upload photo and different from a basic bedroom selfie unless the user specifically requested that.`;
+// Distilled Creatify reference. Use sparingly — Higgsfield few-shots are the dominant
+// stylistic signal. These are HINTS the writer can pull from, not a checklist.
+const CREATIFY_DISTILLED = `CREATIFY REFERENCE (use only if it fits the product naturally — never force a formula):
+HOOK FORMULAS (pick at most one):
+- Pattern Interrupt — start mid-action, unexpected visual.
+- POV Hook — "POV: you finally found a [thing] that [does X]".
+- Bold Claim — lead with the strongest single benefit, stated flat.
+- Question Hook — open a curiosity loop the viewer must close.
+- Stat / Authority — one number or one credential, no list.
+BODY STRUCTURES (pick at most one):
+- Problem → Agitate → Solve.
+- Feature Cascade — hero feature, two supporting beats, proof.
+- Social Proof Stack — quote, visible proof, volume, urgency.
+- Before / After — plain → product → improved result.
+- Day-in-the-Life — one realistic moment, tactile beat, quiet payoff.
+Rules: pick formulas silently. Never name them in the output. If USER_DIRECTION is present, the user's idea wins — formulas only shape camera/structure.`;
 
 // ---------- Few-shot example outputs (verbatim Higgsfield) ----------
 const EX_UGC = `EXAMPLE OUTPUT (study the structure, tone, persona-fit, concrete sensory detail — never copy literally):
