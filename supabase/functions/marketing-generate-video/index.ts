@@ -195,7 +195,9 @@ async function submitAtlas(opts: {
   };
   if (hasRefs) {
     body.reference_images = atlasImageUrls;
+    body.images = atlasImageUrls;
     body.image_urls = atlasImageUrls;
+    body.image_url = atlasImageUrls[0];
     if (atlasAudioUrls.length) body.audio_urls = atlasAudioUrls;
   }
 
