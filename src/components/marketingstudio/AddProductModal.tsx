@@ -311,7 +311,13 @@ export function AddProductModal({
                               </button>
                             </div>
                           ) : p.primary_thumb ? (
-                            <img src={p.primary_thumb} alt={p.name} className="w-full h-full object-cover" />
+                            <img
+                              src={p.primary_thumb}
+                              alt={p.name}
+                              loading="eager"
+                              decoding="async"
+                              className="w-full h-full object-cover"
+                            />
                           ) : (
                             <div className="w-full h-full grid place-items-center text-[10px] text-muted-foreground">
                               No image
