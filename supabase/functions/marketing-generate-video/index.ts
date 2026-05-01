@@ -59,12 +59,12 @@ function uniqueValidUrls(urls: unknown[], limit = 9) {
   return out;
 }
 
-async function signedStorageUrl(admin: ReturnType<typeof createClient>, bucket: string, path: string, ttl = 60 * 60 * 24) {
+async function signedStorageUrl(admin: any, bucket: string, path: string, ttl = 60 * 60 * 24) {
   const { data } = await admin.storage.from(bucket).createSignedUrl(path, ttl);
   return data?.signedUrl ?? null;
 }
 
-async function gatherFreshReferenceUrls(admin: ReturnType<typeof createClient>, opts: {
+async function gatherFreshReferenceUrls(admin: any, opts: {
   productId?: string | null;
   avatarId?: string | null;
   keyframePath?: string | null;
@@ -97,8 +97,8 @@ async function gatherFreshReferenceUrls(admin: ReturnType<typeof createClient>, 
       .select('public_url, storage_path')
       .eq('id', opts.avatarId)
       .maybeSingle();
-    const avatarUrl = av?.public_url || (av?.storage_path ? await signedStorageUrl(admin, 'ms-avatars', av.storage_path) : null);
-    if (avatarUrl) refs.push(avatarUrl);
+    const avatarUrl = (av as any)?.public_url || ((av as any)?.storage_path ? await signedStorageUrl(admin, 'ms-avatars', (av as any).storage_path) : null);
+    if (typeof avatarUrl === 'string') refs.push(avatarUrl);
   }
 
   return uniqueValidUrls(refs.length ? refs : (opts.fallbackUrls ?? []), 9);
