@@ -101,19 +101,41 @@ export function FormatPickerModal({ open, onOpenChange, selected, onSelect }: Pr
 }
 
 function FormatTile({ item, active, onClick }: { item: FormatItem; active: boolean; onClick: () => void }) {
+  const wrapRef = useRef<HTMLDivElement>(null);
   const ref = useRef<HTMLVideoElement>(null);
   const [muted, setMuted] = useState(true);
   const [hovered, setHovered] = useState(false);
+  const [inView, setInView] = useState(false);
+
+  // Only mount/play the video once the tile is near the viewport.
+  useEffect(() => {
+    const el = wrapRef.current;
+    if (!el || inView) return;
+    const io = new IntersectionObserver(
+      (entries) => {
+        for (const e of entries) {
+          if (e.isIntersecting) {
+            setInView(true);
+            io.disconnect();
+            break;
+          }
+        }
+      },
+      { root: null, rootMargin: '200px', threshold: 0.01 },
+    );
+    io.observe(el);
+    return () => io.disconnect();
+  }, [inView]);
 
   useEffect(() => {
     const v = ref.current;
-    if (!v) return;
+    if (!v || !inView) return;
     v.muted = true;
     const tryPlay = () => v.play().catch(() => {});
     if (v.readyState >= 2) tryPlay();
     else v.addEventListener('loadeddata', tryPlay, { once: true });
     return () => v.removeEventListener('loadeddata', tryPlay);
-  }, []);
+  }, [inView]);
 
   return (
     <button
