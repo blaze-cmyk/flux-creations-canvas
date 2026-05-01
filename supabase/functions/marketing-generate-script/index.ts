@@ -740,7 +740,10 @@ Deno.serve(async (req) => {
         extraForLLM
           .map((_, i) => `- @${userExtraNames[i] || `Image ${i + 1}`}: attached reference image #${extraStartIdx + i + 1}`)
           .join('\n') +
-        `\nIf USER_DIRECTION mentions @Image N (or any of the names above), treat that as a literal pointer to the matching reference image. Use those images for any people, props, settings, or wardrobe the user is asking to include — preserve their visible identity / appearance the same way you preserve the product and avatar. Never copy their background or framing — identity / appearance only.\n`
+        `\nThese extra reference images are FIRST-CLASS CASTING / PROP INPUTS, not background flavor:\n` +
+        `- If an extra reference depicts a PERSON and the format is Podcast (or any two-person format), that person IS Speaker B. Lock Speaker B's appearance — face, hair color & length, skin tone, age range, build, wardrobe colors and silhouette — to that exact reference image. Describe these traits explicitly inside every SINGLE B and WIDE TWO-SHOT shot tag in the final paragraph so Seedance has no room to invent a different person. Reference image # is the casting choice; do NOT swap it for a generic "second host".\n` +
+        `- If an extra reference depicts a PROP, OUTFIT, or SETTING, treat it the same way you treat the product / avatar: preserve identity / appearance, ignore its background and framing.\n` +
+        `- If USER_DIRECTION mentions @Image N (or any of the names above), treat that as a literal pointer to the matching reference image.\n`
       : '';
 
     const userTextBlock =
