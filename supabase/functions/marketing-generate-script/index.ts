@@ -241,6 +241,8 @@ function isWeak(finalPrompt: string, details: string[]): { weak: boolean; reason
   if (!finalPrompt || finalPrompt.length < 350) return { weak: true, reason: 'too short' };
   if (BANNED_RX.test(finalPrompt)) return { weak: true, reason: 'banned phrase' };
   if (!/"[^"\n]{2,140}"/.test(finalPrompt)) return { weak: true, reason: 'no quoted dialogue' };
+  if (!/Action and dialogue sequence|HOOK|JUMP CUT|BEAT|POV:|0[–-]\d|Before|After/i.test(finalPrompt)) return { weak: true, reason: 'no creatify-style structure' };
+  if (!/(switches to the back camera|back camera|close-up|macro|props the phone|jump cut|overhead|POV|sets the phone down|detail shot)/i.test(finalPrompt)) return { weak: true, reason: 'too static' };
   if (details && details.length >= 2) {
     const hits = details.filter((d) => d && finalPrompt.toLowerCase().includes(String(d).toLowerCase().split(' ').slice(0, 2).join(' '))).length;
     if (hits === 0) return { weak: true, reason: 'no product detail mentioned' };
