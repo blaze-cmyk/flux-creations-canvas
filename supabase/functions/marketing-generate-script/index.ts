@@ -386,12 +386,14 @@ async function callWriter(args: { systemPrompt: string; userTextBlock: string; i
   if (ANTHROPIC_API_KEY) {
     const r = await callAnthropic(args);
     if (r.ok) return { res: r, provider: 'anthropic' };
-    console.warn('[generate-script] anthropic failed', r.status);
+    const body = await r.clone().text().catch(() => '');
+    console.warn('[generate-script] anthropic failed', r.status, body.slice(0, 500));
   }
   if (OPENROUTER_API_KEY) {
     const r = await callOpenRouter(args);
     if (r.ok) return { res: r, provider: 'openrouter' };
-    console.warn('[generate-script] openrouter failed', r.status);
+    const body = await r.clone().text().catch(() => '');
+    console.warn('[generate-script] openrouter failed', r.status, body.slice(0, 500));
   }
   const r = await callLovableGemini(args);
   return { res: r, provider: 'lovable-gemini' };
