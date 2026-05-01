@@ -268,102 +268,49 @@ Deno.serve(async (req) => {
       });
     }
 
-    // 1) Resolve refs + product/avatar metadata. Always send up to 6 product
-    // reference images to Seedance — capping to 1 caused the model to just
-    // re-animate the single reference photo (the AI-slop pattern). The script
-    // writer only sees up to 3 of them (multimodal call).
-    const { refs, thumb, product, avatar } = await gatherReferenceUrls(admin, {
-      productId,
-      avatarId,
-      maxProductImages: 6,
-    });
+    // 1) Resolve product/avatar thumb cheaply for the placeholder row. Full
+    // reference URL gathering happens inside the background pipeline so the
+    // HTTP response can return in <500ms.
+    let thumb: string | null = null;
+    try {
+      if (productId) {
+        const { data: imgs } = await admin
+          .from('ms_product_images')
+          .select('storage_path, is_primary')
+          .eq('product_id', productId)
+          .order('is_primary', { ascending: false })
+          .limit(1);
+        const path = (imgs?.[0] as any)?.storage_path;
+        if (path) {
+          const { data: signed } = await admin.storage.from('ms-products').createSignedUrl(path, 3600);
+          thumb = signed?.signedUrl ?? null;
+        }
+      } else if (avatarId) {
+        const { data: av } = await admin
+          .from('ms_avatars')
+          .select('public_url, storage_path')
+          .eq('id', avatarId)
+          .maybeSingle();
+        thumb = (av as any)?.public_url ?? null;
+        if (!thumb && (av as any)?.storage_path) {
+          const { data: signed } = await admin.storage.from('ms-avatars').createSignedUrl((av as any).storage_path, 3600);
+          thumb = signed?.signedUrl ?? null;
+        }
+      }
+    } catch (e) {
+      console.warn('[orchestrate] thumb resolve failed', e);
+    }
 
-    // 2) Route Scenario E (avatar + user prompt, no product) to a dedicated
-    // talking-head format that doesn't require product references.
+    // 2) Decide effective format (Scenario E routing) so we persist the right
+    // value on the placeholder row.
     let effectiveFormat = format;
     if (!productId && avatarId && userPromptTrimmed) {
       effectiveFormat = 'AVATAR_TALKING_HEAD';
     }
 
-    // 2b) One-time vision backfill: if this product has no cached
-    // vision_analysis yet, run analyze-product once on the primary image and
-    // persist it. The script writer will pick it up next call (and on retries).
-    if (productId && refs.length > 0) {
-      try {
-        const { data: prodRow } = await admin
-          .from('ms_products')
-          .select('vision_analysis')
-          .eq('id', productId)
-          .maybeSingle();
-        if (prodRow && !(prodRow as any).vision_analysis) {
-          const visRes = await invokeFn('marketing-analyze-product', { image_url: refs[0] });
-          if (visRes.ok && visRes.json?.visual_facts) {
-            await admin
-              .from('ms_products')
-              .update({ vision_analysis: visRes.json.visual_facts })
-              .eq('id', productId);
-          }
-        }
-      } catch (e) {
-        console.warn('[orchestrate] vision backfill failed', e);
-      }
-    }
-
-    // 3) If the user already supplied a substantial prompt/script (long enough,
-    // or contains timestamps/dialogue/beat markers), pass it through RAW to
-    // Seedance — do NOT rewrite it. The script writer is only for the
-    // "minimal input" cases where the user just selected product/avatar.
-    const looksLikeFullScript = (() => {
-      const t = userPromptTrimmed;
-      if (!t) return false;
-      if (t.length >= 220) return true; // a real prompt, not a one-liner
-      if (/\d{1,2}:\d{2}\s*[-–—]\s*\d{1,2}:\d{2}/.test(t)) return true; // 0:00-0:03
-      if (/"[^"\n]{2,160}"/.test(t) && t.length >= 120) return true; // has dialogue
-      if (/\b(BEAT|HOOK|CTA|JUMP CUT|VOICEOVER|VO:|SCENE)\b/i.test(t)) return true;
-      return false;
-    })();
-
-    let scriptPayload: any = null;
-    let finalPrompt = userPromptTrimmed;
-    let scriptPersona: string | null = null;
-    if (looksLikeFullScript) {
-      // Respect the creator's prompt verbatim — only append a tiny legibility
-      // guardrail so on-product text doesn't render mirrored.
-      finalPrompt = `${userPromptTrimmed}\n\nCRITICAL: any printed text, lettering, numbers, or logos visible on the product, packaging, or clothing must always read forward and be perfectly legible — never mirrored, flipped, reversed, or rendered as a mirror reflection.`;
-      scriptPayload = { source: 'user_raw', final_prompt: finalPrompt, voiceover_script: extractSpokenLines(userPromptTrimmed) };
-      scriptPersona = 'user-supplied';
-    } else if (productId || avatarId) {
-      const scriptRes = await invokeFn('marketing-generate-script', {
-        productId,
-        avatarId,
-        format: effectiveFormat,
-        surface,
-        aspect: ratio,
-        duration: duration_seconds,
-        userPrompt: userPromptTrimmed,
-        userDirection: userPromptTrimmed,
-      });
-      const candidate = scriptRes.ok ? scriptRes.json?.prompt : null;
-      scriptPayload = scriptRes.ok ? scriptRes.json?.script : { error: scriptRes.text };
-      scriptPersona = scriptRes.ok ? (scriptRes.json?.script_persona ?? null) : null;
-      const details: string[] = scriptRes.ok ? (scriptRes.json?.concrete_product_details ?? []) : [];
-      const candidateStr = typeof candidate === 'string' ? candidate : '';
-      const lacksDetails = productId && details.length > 0 && !details.some((d) => d && candidateStr.toLowerCase().includes(String(d).toLowerCase().split(' ').slice(0, 2).join(' ')));
-      finalPrompt = (isWeakGeneratedScript(candidate) || lacksDetails)
-        ? buildFallbackPrompt({
-            format: effectiveFormat,
-            product,
-            avatar,
-            userPrompt: userPromptTrimmed,
-            hasProduct: !!productId,
-            hasAvatar: !!avatarId,
-          })
-        : String(candidate).trim();
-    }
-    finalPrompt = applyAntiReplicationDirective(finalPrompt, { hasAvatar: !!avatarId, hasProduct: !!productId });
-    const voiceoverText = scriptPayload?.voiceover_script || extractSpokenLines(finalPrompt);
-
-    // 2) Persist row immediately at stage=videoing — no scripting step anymore.
+    // 3) Persist a placeholder row IMMEDIATELY so the client gets a real id
+    // to poll. Stage starts at 'scripting' — the rest of the pipeline runs in
+    // the background via EdgeRuntime.waitUntil.
     const { data: row, error: insErr } = await admin
       .from('ms_generations')
       .insert({
@@ -376,14 +323,12 @@ Deno.serve(async (req) => {
         aspect: ratio,
         duration_seconds,
         resolution,
-        prompt: finalPrompt,
-        script: scriptPayload ?? { final_prompt: finalPrompt, voiceover_script: voiceoverText },
-        script_text: voiceoverText || finalPrompt,
-        script_persona: scriptPersona,
-        reference_paths: refs,
+        prompt: userPromptTrimmed || '(generating script…)',
+        script: { source: 'pending' },
+        script_text: userPromptTrimmed || '',
         thumb_url: thumb,
         status: 'queued',
-        stage: 'videoing',
+        stage: 'scripting',
       })
       .select()
       .single();
@@ -391,10 +336,106 @@ Deno.serve(async (req) => {
 
     const generationId = row.id;
 
-    // Respond immediately. Video submission runs in background so the UI
-    // gets a real id to poll without waiting on the provider handshake.
+    // 4) Background pipeline: gather refs, run script writer, then submit to
+    // the video function. All slow work happens here AFTER we've already
+    // responded to the client.
     const runPipeline = async () => {
       try {
+        // 4a) Gather full reference URLs + product/avatar metadata.
+        const { refs, product, avatar } = await gatherReferenceUrls(admin, {
+          productId,
+          avatarId,
+          maxProductImages: 6,
+        });
+
+        // 4b) One-time vision backfill for the product.
+        if (productId && refs.length > 0) {
+          try {
+            const { data: prodRow } = await admin
+              .from('ms_products')
+              .select('vision_analysis')
+              .eq('id', productId)
+              .maybeSingle();
+            if (prodRow && !(prodRow as any).vision_analysis) {
+              const visRes = await invokeFn('marketing-analyze-product', { image_url: refs[0] });
+              if (visRes.ok && visRes.json?.visual_facts) {
+                await admin
+                  .from('ms_products')
+                  .update({ vision_analysis: visRes.json.visual_facts })
+                  .eq('id', productId);
+              }
+            }
+          } catch (e) {
+            console.warn('[orchestrate] vision backfill failed', e);
+          }
+        }
+
+        // 4c) Decide whether to pass the user's prompt through verbatim or
+        // route it through the Claude script writer.
+        const looksLikeFullScript = (() => {
+          const t = userPromptTrimmed;
+          if (!t) return false;
+          if (t.length >= 220) return true;
+          if (/\d{1,2}:\d{2}\s*[-–—]\s*\d{1,2}:\d{2}/.test(t)) return true;
+          if (/"[^"\n]{2,160}"/.test(t) && t.length >= 120) return true;
+          if (/\b(BEAT|HOOK|CTA|JUMP CUT|VOICEOVER|VO:|SCENE)\b/i.test(t)) return true;
+          return false;
+        })();
+
+        let scriptPayload: any = null;
+        let finalPrompt = userPromptTrimmed;
+        let scriptPersona: string | null = null;
+        if (looksLikeFullScript) {
+          finalPrompt = `${userPromptTrimmed}\n\nCRITICAL: any printed text, lettering, numbers, or logos visible on the product, packaging, or clothing must always read forward and be perfectly legible — never mirrored, flipped, reversed, or rendered as a mirror reflection.`;
+          scriptPayload = { source: 'user_raw', final_prompt: finalPrompt, voiceover_script: extractSpokenLines(userPromptTrimmed) };
+          scriptPersona = 'user-supplied';
+        } else if (productId || avatarId) {
+          const scriptRes = await invokeFn('marketing-generate-script', {
+            productId,
+            avatarId,
+            format: effectiveFormat,
+            surface,
+            aspect: ratio,
+            duration: duration_seconds,
+            userPrompt: userPromptTrimmed,
+            userDirection: userPromptTrimmed,
+          });
+          const candidate = scriptRes.ok ? scriptRes.json?.prompt : null;
+          scriptPayload = scriptRes.ok ? scriptRes.json?.script : { error: scriptRes.text };
+          scriptPersona = scriptRes.ok ? (scriptRes.json?.script_persona ?? null) : null;
+          const details: string[] = scriptRes.ok ? (scriptRes.json?.concrete_product_details ?? []) : [];
+          const candidateStr = typeof candidate === 'string' ? candidate : '';
+          const lacksDetails = productId && details.length > 0 && !details.some((d) => d && candidateStr.toLowerCase().includes(String(d).toLowerCase().split(' ').slice(0, 2).join(' ')));
+          finalPrompt = (isWeakGeneratedScript(candidate) || lacksDetails)
+            ? buildFallbackPrompt({
+                format: effectiveFormat,
+                product,
+                avatar,
+                userPrompt: userPromptTrimmed,
+                hasProduct: !!productId,
+                hasAvatar: !!avatarId,
+              })
+            : String(candidate).trim();
+        }
+        finalPrompt = applyAntiReplicationDirective(finalPrompt, { hasAvatar: !!avatarId, hasProduct: !!productId });
+        const voiceoverText = scriptPayload?.voiceover_script || extractSpokenLines(finalPrompt);
+
+        // 4d) Persist script + advance stage to 'videoing' so the UI knows
+        // we're moving on.
+        await admin
+          .from('ms_generations')
+          .update({
+            prompt: finalPrompt,
+            script: scriptPayload ?? { final_prompt: finalPrompt, voiceover_script: voiceoverText },
+            script_text: voiceoverText || finalPrompt,
+            script_persona: scriptPersona,
+            reference_paths: refs,
+            stage: 'videoing',
+          })
+          .eq('id', generationId);
+
+        // 4e) Submit to the video function (still synchronous from its own POV
+        // but we're already in the background).
         const vidRes = await invokeFn('marketing-generate-video', {
           reuseGenerationId: generationId,
           prompt: finalPrompt,
@@ -430,7 +471,7 @@ Deno.serve(async (req) => {
     }
 
     return new Response(
-      JSON.stringify({ id: generationId, stage: 'videoing', status: 'queued' }),
+      JSON.stringify({ id: generationId, stage: 'scripting', status: 'queued' }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
     );
   } catch (e) {
