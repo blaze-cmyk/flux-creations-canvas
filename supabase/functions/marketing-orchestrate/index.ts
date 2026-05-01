@@ -196,7 +196,7 @@ function buildFallbackPrompt(args: {
   return [
     header,
     beats,
-    'Action and dialogue sequence must create a new scene using the references only as anchors. Do not recreate the exact uploaded product/avatar image. No split-screens, no text overlays, no logos baked in, no music, only natural ambient sound. Avoid words like introducing, game-changer, elevate, must-have. Keep dialogue short, casual, real, and tied to visible physical details.',
+    'Action and dialogue sequence must create a new scene using the references only as anchors. Do not recreate the exact uploaded product/avatar image. No split-screens, no text overlays, no logos baked in, no music, only natural ambient sound. Avoid words like introducing, game-changer, elevate, must-have. Keep dialogue short, casual, real, and tied to visible physical details. CRITICAL: any printed text, lettering, numbers, or logos visible on the product, packaging, or clothing must always read forward and be perfectly legible — never mirrored, flipped, reversed, or rendered as a mirror reflection. Avoid mirror reflections entirely; film the subject and product directly with the camera.',
   ].join('\n') + userLine;
 }
 
