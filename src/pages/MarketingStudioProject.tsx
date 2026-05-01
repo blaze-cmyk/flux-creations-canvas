@@ -379,34 +379,31 @@ export default function MarketingStudioProject() {
                       }}
                       className="w-full h-full object-cover"
                     />
-                  ) : g.thumbUrl ? (
+                  ) : g.thumbUrl && !isPending && !isFailed ? (
                     <img
                       src={g.thumbUrl}
                       alt=""
-                      className={`w-full h-full object-cover ${isPending ? 'opacity-30 blur-sm' : ''}`}
+                      className="w-full h-full object-cover"
                     />
                   ) : (
-                    <div className="absolute inset-0 bg-gradient-to-br from-ms-surface-2 to-ms-surface" />
+                    <div className="absolute inset-0 bg-[#0a0a0a]" />
                   )}
 
                   {isPending && (
                     <>
-                      <div className="absolute inset-0 ms-shimmer" />
+                      <div className="absolute inset-0 ms-shimmer opacity-40" />
                       <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 text-foreground/90 px-3">
                         <Loader2 className="w-6 h-6 animate-spin" />
                         <div className="text-[11px] font-medium tracking-wide uppercase text-center">
                           {stageLabel(g)}
                         </div>
-                        <div className="w-full h-1 rounded-full bg-white/10 overflow-hidden">
+                        <div className="w-3/4 h-1 rounded-full bg-white/10 overflow-hidden">
                           <div
                             className="h-full bg-foreground/80 transition-all"
                             style={{ width: `${pct}%` }}
                           />
                         </div>
                         <div className="text-[10px] text-muted-foreground">{elapsed}s</div>
-                        <div className="text-[10px] text-muted-foreground line-clamp-2 text-center">
-                          {g.prompt}
-                        </div>
                       </div>
                     </>
                   )}
