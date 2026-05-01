@@ -229,6 +229,8 @@ export function PromptBar({ projectId }: Props) {
             userPrompt: prompt,
             exactVoiceover,
             projectId: pid,
+            extraRefImages: extraRefs.map((r) => r.url),
+            extraRefNames: extraRefs.map((r) => r.name),
           },
         },
       );
