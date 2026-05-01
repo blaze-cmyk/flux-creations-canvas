@@ -115,6 +115,7 @@ export type Database = {
           reference_paths: string[] | null
           resolution: string | null
           script: Json | null
+          script_persona: string | null
           script_text: string | null
           stage: string
           status: string
@@ -143,6 +144,7 @@ export type Database = {
           reference_paths?: string[] | null
           resolution?: string | null
           script?: Json | null
+          script_persona?: string | null
           script_text?: string | null
           stage?: string
           status?: string
@@ -171,6 +173,7 @@ export type Database = {
           reference_paths?: string[] | null
           resolution?: string | null
           script?: Json | null
+          script_persona?: string | null
           script_text?: string | null
           stage?: string
           status?: string
@@ -251,6 +254,7 @@ export type Database = {
           status: string
           updated_at: string
           user_id: string | null
+          vision_analysis: Json | null
         }
         Insert: {
           brand_color?: string | null
@@ -263,6 +267,7 @@ export type Database = {
           status?: string
           updated_at?: string
           user_id?: string | null
+          vision_analysis?: Json | null
         }
         Update: {
           brand_color?: string | null
@@ -275,6 +280,7 @@ export type Database = {
           status?: string
           updated_at?: string
           user_id?: string | null
+          vision_analysis?: Json | null
         }
         Relationships: []
       }
