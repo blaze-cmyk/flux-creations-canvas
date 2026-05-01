@@ -341,7 +341,7 @@ async function submitWithFallback(opts: {
   resolution: string;
   productId?: string | null;
   avatarId?: string | null;
-}): Promise<{ provider: Provider; requestId: string } | { error: string; details: unknown; stage: string }> {
+}): Promise<{ provider: Provider; requestId: string; endpoint: string } | { error: string; details: unknown; stage: string }> {
   const chain = buildChain(opts);
   if (chain.length === 0) return { error: 'no_providers_configured', details: null, stage: 'submit' };
 
@@ -349,19 +349,14 @@ async function submitWithFallback(opts: {
   const reasons: string[] = [];
   for (const provider of chain) {
     try {
-      const providerOpts = provider === 'fal'
-        ? { ...opts, image_urls: falSafeImageUrls(opts) }
-        : opts;
-      if (provider === 'fal' && providerOpts.image_urls.length !== opts.image_urls.length) {
-        log('WARN', 'submit: fal fallback dropping avatar ref to avoid Seedance real-person policy block', {
-          originalRefs: opts.image_urls.length,
-          falRefs: providerOpts.image_urls.length,
-        });
-      }
-      const r = provider === 'atlascloud' ? await submitAtlas(providerOpts) : await submitFal(providerOpts);
+      // Per fal + Atlas Seedance 2.0 docs both accept up to 9 reference_images
+      // (avatar + product). Do not strip refs preemptively; only react to the
+      // provider's own response.
+      const r = provider === 'atlascloud' ? await submitAtlas(opts) : await submitFal(opts);
+      const endpoint = providerEndpoint(provider, opts.image_urls.length > 0);
       if (r.ok && r.requestId) {
-        log('INFO', 'submit: provider accepted', { provider, requestId: r.requestId });
-        return { provider, requestId: r.requestId };
+        log('INFO', 'submit: provider accepted', { provider, requestId: r.requestId, endpoint });
+        return { provider, requestId: r.requestId, endpoint };
       }
       log('WARN', 'submit: provider rejected, trying next', { provider, raw: r.raw });
       lastErr = r.raw;
@@ -369,15 +364,16 @@ async function submitWithFallback(opts: {
       if (provider === 'atlascloud' && raw?.code === 402) {
         reasons.push('AtlasCloud: insufficient balance — top up at atlascloud.ai to continue.');
       } else if (provider === 'fal' && Array.isArray(raw?.detail) && raw.detail[0]?.type === 'content_policy_violation') {
-        reasons.push('fal: avatar image blocked (real-person likeness). Use AtlasCloud instead.');
+        reasons.push('fal: content policy violation on reference image. Try a different photo.');
       } else {
-        reasons.push(`${provider}: ${raw?.msg || raw?.detail?.[0]?.msg || 'rejected'}`);
+        reasons.push(`${provider}: ${raw?.msg || raw?.detail?.[0]?.msg || raw?.message || 'rejected'}`);
       }
       if (provider === 'atlascloud' && opts.audio_urls.length > 0 && hasAudioUrlError(r.raw)) {
         const retry = await submitAtlas({ ...opts, audio_urls: [] });
+        const endpoint = providerEndpoint(provider, opts.image_urls.length > 0);
         if (retry.ok && retry.requestId) {
           log('INFO', 'submit: provider accepted without audio ref', { provider, requestId: retry.requestId });
-          return { provider, requestId: retry.requestId };
+          return { provider, requestId: retry.requestId, endpoint };
         }
         lastErr = retry.raw;
       }
