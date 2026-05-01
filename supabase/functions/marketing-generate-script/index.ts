@@ -142,8 +142,8 @@ HOOK (0–2s) POV handheld, slightly shaky. A bright red shopping bag with gold 
 const EX_TALKING_HEAD = `EXAMPLE OUTPUT (study the structure, tone, persona-fit — never copy literally):
 Vertical 9:16, shot on iPhone front camera, natural daylight from a side window, handheld with subtle micro-shake, real skin tones, no filters. A young woman sits close to the front camera in a casual room — warm light, soft background, slightly cluttered desk visible at the edge. She speaks directly to the lens, relaxed and natural, like talking to a friend. Action and dialogue sequence: She leans in slightly, half-smile: "Okay I need to tell you something." Pauses, looks off camera, looks back. Continues with one personal observation, one specific reason it matters, one honest reaction. Keeps it under five spoken lines. Final beat: she stops talking, holds eye contact for a beat, breaks into a small smile, reaches toward the phone — video ends mid-motion.`;
 
-const EX_PODCAST = `EXAMPLE OUTPUT (study the multi-cam shuffle, reaction shots, tactile-proof beat, action-cut, conversational overlap — never copy literally):
-A 25-second vertical 9:16 UGC video styled as a multi-cam podcast clip. The scene is a dim modern living room — brown fabric couch, mixed practical lighting (warm lamp + window edge), three locked tripod cameras working in shuffle: WIDE TWO-SHOT framing both subjects from the front with a foreground black podcast microphone slightly out of focus on the left of frame, SINGLE A chest-up of Guy 1 (left, black LA cap, black tee) with his own black podcast mic in foreground, SINGLE B chest-up of Guy 2 (right, white ribbed tank, thick olive-green Comfrt sweatpants with elastic drawstring waistband) with his own black podcast mic in foreground. Cuts are hard, motivated by who is speaking. 0–2s WIDE TWO-SHOT — HOOK: Guy 1 leans back, looks at Guy 2: "What is the most comfortable pair of sweatpants you own?" Hard cut. 2–3s SINGLE B — Guy 2 alone in frame, mic in foreground, glances down then up, calm: "Comfrt?" Hard cut. 3–7s SINGLE A — Guy 1 alone, leans forward, hand chops down on "viral", points off-frame on "market": "Bro, they're going viral right now for being like the most comfortable sweat set on the market." Hard cut. 7–9s REACTION — SINGLE B of Guy 2 silent, nodding slowly, glancing down at his own pants, half-smile, voice of Guy 1 still trailing under the cut. Hard cut. 9–11s SINGLE B — Guy 2 looks up, nods: "And they're the best thing I've ever purchased." Hard cut. 11–13s WIDE TWO-SHOT — TACTILE: Guy 1 leans deep across the frame, pinches the thick olive fabric on Guy 2's left thigh: "May I feel?" Guy 2 shifts his leg: "Yeah, check 'em out." 13–15s ACTION CUT: still on the WIDE, Guy 2 dips off-camera right, snaps back up, throws a bundled olive-green Comfrt hoodie across the frame at Guy 1: "Wait dude, check out the whole set." Hard cut masked by motion blur of the hoodie crossing the lens. 15–25s SINGLE B — Guy 2 is now wearing the matching olive-green Comfrt pullover with the black "COMFRT" chest logo facing the camera and reading forward, mic in foreground. He pinches the hoodie fabric near his collarbone and pulls it slightly: "I don't fly or do any traveling unless it's in a Comfrt set. It's like this slightly weighted material that's supposed to help with stress, anxiety. I love anything that supports mental health — so you gotta get a set." On the final line he locks his elbow and points his index finger directly into the lens. Brief 1s REACTION cut to SINGLE A of Guy 1 silent, nodding once, small approving smirk. Style: raw multi-cam podcast clip, hard cuts only, no music, no text overlays, only natural room tone and conversational overlap.`;
+const EX_PODCAST = `EXAMPLE OUTPUT (study the PACING SHIFTS — fast bursts then slow punchlines — the GENUINE LAUGH, the unscripted-feeling tangent, the meme-able single line. Never copy literally, but match this energy):
+A 22-second vertical 9:16 multi-cam podcast clip pulled from a real episode. Dim modern podcast studio: matte-black acoustic foam back wall in square wedge pattern, warm tungsten key light cutting in from camera-left at 3200K, soft amber rim from a vintage edison bulb behind the guests, deep shadows on opposite cheeks. Two dark brown leather armchairs with brass studs, low matte-black coffee table with a half-full glass tumbler. Three locked tripod cameras, ~50mm, shallow depth of field, faint film grain. WIDE TWO-SHOT frames both hosts with a black RØDE PodMic on a visible articulating boom arm slightly out of focus lower-left. SINGLE A is chest-up of Maya (left chair, oversized cream knit, gold hoops, hair down, smooth warm voice low register) with her own RØDE mic on boom in foreground. SINGLE B is chest-up of Jordan (right chair, black crewneck, short curly hair, dry comedic delivery) with his own RØDE mic on boom in foreground. 0–2s SINGLE A — Maya leans into the mic fast, eyes wide, half-laughing already: "Okay wait — bro, I have to say it." Hard cut. 2–3s SINGLE B — Jordan deadpan, eyebrow up, slow: "Say it." Hard cut. 3–6s SINGLE A — Maya, faster now, hand flicks up beside her face on "literally", voice rising on the last word: "I literally have not taken these off in like — four days." Hard cut. 6–8s REACTION — SINGLE B of Jordan silent, slow blink, then a small involuntary laugh through his nose, glances down at her pants off-screen, shakes his head once. Maya's voice trails under the cut: "…four days, Jordan." Hard cut. 8–10s SINGLE B — Jordan, low and dry, leaning toward his mic: "That's disgusting. Continue." Hard cut. 10–13s WIDE TWO-SHOT — TACTILE: Maya laughs out loud, head tipping back for a beat, then leans forward, pinches the thick olive fabric on her own thigh and tugs it: "No but feel — feel this, this is insane." Jordan reaches across, pinches the same fabric, pulls a face: "Oh. Oh that's — yeah okay." 13–15s ACTION CUT: still WIDE, Maya dips off-camera right, snaps back up, throws a bundled matching olive hoodie across the frame at Jordan: "Wait — put this on right now." Hard cut masked by motion blur of the hoodie crossing the lens. 15–22s SINGLE B — Jordan is now wearing the olive Comfrt pullover, "COMFRT" chest logo facing camera and reading forward, mic in foreground. He pinches the fabric at his collarbone, pulls it out slightly, looks down at it then up at the lens with a small surprised smile, slow pacing: "Okay this is — this is genuinely a problem." Beat. He locks his elbow and points his index finger right into the lens, faster: "Everyone's getting one. Get a set." Brief 1s REACTION cut to SINGLE A of Maya silent, smug grin, slow nod, mouths "told you" off-mic. Style: raw multi-cam podcast clip, hard cuts only, no music, only conversational overlap, real laughter, room tone, and the occasional breath into the mic.`;
 
 // ---------- Format prompts with POV_HANDS branches ----------
 const UGC_PROMPT = `You write Seedance 2.0 video generation prompts for UGC-style product review videos. Your output is a single continuous paragraph of 220–380 words. No headings, no bullet points, no numbered steps, no emojis, no hashtags.
@@ -285,14 +285,34 @@ POSTURE-AS-PROOF: for comfort, wellness, loungewear, or sleepwear products, the 
 
 BEATS: scale to DURATION using the STRICT DURATION SPEC windows above. Every script MUST include at least one TACTILE PROOF BEAT — a physical action (pinch fabric, pull hood, grip strap, throw matching piece) that lands inside the same beat as the claim it validates. If the script needs a wardrobe or state change, mask the cut with an ACTION-CUT TRANSITION (throw mask / lean mask / hand-swipe mask) — describe the action and write 'Hard cut masked by motion blur of …' verbatim. All other Mode A multi-cam cuts are normal hard cuts between the three locked angles, motivated by speech.
 
-DIALOGUE RULES:
-- Two distinct speakers, all lines in double quotes, ≤14 words per line.
-- Attribute every spoken line to the correct speaker by name immediately before the quote.
-- At least three disfluencies spread across the script: like, cause, bro, dude, girl, wait, okay, oh, right?, I mean.
-- Conversational overlap is encouraged: write two consecutive quoted lines for the same beat to signal speakers stepping on each other.
+DIALOGUE — write like a real TikTok/YouTube podcast clip, NOT like an ad read. The cinematography is already perfect; the script is what makes or breaks this. Study the EX_PODCAST example for the energy level.
+
+PACING IS THE #1 LEVER. A real podcast clip is NEVER monotone. You MUST vary pacing across the runtime:
+- FAST BURSTS: short, overlapping, excited lines stacked back-to-back ("wait — bro — I have to say it"). Use fast bursts for hooks, reactions, hype moments.
+- SLOW PUNCHLINES: one beat, deliberate delivery, a pause before or after the key word. Use slow for the meme-able line, the dry comeback, the realization.
+- BREATHS & FILLER: write at least one mid-sentence em-dash break or self-correction ("it's like — it's actually insane"), and at least one audible reaction without words (a laugh, a slow blink, "pfff", "huh", an exhale into the mic written in the action description).
+- The runtime should physically feel like a wave: fast → slow → fast → punchline.
+
+HUMOR & EXPRESSION — this is a PODCAST not a commercial. Required in every script:
+- At least one moment of GENUINE LAUGHTER (someone laughs mid-line, head tips back, snorts, breaks character for half a second). Describe it physically in the action, not just "laughs".
+- At least one DRY/DEADPAN line from the second speaker (one-word reaction, raised eyebrow, "continue", "no", "is that legal", "that's disgusting").
+- At least one moment of SLIGHT EXAGGERATION or playful chaos ("I literally have not taken these off in four days", "this is genuinely a problem", "everyone's getting one"). Real podcast clips go viral on ONE quotable line — write that line on purpose.
+- Reactions are PHYSICAL: eye-rolls, slow blinks, head tips, mouthing words off-mic, leaning back, pulling away from the mic. Write them into the shot tag, not into a stage direction at the end.
+
+MECHANICS:
+- Two distinct speakers. All spoken lines in double quotes, ≤14 words per line.
+- Attribute every line to the speaker by name immediately before the quote.
+- Spread at least 4 disfluencies across the script: like, cause, bro, dude, girl, wait, okay, oh, right?, I mean, no but, literally, genuinely. Never stack them — sprinkle.
+- CONVERSATIONAL OVERLAP is mandatory: at least once, write two consecutive quoted lines from different speakers in the same beat to signal them stepping on each other.
 - Voice MUST match CREATOR_PERSONA exactly for the on-camera guest.
-- The second speaker (Mode A only) speaks with a smooth, warm, low-register tone — calm and conversational, never bubbly or high-pitched. Describe their voice in the prompt as "smooth warm voice, low register, conversational".
-- No "Hey guys", "today I'm reviewing", "let's take a look".
+- The second speaker (Mode A only) speaks with a smooth, warm, low-register tone — calm and conversational, often the dry-comedic foil to the more excitable first speaker. Describe their voice in the prompt as "smooth warm voice, low register, dry comedic delivery".
+
+BANNED AI-SLOP PHRASING — never write any of these:
+- "Hey guys", "today I'm reviewing", "let's take a look", "let's talk about", "in this video"
+- "absolutely love", "obsessed with", "game changer", "10 out of 10", "highly recommend", "must-have", "let me tell you"
+- Symmetrical Q&A where speaker A asks a clean feature question and speaker B gives a clean feature answer. Real podcasts tangent, interrupt, joke, then circle back to the product.
+- Any line that sounds like it was written for an ad. If you wouldn't say it to your friend on a couch, cut it.
+
 
 CTA: end with one of — direct ("you gotta get a set"), soft intrigue ("they have every color you could ever want"), pointed fourth-wall (guest locks elbow, points finger into the lens), or social proof close ("all my friends are blowing me up").
 
@@ -365,6 +385,17 @@ function isWeak(
     }
     if (!/(pinch|grip|pull|tug|tap|touch|throws?|leans? (deep|forward|across)|holds? up)/i.test(finalPrompt)) {
       return { weak: true, reason: 'podcast missing tactile proof beat' };
+    }
+    // Anti-AI-slop phrasing — reject and regenerate
+    const slopRx = /(hey guys|today i'?m reviewing|let'?s take a look|let'?s talk about|in this video|absolutely love|obsessed with|game ?changer|10 out of 10|highly recommend|must[- ]have|let me tell you)/i;
+    const slopHit = finalPrompt.match(slopRx);
+    if (slopHit) return { weak: true, reason: `podcast script contains banned ad-slop phrase: "${slopHit[0]}"` };
+    // Energy check: needs at least one laugh/smirk/grin/snort and at least one em-dash break for pacing
+    if (!/(laugh|laughs|laughing|snort|grin|smirk|chuckle|breaks? character|tips? .{0,12} head back)/i.test(finalPrompt)) {
+      return { weak: true, reason: 'podcast missing real laughter / expressive reaction beat' };
+    }
+    if (!/—/.test(finalPrompt)) {
+      return { weak: true, reason: 'podcast missing em-dash pacing breaks (lines need self-corrections / interruptions)' };
     }
   } else {
     if (!/(switches to the back camera|back camera|close-up|macro|props the phone|jump cut|overhead|POV|sets the phone down|detail shot)/i.test(finalPrompt)) return { weak: true, reason: 'too static' };
