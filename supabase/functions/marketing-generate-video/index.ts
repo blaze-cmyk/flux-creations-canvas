@@ -59,6 +59,72 @@ function uniqueValidUrls(urls: unknown[], limit = 9) {
   return out;
 }
 
+async function signedStorageUrl(admin: ReturnType<typeof createClient>, bucket: string, path: string, ttl = 60 * 60 * 24) {
+  const { data } = await admin.storage.from(bucket).createSignedUrl(path, ttl);
+  return data?.signedUrl ?? null;
+}
+
+async function gatherFreshReferenceUrls(admin: ReturnType<typeof createClient>, opts: {
+  productId?: string | null;
+  avatarId?: string | null;
+  keyframePath?: string | null;
+  keyframeUrl?: string | null;
+  fallbackUrls?: unknown[];
+}) {
+  const refs: string[] = [];
+  if (opts.keyframePath) {
+    const signed = await signedStorageUrl(admin, 'ms-products', opts.keyframePath);
+    if (signed) refs.push(signed);
+  } else if (isValidHttpUrl(opts.keyframeUrl)) {
+    refs.push(String(opts.keyframeUrl).trim());
+  }
+
+  if (opts.productId) {
+    const { data: imgs } = await admin
+      .from('ms_product_images')
+      .select('storage_path, is_primary')
+      .eq('product_id', opts.productId)
+      .order('is_primary', { ascending: false });
+    for (const img of imgs ?? []) {
+      const signed = await signedStorageUrl(admin, 'ms-products', (img as any).storage_path);
+      if (signed) refs.push(signed);
+    }
+  }
+
+  if (opts.avatarId) {
+    const { data: av } = await admin
+      .from('ms_avatars')
+      .select('public_url, storage_path')
+      .eq('id', opts.avatarId)
+      .maybeSingle();
+    const avatarUrl = av?.public_url || (av?.storage_path ? await signedStorageUrl(admin, 'ms-avatars', av.storage_path) : null);
+    if (avatarUrl) refs.push(avatarUrl);
+  }
+
+  return uniqueValidUrls(refs.length ? refs : (opts.fallbackUrls ?? []), 9);
+}
+
+async function uploadAtlasMedia(url: string, index: number, kind: 'image' | 'audio') {
+  const source = await fetch(url);
+  if (!source.ok) throw new Error(`source ${kind} ${index + 1} not downloadable (${source.status})`);
+  const blob = await source.blob();
+  const form = new FormData();
+  const ext = kind === 'audio' ? 'mp3' : ((blob.type.split('/')[1] || 'jpg').split(';')[0]);
+  form.append('file', blob, `${kind}-${index + 1}.${ext}`);
+
+  const res = await fetch('https://api.atlascloud.ai/api/v1/model/uploadMedia', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${ATLAS_KEY}` },
+    body: form,
+  });
+  const json = await res.json().catch(() => ({}));
+  const uploaded = json?.url ?? json?.data?.url ?? json?.data?.file_url ?? json?.data?.media_url;
+  if (!res.ok || !isValidHttpUrl(uploaded)) {
+    throw new Error(`Atlas uploadMedia rejected ${kind} ${index + 1}: ${json?.msg || json?.message || res.status}`);
+  }
+  return String(uploaded);
+}
+
 function falSafeImageUrls(opts: { image_urls: string[]; productId?: string | null; avatarId?: string | null }) {
   if (!opts.avatarId) return opts.image_urls;
   // fal/Seedance currently accepts the queue request but rejects real-person avatar
