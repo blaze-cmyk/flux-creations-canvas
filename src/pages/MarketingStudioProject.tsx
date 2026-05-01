@@ -472,6 +472,13 @@ export default function MarketingStudioProject() {
         generation={selected}
         projectId={project.id}
       />
+
+      <FailedGenerationPanel
+        open={!!failedDetail}
+        generation={failedDetail}
+        onClose={() => setFailedDetail(null)}
+        onRetry={(g) => handleRetry(g)}
+      />
     </MarketingStudioLayout>
   );
 }
