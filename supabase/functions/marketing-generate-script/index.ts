@@ -520,7 +520,9 @@ async function callWriter(args: { systemPrompt: string; userTextBlock: string; i
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response(null, { headers: corsHeaders });
   try {
-    const { productId, avatarId, format, surface, aspect, duration, userPrompt, exactVoiceover, userDirection } = await req.json();
+    const { productId, avatarId, format, surface, aspect, duration, userPrompt, exactVoiceover, userDirection, extraRefImages = [], extraRefNames = [] } = await req.json();
+    const userExtraRefs: string[] = (Array.isArray(extraRefImages) ? extraRefImages : []).filter((u: any) => typeof u === 'string' && /^https?:\/\//.test(u));
+    const userExtraNames: string[] = (Array.isArray(extraRefNames) ? extraRefNames : []).map((n: any) => String(n || '').trim());
     const admin = createClient(SUPABASE_URL, SERVICE_KEY);
 
     // ---------- Build product context + collect product image URLs ----------
