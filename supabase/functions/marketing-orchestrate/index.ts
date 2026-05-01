@@ -267,12 +267,30 @@ Deno.serve(async (req) => {
       }
     }
 
-    // 3) Use the AI script writer for human, format-specific UGC. If it fails
-    // or returns weak copy, fall back to a deterministic Higgsfield-style prompt.
+    // 3) If the user already supplied a substantial prompt/script (long enough,
+    // or contains timestamps/dialogue/beat markers), pass it through RAW to
+    // Seedance — do NOT rewrite it. The script writer is only for the
+    // "minimal input" cases where the user just selected product/avatar.
+    const looksLikeFullScript = (() => {
+      const t = userPromptTrimmed;
+      if (!t) return false;
+      if (t.length >= 220) return true; // a real prompt, not a one-liner
+      if (/\d{1,2}:\d{2}\s*[-–—]\s*\d{1,2}:\d{2}/.test(t)) return true; // 0:00-0:03
+      if (/"[^"\n]{2,160}"/.test(t) && t.length >= 120) return true; // has dialogue
+      if (/\b(BEAT|HOOK|CTA|JUMP CUT|VOICEOVER|VO:|SCENE)\b/i.test(t)) return true;
+      return false;
+    })();
+
     let scriptPayload: any = null;
     let finalPrompt = userPromptTrimmed;
     let scriptPersona: string | null = null;
-    if (productId || avatarId) {
+    if (looksLikeFullScript) {
+      // Respect the creator's prompt verbatim — only append a tiny legibility
+      // guardrail so on-product text doesn't render mirrored.
+      finalPrompt = `${userPromptTrimmed}\n\nCRITICAL: any printed text, lettering, numbers, or logos visible on the product, packaging, or clothing must always read forward and be perfectly legible — never mirrored, flipped, reversed, or rendered as a mirror reflection.`;
+      scriptPayload = { source: 'user_raw', final_prompt: finalPrompt, voiceover_script: extractSpokenLines(userPromptTrimmed) };
+      scriptPersona = 'user-supplied';
+    } else if (productId || avatarId) {
       const scriptRes = await invokeFn('marketing-generate-script', {
         productId,
         avatarId,
