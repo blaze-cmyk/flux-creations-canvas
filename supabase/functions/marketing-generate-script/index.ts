@@ -262,7 +262,7 @@ Deno.serve(async (req) => {
       );
     }
 
-    const sys = FORMAT_SYSTEM_PROMPTS[format] || FORMAT_SYSTEM_PROMPTS.UGC;
+    const sys = `${HUMAN_UGC_FIREWALL}\n\n${FORMAT_SYSTEM_PROMPTS[format] || FORMAT_SYSTEM_PROMPTS.UGC}`;
 
     const userMsg =
       `${productCtx}\n\n${avatarCtx}\n\n` +
@@ -271,6 +271,8 @@ Deno.serve(async (req) => {
       `DURATION: ${duration}s\n\n` +
       `Generate the final Seedance 2.0 prompt now, following every rule in the system message. ` +
       `Use the literal PRODUCT_NAME and AVATAR_NAME above — do not invent a different product or person. ` +
+      `If reference images exist, treat them only as visual anchors; create a new UGC scene with real action, not a still copy of those images. ` +
+      `Make the voiceover_script painfully human: short, specific, imperfect, tied to visible product details, never generic ad praise. ` +
       `Output one continuous paragraph in the final_prompt field. No preamble, no labels, no headings.`;
 
     const aiRes = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
