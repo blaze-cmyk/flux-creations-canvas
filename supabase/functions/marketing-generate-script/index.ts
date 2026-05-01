@@ -270,11 +270,15 @@ MODE B — SINGLE GUEST + INVISIBLE OFF-CAMERA INTERVIEWER:
 - One subject seated facing slightly off-camera-left toward an unseen interviewer. One locked frame, no cuts. The interviewer is HEARD ONLY — never seen — and feeds lifestyle scenarios.
 - Mark every off-camera line in the paragraph as 'Off-camera (heard only):' or '(off-camera):' so the model never renders a second person on screen.
 
-If exactly one avatar is provided, default to MODE B with that avatar as the guest. If zero or two avatars are provided, default to MODE A and invent the missing character(s). Never produce a single-monologue script.
+CASTING ROUTING (count BOTH the avatar AND any USER_EXTRA_REFERENCE_IMAGES that depict a person):
+- 0 people total → MODE A, invent both speakers.
+- 1 person total (avatar OR a single person-ref) → MODE B with that person as the on-camera guest, invisible interviewer off-camera.
+- 2+ people total (avatar + at least one person-ref, or two person-refs) → MODE A. Speaker A = the AVATAR (or first person-ref if no avatar). Speaker B = the next person-ref provided by the user. NEVER invent Speaker B if a person-ref was attached — Speaker B's face, hair, build, skin tone, age range, and overall appearance MUST match that reference image exactly. The reference IS the casting choice.
+Never produce a single-monologue script.
 
 ANTI-AI-SLOP DECREES — these tells immediately mark a clip as AI-generated. Avoid them:
 - No floating mic with no boom arm. The mic always has a visible black articulating boom arm.
-- No identical guests (do not mirror the avatar's face onto the second speaker — give the invented speaker a clearly different look: different hair, age, build, wardrobe).
+- No identical guests. If a person-ref image was attached for Speaker B, lock Speaker B to that reference's appearance verbatim (hair, build, age, skin tone, wardrobe colors). If NO person-ref was attached, invent a Speaker B clearly distinct from Speaker A (different hair, age, build, wardrobe).
 - No symmetrical "two heads facing camera" composition for more than 1 beat.
 - No glassy plastic skin, no airbrushed lighting — describe practical light sources by name (tungsten, edison, key, rim) so the model knows it is interior, motivated lighting, not generic studio.
 - No subtitles, no captions, no on-screen text, no logos floating in the background, no smartphone in frame.
@@ -736,7 +740,10 @@ Deno.serve(async (req) => {
         extraForLLM
           .map((_, i) => `- @${userExtraNames[i] || `Image ${i + 1}`}: attached reference image #${extraStartIdx + i + 1}`)
           .join('\n') +
-        `\nIf USER_DIRECTION mentions @Image N (or any of the names above), treat that as a literal pointer to the matching reference image. Use those images for any people, props, settings, or wardrobe the user is asking to include — preserve their visible identity / appearance the same way you preserve the product and avatar. Never copy their background or framing — identity / appearance only.\n`
+        `\nThese extra reference images are FIRST-CLASS CASTING / PROP INPUTS, not background flavor:\n` +
+        `- If an extra reference depicts a PERSON and the format is Podcast (or any two-person format), that person IS Speaker B. Lock Speaker B's appearance — face, hair color & length, skin tone, age range, build, wardrobe colors and silhouette — to that exact reference image. Describe these traits explicitly inside every SINGLE B and WIDE TWO-SHOT shot tag in the final paragraph so Seedance has no room to invent a different person. Reference image # is the casting choice; do NOT swap it for a generic "second host".\n` +
+        `- If an extra reference depicts a PROP, OUTFIT, or SETTING, treat it the same way you treat the product / avatar: preserve identity / appearance, ignore its background and framing.\n` +
+        `- If USER_DIRECTION mentions @Image N (or any of the names above), treat that as a literal pointer to the matching reference image.\n`
       : '';
 
     const userTextBlock =
