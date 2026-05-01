@@ -226,37 +226,72 @@ Deno.serve(async (req) => {
       });
     }
 
-    // 1) Resolve refs + product/avatar metadata up front so we can build a
-    // concrete Higgsfield-style prompt anchored on real visual details.
-    // When the user did NOT type a prompt, cap product refs to 1 (primary
-    // image only). Sending every reference image makes Seedance frame-blend
-    // them into a static AI-slop output instead of directing a real scene.
+    // 1) Resolve refs + product/avatar metadata. Always send up to 6 product
+    // reference images to Seedance — capping to 1 caused the model to just
+    // re-animate the single reference photo (the AI-slop pattern). The script
+    // writer only sees up to 3 of them (multimodal call).
     const { refs, thumb, product, avatar } = await gatherReferenceUrls(admin, {
       productId,
       avatarId,
-      maxProductImages: userPromptTrimmed ? 6 : 1,
+      maxProductImages: 6,
     });
 
-    // 2) Use the AI script writer for human, format-specific UGC. If it fails
-    // or returns weak copy, fall back to a deterministic Higgsfield-style prompt
-    // instead of sending raw user text or static reference-image instructions.
+    // 2) Route Scenario E (avatar + user prompt, no product) to a dedicated
+    // talking-head format that doesn't require product references.
+    let effectiveFormat = format;
+    if (!productId && avatarId && userPromptTrimmed) {
+      effectiveFormat = 'AVATAR_TALKING_HEAD';
+    }
+
+    // 2b) One-time vision backfill: if this product has no cached
+    // vision_analysis yet, run analyze-product once on the primary image and
+    // persist it. The script writer will pick it up next call (and on retries).
+    if (productId && refs.length > 0) {
+      try {
+        const { data: prodRow } = await admin
+          .from('ms_products')
+          .select('vision_analysis')
+          .eq('id', productId)
+          .maybeSingle();
+        if (prodRow && !(prodRow as any).vision_analysis) {
+          const visRes = await invokeFn('marketing-analyze-product', { image_url: refs[0] });
+          if (visRes.ok && visRes.json?.visual_facts) {
+            await admin
+              .from('ms_products')
+              .update({ vision_analysis: visRes.json.visual_facts })
+              .eq('id', productId);
+          }
+        }
+      } catch (e) {
+        console.warn('[orchestrate] vision backfill failed', e);
+      }
+    }
+
+    // 3) Use the AI script writer for human, format-specific UGC. If it fails
+    // or returns weak copy, fall back to a deterministic Higgsfield-style prompt.
     let scriptPayload: any = null;
     let finalPrompt = userPromptTrimmed;
+    let scriptPersona: string | null = null;
     if (productId || avatarId) {
       const scriptRes = await invokeFn('marketing-generate-script', {
         productId,
         avatarId,
-        format,
+        format: effectiveFormat,
         surface,
         aspect: ratio,
         duration: duration_seconds,
         userPrompt: userPromptTrimmed,
+        userDirection: userPromptTrimmed,
       });
       const candidate = scriptRes.ok ? scriptRes.json?.prompt : null;
       scriptPayload = scriptRes.ok ? scriptRes.json?.script : { error: scriptRes.text };
-      finalPrompt = isWeakGeneratedScript(candidate)
+      scriptPersona = scriptRes.ok ? (scriptRes.json?.script_persona ?? null) : null;
+      const details: string[] = scriptRes.ok ? (scriptRes.json?.concrete_product_details ?? []) : [];
+      const candidateStr = typeof candidate === 'string' ? candidate : '';
+      const lacksDetails = productId && details.length > 0 && !details.some((d) => d && candidateStr.toLowerCase().includes(String(d).toLowerCase().split(' ').slice(0, 2).join(' ')));
+      finalPrompt = (isWeakGeneratedScript(candidate) || lacksDetails)
         ? buildFallbackPrompt({
-            format,
+            format: effectiveFormat,
             product,
             avatar,
             userPrompt: userPromptTrimmed,
@@ -275,7 +310,7 @@ Deno.serve(async (req) => {
         project_id: projectId ?? null,
         product_id: productId ?? null,
         avatar_id: avatarId ?? null,
-        format,
+        format: effectiveFormat,
         surface,
         aspect: ratio,
         duration_seconds,
@@ -283,6 +318,7 @@ Deno.serve(async (req) => {
         prompt: finalPrompt,
         script: scriptPayload ?? { final_prompt: finalPrompt, voiceover_script: voiceoverText },
         script_text: voiceoverText || finalPrompt,
+        script_persona: scriptPersona,
         reference_paths: refs,
         thumb_url: thumb,
         status: 'queued',
@@ -307,7 +343,7 @@ Deno.serve(async (req) => {
           resolution,
           productId,
           avatarId,
-          format,
+          format: effectiveFormat,
           surface,
           projectId,
           script_text: voiceoverText || finalPrompt,

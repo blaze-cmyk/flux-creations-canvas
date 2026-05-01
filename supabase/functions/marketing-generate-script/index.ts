@@ -1,4 +1,8 @@
 // Generate a Seedance-ready prompt + script from product + avatar + format preset.
+// Multimodal: sends product/avatar images directly to the LLM so the writer can
+// reference real physical details. Rolls a creator persona per call for variety.
+// Few-shot anchored on Higgsfield reference prompts. Treats user prompts as
+// USER_DIRECTION (creative core), not just a setting hint.
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0';
 
 const corsHeaders = {
@@ -11,215 +15,304 @@ const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY')!;
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 
+const PRIMARY_MODEL = 'google/gemini-2.5-pro';
+const FALLBACK_MODEL = 'google/gemini-3-flash-preview';
+
+// ---------- Creator personas (rolled per call) ----------
+type Persona = {
+  id: string;
+  name: string;
+  voice: string;
+};
+
+const PERSONAS: Persona[] = [
+  {
+    id: 'dry-deadpan',
+    name: 'Dry Deadpan',
+    voice:
+      'Flat affect, slightly bored delivery that gives way to one genuine reaction. Short sentences. Pauses are weapons. No exclamation points. Final verdict is understated ("Yeah. It\'s good.").',
+  },
+  {
+    id: 'wide-eyed-genuine',
+    name: 'Wide-Eyed Genuine',
+    voice:
+      'Quietly amazed, almost whispering. Talks like she just found something nobody knows about. Uses "Wait" and "Look" a lot. Lines feel discovered, not announced.',
+  },
+  {
+    id: 'chaotic-bestie',
+    name: 'Chaotic Bestie',
+    voice:
+      'Talks fast, half-laughing, mid-thought asides ("WHY is there a duck"). Self-interrupts. Genuinely losing it over one detail. Energy is "I had to text you about this."',
+  },
+  {
+    id: 'quiet-luxury',
+    name: 'Quiet Luxury',
+    voice:
+      'Low volume, slow pacing, almost private. Lines under six words. Talks to herself, not the camera. Energy: "It feels really refined." Never excited, only impressed.',
+  },
+  {
+    id: 'hype-friend',
+    name: 'Hype Friend',
+    voice:
+      'Warm, encouraging, talking to a friend they want to put on. Uses "Okay so" openers. Honest enthusiasm with concrete reasons attached. Never marketing-bright, always personal.',
+  },
+  {
+    id: 'low-key-cool',
+    name: 'Low-Key Cool',
+    voice:
+      'Slight smirk, half-smile. Says less than she could. One eyebrow energy. Final line is a one-liner verdict ("Yeah this is the one." / "You are welcome.").',
+  },
+];
+
+function rollPersona(): Persona {
+  return PERSONAS[Math.floor(Math.random() * PERSONAS.length)];
+}
+
+// ---------- Hard rules that override every format ----------
 const HUMAN_UGC_FIREWALL = `You are not writing ad copy. You are writing the exact prompt a strong UGC director would send to a video model.
 
 Hard rules that override every format below:
-- Make a fresh scene, not a recreation of the uploaded product/avatar reference images. References are identity/product anchors only.
+- Make a fresh scene, not a recreation of the uploaded reference images. References are identity/product anchors only.
 - The creator's spoken lines must sound like a real person talking to a friend, not a brand, narrator, influencer script, or marketing voiceover.
-- No generic praise unless it is attached to a concrete physical detail. Avoid empty lines like "I'm obsessed", "so good", "love this" unless the next words name the exact color, texture, fit, hardware, movement, sound, or result.
+- No generic praise unless attached to a CONCRETE physical detail you can SEE in the product images. Empty lines like "I'm obsessed", "so good", "love this" are banned UNLESS the next words name an exact color, texture, fit, hardware piece, movement, sound, or visible result.
 - Every beat must contain real physical action: tilt, tap, trace, pull, peel, wear, use, rotate, pour, draw, lace, zip, clasp, sip, test, compare, or reveal.
 - Mention the product by its literal PRODUCT_NAME, but do not repeat the name in every sentence.
-- If the user prompt is blank, invent a product-specific creative angle from PRODUCT_DESCRIPTION and product type. Never default to a static hold-up.
-- If an avatar is provided, use them as the creator inside the scene. If no avatar is provided, use POV hands or product-only UGC, not a random invented spokesperson.
-- Output should feel like the Higgsfield examples: camera/style line, concrete scene/product paragraph, then an action and dialogue sequence with timed physical beats.`;
+- USER_DIRECTION (when present) is the creative core. Build the beats and dialogue AROUND it. Format rules govern camera/structure only — they NEVER override the user's creative direction.
+- If USER_DIRECTION is blank, invent a product-specific creative angle from the visible product details. Never default to a static hold-up.
+- If an avatar is provided, use them as the creator inside the scene. If no avatar is provided, use POV hands (with described nail color and sleeve color matched to product palette) — NEVER invent a random spokesperson.
+- Output MUST feel like the EXAMPLE OUTPUT below: camera/style line, concrete scene/product paragraph, then "Action and dialogue sequence:" with timed physical beats and short quoted lines.
+- The CREATOR_PERSONA voice is mandatory — every line of dialogue must sound like that specific archetype, not a generic UGC creator.
+- The concrete_product_details array MUST contain at least 4 items extracted from the actual product images (color names, materials, hardware pieces, printed text, distinctive features). Do not invent details that aren't visible.`;
 
+// ---------- Few-shot example outputs (verbatim Higgsfield) ----------
+const EX_UGC = `EXAMPLE OUTPUT (study the structure, tone, persona-fit, concrete sensory detail — never copy literally):
+Vertical 9:16 selfie-style UGC tennis racket review, shot on iPhone front and back camera mix, natural daylight on an outdoor tennis court, handheld authentic energy, casual "showing a friend my new racket" vibe, warm natural light, real skin tones, no filters. An outdoor tennis court — green hard court surface with white lines, a net visible in the background, natural daylight. The young woman wears a bright lime green tennis outfit, the vivid green a striking contrast against the mint green and orange of the AURA 300 racket; she holds the SERA AURA 300 — mint green to white gradient frame, orange cross-string pattern through the white string face, white perforated grip tape, AURA 300 lettering on the shaft. Action and dialogue sequence: She holds the AURA 300 up to the front camera, the full racket face filling the vertical frame, tilts it slowly catching the sun: "Okay so this just arrived and I am obsessed with the color." She switches to the back camera, bounces the racket lightly on her palm: "It feels really balanced, like not too heavy." She brings the racket close to the back lens so the orange cross-string pattern fills the frame. She props the phone, hits two slow controlled groundstrokes — the lime green outfit and mint racket moving through the frame together. Close-up back camera, pans down the shaft past the AURA 300 lettering: "And the grip feels so good, really clean." She holds the full racket up beside her face on the front camera: "Yeah. Yeah this is the one."`;
+
+const EX_TUTORIAL = `EXAMPLE OUTPUT (study the structure, tone, persona-fit, concrete sensory detail — never copy literally):
+Shot on iPhone front camera, vertical 9:16, natural HDR, slight exposure shifts, real skin tones, authentic UGC creator energy, warm indoor natural light. A bright casual room — warm natural light from the side, a clean desk surface with the ATELIER INK 12 CORE colors set in its clear transparent plastic case, the colorful marker caps visible through the case walls, a white sketchpad open beside it. A young woman sits close to the front camera, relaxed and natural. Action and dialogue sequence: She picks up the full ATELIER INK clear case with both hands and holds it up to the front camera, the 12 colorful caps facing the lens: "Okay I need to show you these." She pulls out the green G04 marker, uncaps it slowly, sniffs the tip, pauses: "Why does it smell like that." She opens the sketchpad and draws a slow deliberate star with the green marker. Holds the paper up: "That color is insane." She picks up the cobalt blue B17, draws beside the green: "The pigment is so good." Looks directly into the camera, taps the marker cap slowly against her lip: "Honestly — if you draw, if you doodle — just get these." Lifts the full clear case up to the lens: "That's it. That's the review."`;
+
+const EX_TRYON = `EXAMPLE OUTPUT (study the structure, tone, persona-fit, concrete sensory detail — never copy literally):
+A 15-second vertical (9:16) UGC try-on video filmed on a smartphone. A young East Asian woman with a short black bob stands in front of a full-length mirror in a minimalist bedroom — neutral beige walls, natural daylight from a window. Handheld selfie-style. 0–3s: She faces the mirror wearing a simple white tee, holds up a black fitted top and a black-and-white striped mini skirt on hangers with a "watch this" expression, raises an eyebrow. JUMP CUT — she's now wearing the fitted black short-sleeve top, adjusts the hem, turns side to side. JUMP CUT — pulls on the black-and-white striped knit mini skirt, tugs it over her hips, does a quick spin. JUMP CUT — full outfit complete with bright neon yellow tights and matching neon yellow pointed-toe stilettos. She steps back, does a confident slow turn, hand on hip. Faces the mirror straight on, deadpan editorial expression, holds for a beat then breaks into a small satisfied smile. Reaches toward the phone — video ends mid-motion. Quick jump cuts, handheld slight shake, natural bedroom lighting, no ring light, no music, no text.`;
+
+const EX_UNBOXING = `EXAMPLE OUTPUT (study the structure, tone, persona-fit, concrete sensory detail — never copy literally):
+HOOK (0–2s) POV handheld, slightly shaky. A bright red shopping bag with gold text "MAISON BRUNÉ" gets tossed onto a white unmade bed from above — lands with a satisfying thud, tissue paper rustling. Natural bedroom lighting, warm tones. JUMP CUT (2–4s) Close-up hands grabbing the red bag handles, pulling it closer. Camera slightly out of focus then snaps sharp. JUMP CUT (4–7s) Hands pull out the pink dustbag — "MAISON BRUNÉ PARIS" printed in rose. Fabric sliding sound. JUMP CUT (7–12s) Tan pebbled leather tote bag drops onto the bed in full frame. Gold chain strap clinks and settles. Camera circles product quickly. Natural window light catches the gold hardware. JUMP CUT (12–18s) Extreme close-up: fingers running across the grainy leather texture. Gold lobster clasp swings. OUTRO (18–22s) Bag held up toward camera with both hands — full reveal. Slight smile reflected in mirror behind.`;
+
+const EX_TALKING_HEAD = `EXAMPLE OUTPUT (study the structure, tone, persona-fit — never copy literally):
+Vertical 9:16, shot on iPhone front camera, natural daylight from a side window, handheld with subtle micro-shake, real skin tones, no filters. A young woman sits close to the front camera in a casual room — warm light, soft background, slightly cluttered desk visible at the edge. She speaks directly to the lens, relaxed and natural, like talking to a friend. Action and dialogue sequence: She leans in slightly, half-smile: "Okay I need to tell you something." Pauses, looks off camera, looks back. Continues with one personal observation, one specific reason it matters, one honest reaction. Keeps it under five spoken lines. Final beat: she stops talking, holds eye contact for a beat, breaks into a small smile, reaches toward the phone — video ends mid-motion.`;
+
+// ---------- Format prompts with POV_HANDS branches ----------
 const UGC_PROMPT = `You write Seedance 2.0 video generation prompts for UGC-style product review videos. Your output is a single continuous paragraph of 220–380 words. No headings, no bullet points, no numbered steps, no emojis, no hashtags.
 
-The video is vertical 9:16, shot on iPhone front and back camera mix, natural daylight or warm indoor light, real skin tones, no filters, no color grading, slight handheld micro-shake. The energy is "showing a friend my new thing" — casual, unpolished, genuinely excited.
+The video is vertical 9:16, shot on iPhone front and back camera mix, natural daylight or warm indoor light, real skin tones, no filters, no color grading, slight handheld micro-shake. The energy is "showing a friend my new thing" — casual, unpolished, genuinely excited (filtered through CREATOR_PERSONA).
 
-You will receive:
-- PRODUCT_NAME, PRODUCT_COLOR, PRODUCT_MATERIAL, PRODUCT_DESCRIPTION
-- AVATAR_NAME, AVATAR_GENDER, AVATAR_DESCRIPTION
-- SETTING_HINT (optional — if blank, pick a setting that matches the product naturally)
+WHEN AVATAR IS PROVIDED:
+1. SETTING — one sentence, natural light source named, matches the product.
+2. AVATAR APPEARANCE — what the avatar wears. Real fabrics. Color contrast or harmony with the product.
+3. PRODUCT IN HAND — described from the actual product images using PRODUCT_NAME and the concrete_product_details list.
+4. FOUR BEATS: front-camera reaction → detail close-up of one specific physical feature you can SEE in the images → real motion using the product → final verdict beside the face.
 
-Your prompt must contain in this order:
+WHEN NO AVATAR (POV_HANDS MODE):
+1. SETTING — surface and light source matched to the product.
+2. HANDS DESCRIPTION — natural female (or male, infer from product) hands, nail color and sleeve color chosen to harmonize with the product palette. No face visible.
+3. PRODUCT IN HAND — same level of physical detail as above.
+4. FOUR BEATS: hands hold product to lens → fingers trace one specific detail → demonstrate the product in real motion → hands set product down with a final tactile beat. Dialogue may be sparse — POV hands often work with just 2–3 quiet lines or pure ASMR.
 
-1. SETTING — one sentence describing the room or location. Concrete. Natural light source named. Matches the product (outdoor court for sports, casual bedroom for accessories, kitchen for food/drink, etc).
+Dialogue rules (both modes):
+- 4–6 lines for avatar mode, 2–4 for POV; each ≤10 words, all in double quotes
+- Voice MUST match CREATOR_PERSONA exactly
+- Pauses written as "..." inside the line
+- Lines must reference at least 2 entries from concrete_product_details
 
-2. AVATAR APPEARANCE — what [AVATAR_NAME] is wearing. Real colors, real fabrics. The outfit should create a visible contrast or harmony with the product color.
+OUTPUT: One paragraph. Final prompt ready to send to Seedance 2.0. No preamble, no labels.
 
-3. PRODUCT IN HAND — describe the product held up to the front camera lens. Use PRODUCT_NAME exactly. Describe the color, material, any printed text visible, any hardware, texture. Be precise enough that a model could render it.
-
-4. FOUR BEATS:
-   BEAT 1 (0–3s): Front camera. Avatar holds product up, full face in frame. First reaction line in quotes. Should feel like a genuine surprised response — not a scripted opener. The product is angled slightly to catch the light.
-   BEAT 2 (3–7s): Switches to back camera or brings product close to front lens for a detail close-up. Second line in quotes. Focus on one specific physical detail — a texture, a string pattern, a hardware detail, a surface. Name it specifically.
-   BEAT 3 (7–12s): Avatar uses, wears, or demonstrates the product in real motion. Phone propped against something or back-cam handheld. No dialogue during action — let the product do the work. Describe the motion precisely.
-   BEAT 4 (12–15s): Front camera returns. Avatar holds product beside their face. Final verdict line in quotes. Short. Blunt. Certain.
-
-Dialogue rules:
-- 4–6 lines total, each ≤10 words, all in double quotes
-- Conversational American English, mid-20s energy
-- Pauses are written as "..." inside the line
-- May start with "Okay" or "Wait" or "So" — these are natural
-- Allowed energy: genuine surprise, quiet obsession, dry humor, earned satisfaction
-- BANNED: any line that sounds written for an ad. Any line that contains a product benefit claim stated directly ("it keeps my drinks cold all day" is allowed because it's personal experience — "experience all-day cold drinks" is not)
-
-BANNED WORDS AND PHRASES (never appear in your output):
-introducing, game-changer, elevate, unleash, revolutionary, transform your, experience the, level up, must-have, you'll love, perfect for, this is your sign, don't miss, limited time, step one, step two, as you can see, in this video, today I'm reviewing
-
-OUTPUT: One paragraph. Final prompt ready to send to Seedance 2.0. No preamble, no explanation, no labels.`;
+${EX_UGC}`;
 
 const UGC_TRYON_PROMPT = `You write Seedance 2.0 video generation prompts for UGC virtual try-on videos. Your output is a single continuous paragraph of 250–420 words. No headings, no bullet points, no numbered steps, no emojis, no hashtags.
 
-The video is vertical 9:16, iPhone front camera in a mirror OR selfie cam in a bedroom or dressing room. Fashion-vlog energy. Natural daylight, slight handheld shake. The feeling is a girl getting dressed while filming — not a polished lookbook. Jump cuts between stages. The outfit or accessory is the star.
+Vertical 9:16, iPhone front camera in a mirror or selfie cam in a bedroom or dressing room. Fashion-vlog energy. Natural daylight, slight handheld shake. Jump cuts between dressing stages.
 
-You will receive:
-- PRODUCT_NAME, PRODUCT_COLOR, PRODUCT_MATERIAL, PRODUCT_TYPE (garment / accessory / jewelry / footwear)
-- AVATAR_NAME, AVATAR_GENDER, AVATAR_DESCRIPTION
-- SETTING_HINT (optional)
+Structure: SETTING (mirror/dressing room) → STARTING STATE (avatar in basic outfit, holding product) → PRODUCT DESCRIPTION (every visible detail from concrete_product_details) → FIVE JUMP-CUT BEATS (raise → first piece on → adjust/spin → full look reveal → final pose).
 
-Your prompt must contain in this order:
+Dialogue: 2–4 short lines in double quotes, voice = CREATOR_PERSONA. Silence allowed and often better. Mark hard cuts as "JUMP CUT" inside the paragraph.
 
-1. SETTING — bedroom or dressing room. Describe the mirror (full-length or vanity), the soft daylight source, one or two room details that make it feel lived-in (clothes on a chair, a plant, a ring light off to the side unused). Not sterile.
+OUTPUT: One paragraph. No preamble, no labels.
 
-2. STARTING STATE — [AVATAR_NAME] is in a simple white tee or bathrobe or basic outfit. This is the "before." She may be holding the product on a hanger, or have it laid on the bed. Describe it briefly — exact color, fabric, cut.
+${EX_TRYON}`;
 
-3. PRODUCT DESCRIPTION — the garment, accessory, or piece being tried on. Use PRODUCT_NAME. Describe every visible detail: exact color name, fabric type, silhouette, any hardware, any prints, any details at hem or collar or strap. This is the reference the model uses to generate the product.
+const TUTORIAL_PROMPT = `You write Seedance 2.0 video generation prompts for UGC hands-on product demo videos. NOT a how-to guide. A product review told through demonstration. One continuous paragraph, 220–380 words. No headings, no bullets.
 
-4. FIVE BEATS with JUMP CUTS:
-   BEAT 1 (0–3s): She faces the camera or mirror in her starting outfit. Holds the product up or out with a "watch this" expression. One line or no line — may just raise an eyebrow.
-   BEAT 2 (3–6s): JUMP CUT — first piece is on. She adjusts it, smooths it, turns side to side. One short reaction in quotes. Focus on fit and fabric.
-   BEAT 3 (6–9s): JUMP CUT — if multi-piece, second piece is on. She tugs it into place, does a quick spin or hip shift. One short line or silent.
-   BEAT 4 (9–12s): Full look complete. She steps back from the mirror for a head-to-toe shot. Whole outfit visible. Confident turn, hand on hip, or playful pose. One line or silence.
-   BEAT 5 (12–15s): Final pose facing the camera straight on. Holds for a beat. Small satisfied smile or deadpan confident expression. Reaches toward the phone — video ends mid-motion.
+Vertical 9:16, warm natural light, clean realistic location matched to the product. Handheld. Product always visible.
 
-Dialogue rules:
-- 2–4 lines total, short, in double quotes
-- Playful, self-aware, slightly casual. May include a beat of self-doubt that resolves ("It's a little chaotic… but it works.")
-- Can end with a silent pose — silence is allowed and often better
-- BANNED: any styling tip, any "this goes great with", any product benefit claims that sound written
+WHEN AVATAR IS PROVIDED — FIVE BEATS:
+HOOK (0–2s): Avatar grabs the product, brings to lens, looks at camera. One strong opening line in CREATOR_PERSONA voice — a statement, not a question.
+FEATURE HIGHLIGHT (2–6s): Avatar runs a finger along a specific physical feature from concrete_product_details. One quiet line.
+DEMONSTRATION (6–10s): Avatar uses the product for its primary purpose. Real action, real visible result.
+RESULT/PAYOFF (10–13s): Avatar holds the result up to the light. One short first-person line.
+VERDICT (13–15s): Looks at product, then at camera. One line. Short. Done.
 
-Camera notes to always include:
-- Handheld slight shake
-- Natural bedroom lighting, no ring light
-- If mirror is present: mirror shows only her face and the room, never shows the phone or filming device
-- Jump cuts are labeled as "JUMP CUT" within the paragraph so Seedance reads them as hard cuts
+WHEN NO AVATAR (POV_HANDS MODE):
+Same five beats, but only hands visible. Nail color and sleeve color matched to product palette. Dialogue is sparse first-person voiceover-style ("Look at this." / "Hear how quiet that is.") — keep CREATOR_PERSONA voice.
 
-BANNED WORDS AND PHRASES:
-introducing, game-changer, elevate, transform, revolutionary, level up, must-have, perfect for, you'll love, effortlessly stylish, this season, new collection, style tip, outfit inspo
+Dialogue: 4–6 lines avatar / 2–4 lines POV, ≤10 words each, in double quotes, voice = CREATOR_PERSONA.
 
-OUTPUT: One paragraph. Final prompt ready to send to Seedance 2.0. No preamble, no explanation, no labels.`;
+OUTPUT: One paragraph. No preamble, no labels.
 
-const TUTORIAL_PROMPT = `You write Seedance 2.0 video generation prompts for UGC hands-on product demo videos. This is not a how-to guide or a recipe tutorial. It is a product review told through demonstration — the avatar is showing you what the product does by actually using it. Your output is a single continuous paragraph of 220–380 words. No headings, no bullet points, no numbered steps, no emojis, no hashtags.
+${EX_TUTORIAL}`;
 
-The video is vertical 9:16, warm natural light, clean realistic location that matches the product (kitchen counter for blenders/cookware, bathroom for skincare/beauty, desk for stationery/tech, outdoor for sports/fitness). Handheld. Product always visible in frame.
+const UNBOXING_PROMPT = `You write Seedance 2.0 video generation prompts for UGC unboxing videos. One continuous paragraph, 250–420 words.
 
-You will receive:
-- PRODUCT_NAME, PRODUCT_COLOR, PRODUCT_MATERIAL, PRODUCT_DESCRIPTION, PRODUCT_KEY_FEATURE
-- AVATAR_NAME, AVATAR_GENDER, AVATAR_DESCRIPTION
-- SETTING_HINT (optional)
+Two sub-modes:
+SUB-MODE A — ASMR TOP-DOWN: collectibles, jewelry, designer objects, premium accessories. Overhead camera. Only hands visible — natural hands, sleeve color complementing product. Slow deliberate movements. Every sound named (cardboard tap, sticker peel, tissue rustle, foam lift). Minimal or no dialogue.
+SUB-MODE B — SELFIE UNBOXING: fashion hauls, luxury bags, streetwear. Front camera or POV. Casual bedroom energy. Quiet impressed dialogue in CREATOR_PERSONA voice.
 
-Your prompt must contain in this order:
+You pick the sub-mode based on product type. If no avatar is provided, default to Sub-Mode A (ASMR).
 
-1. SETTING — one sentence. The specific surface or location. The light source. One or two real-life details that make it feel like a home, not a set (a folded towel, a fruit bowl, a small plant). No studio backdrops.
+Structure: SETTING → PACKAGING DESCRIPTION (the box exactly as it appears before opening, from images) → PRODUCT DESCRIPTION (from concrete_product_details) → FIVE BEATS (arrival → open → peel/reveal → rotate → beauty shot).
 
-2. AVATAR APPEARANCE — brief. What [AVATAR_NAME] is wearing. Casual, practical for the product type.
+Dialogue (Sub-Mode B only): 2–4 lines max, ≤8 words each, quiet impressed, voice = CREATOR_PERSONA.
 
-3. PRODUCT IN SETTING — where the product sits before it's picked up. Describe it with the same level of detail you'd give a product photographer: PRODUCT_NAME, exact color, material surface, any visible text or hardware, any physical feature that makes it distinctive.
+OUTPUT: One paragraph. No preamble, no labels.
 
-4. FIVE BEATS:
-   BEAT 1 — HOOK (0–2s): Avatar picks up or grabs the product with both hands, brings it close to the lens, looks directly into camera. One strong opening line in quotes. Not a question. A statement. It can be a claim ("This blender just changed my morning routine.") or an observation or a reaction. Wide eyes optional — but it should feel earned, not performed.
+${EX_UNBOXING}`;
 
-   BEAT 2 — FEATURE HIGHLIGHT (2–6s): Avatar runs a finger along a key physical feature — a dial, a seam, a texture, a button, a hinge. Describes what they're touching in one quiet line. The camera gets close. This is where the product's craftsmanship or design becomes tactile.
+const AVATAR_TALKING_HEAD_PROMPT = `You write Seedance 2.0 video generation prompts for an avatar talking directly to camera about a topic the user gave you. There is NO product being reviewed. Do not invent a product. The avatar is the entire scene.
 
-   BEAT 3 — DEMONSTRATION (6–10s): Avatar uses the product for its primary purpose. Real action, real result. Blender runs. Product is applied to skin. Marker draws a stroke. The result is visible. No line here — or one line of genuine reaction during the action ("Hear how quiet that is?").
+Vertical 9:16, shot on iPhone front camera, natural daylight, handheld with subtle micro-shake, real skin tones, no filters. One continuous paragraph, 180–320 words.
 
-   BEAT 4 — RESULT/PAYOFF (10–13s): Avatar holds the result up to the light or camera. Smoothie in a glass. Glowing skin in a mirror. A drawn line on paper. One short line describing what they see, in first person.
+Structure:
+1. SETTING — one sentence, intimate room or location matching the topic, natural light source named.
+2. AVATAR APPEARANCE — brief, what the avatar wears, casual.
+3. ACTION AND DIALOGUE SEQUENCE — 3–4 beats:
+   BEAT 1: Avatar leans in slightly, opens with a hook line in CREATOR_PERSONA voice tied to USER_DIRECTION.
+   BEAT 2: Pauses, glances away, returns. One personal observation.
+   BEAT 3: One specific reason it matters or one honest reaction.
+   BEAT 4: Stops talking, holds eye contact, small smile, reaches toward the phone — video ends mid-motion.
 
-   BEAT 5 — VERDICT (13–15s): Avatar looks at the product, then back to camera. One line. Short. A nod. Done. ("Yeah. Worth it." / "First try. No chunks." / "That's it. That's the review.")
+Dialogue: 3–5 lines, ≤12 words each, in double quotes, voice = CREATOR_PERSONA, built ENTIRELY around USER_DIRECTION. Never insert product references.
 
-Dialogue rules:
-- 4–6 lines total, ≤10 words each, in double quotes
-- Warm friendly mid-20s American tone
-- Natural breaths and pauses are part of the delivery — write "..." for a pause
-- BANNED VOICE: numbered teacher-voice, any "step one / step two", any "as you can see", any scripted product-benefit sentence that sounds written by marketing
-- ALLOWED VOICE: personal experience, honest reaction, quiet observation, earned satisfaction
+OUTPUT: One paragraph. No preamble, no labels.
 
-BANNED WORDS AND PHRASES:
-introducing, game-changer, elevate, transform, revolutionary, level up, must-have, perfect for, you'll love, step one, step two, in this tutorial, today we're going to, as you can see, don't forget to, pro tip
-
-OUTPUT: One paragraph. Final prompt ready to send to Seedance 2.0. No preamble, no explanation, no labels.`;
-
-const UNBOXING_PROMPT = `You write Seedance 2.0 video generation prompts for UGC unboxing videos. Your output is a single continuous paragraph of 250–420 words. No headings, no bullet points, no numbered steps, no emojis, no hashtags.
-
-There are two sub-modes. You pick the correct one based on the product type:
-
-SUB-MODE A — ASMR TOP-DOWN: Use this for collectibles, jewelry, designer objects, art toys, premium accessories, anything where the packaging itself is an experience. Overhead camera looking straight down at a surface (light wood, white silk, marble — pick one that harmonizes with the product's color palette). Only hands visible — female hands with natural nails, cozy sweater sleeves whose color complements the product. Warm soft natural daylight from a window. Slow, deliberate movements. Every sound is named and described. Minimal or no dialogue. Pure visual and audio satisfaction.
-
-SUB-MODE B — SELFIE UNBOXING: Use this for fashion hauls, luxury bags, streetwear, lifestyle products, anything that arrives in a shopping bag or branded box that gets tossed onto a bed. Front camera selfie-style or POV hands. Avatar present on screen or POV (hands only). Casual bedroom energy. Product thrown onto an unmade bed or set on a desk. Quiet impressed dialogue in quotes. More movement, less precision.
-
-You will receive:
-- PRODUCT_NAME, PRODUCT_COLOR, PRODUCT_MATERIAL, PRODUCT_DESCRIPTION, PACKAGING_DESCRIPTION
-- AVATAR_NAME, AVATAR_GENDER, AVATAR_DESCRIPTION (used for Sub-Mode B)
-- SETTING_HINT (optional)
-
-Your prompt must contain in this order:
-
-1. SETTING — one sentence. Surface material and color, light source, one atmospheric detail (a cozy sweater sleeve color, a plant in the background, a white unmade bed).
-
-2. PACKAGING DESCRIPTION — describe the external package exactly as it would appear before opening: box color, lid color, any printed text (brand name, product name — use exact names), any ribbon, any clasp. This is what the model renders first.
-
-3. PRODUCT DESCRIPTION — describe the actual product inside: PRODUCT_NAME, color, material, finish, any hardware, any text printed on it, any physical feature that makes it distinctive. The model needs this to render the reveal correctly.
-
-4. FIVE BEATS:
-
-   For SUB-MODE A (ASMR):
-   BEAT 1 — ARRIVAL (0–2s): Sealed package sits centered on surface. Hands enter from the bottom of frame. Describe the exact sound when fingers tap or touch the box. Slow, no rush.
-   BEAT 2 — OPEN (2–5s): Hands grip and lift lid or pull ribbon. Describe the sound precisely (hollow cardboard thud / crisp ribbon slide / sticker peel). Describe what is revealed: tissue paper, foam insert, dustbag — name the color and any printed text.
-   BEAT 3 — PEEL AND REVEAL (5–8s): Remove tissue or dustbag. Name the sound (tissue rustle / fabric slide). Product is now visible for the first time. Hands pause — let the model hold this beat. Name every visible surface and how it catches the light.
-   BEAT 4 — ROTATE (8–12s): One hand lifts the product, holds it at center frame, rotates it slowly. Name what becomes visible on each rotation: front face, sides, base, hardware, back, texture. The light catches each surface differently — name the effect.
-   BEAT 5 — BEAUTY SHOT (12–15s): Product placed standing or laid flat on the surface alongside any included extras (cards, certificates, accessories). Packaging arranged behind. Hands pull away slowly. Hold for 1.5 seconds. Describe the final composition exactly.
-   No music. Name every ASMR sound that should be present (cardboard tap, sticker peel, tissue rustle, foam lift, card slide on surface).
-
-   For SUB-MODE B (Selfie):
-   BEAT 1 — HOOK (0–2s): Shopping bag or branded box gets tossed onto the bed from above or sits at center frame. Name the bag/box color and any printed text. Camera is slightly shaky. Breathing or ambient sound.
-   BEAT 2 — REACH IN (2–6s): Hands grip the handles or the box, pull it closer. Slightly out of focus then snaps sharp. Pull out the dustbag or outer sleeve — name its color and any printed text. Fabric sliding sound.
-   BEAT 3 — REVEAL (6–10s): Product drops or is lifted into full frame. Name the exact color, material, hardware. One quiet impressed line in quotes: short, unhurried.
-   BEAT 4 — DETAIL (10–14s): Extreme close-up — fingers trace a texture, a strap, a clasp, a material surface. Camera circles the product. One more quiet line in quotes.
-   BEAT 5 — FINAL HOLD (14–15s): Product held up toward camera with both hands. Full reveal. One final quiet line or silence. Slight smile if face is present.
-
-Dialogue rules for Sub-Mode B:
-- 2–4 lines maximum, in double quotes, each ≤8 words
-- Quiet, impressed, almost private — like talking to yourself
-- Energy: "Okay… wow.", "This is actually beautiful.", "It feels really refined."
-- BANNED: any upbeat exclamation, any product benefit stated like a claim, any scripted line
-
-BANNED WORDS AND PHRASES (both sub-modes):
-introducing, game-changer, elevate, transform, revolutionary, level up, must-have, perfect for, you'll love, unbox with me, today I'm unboxing, let's take a look, as you can see, don't forget
-
-OUTPUT: One paragraph. Final prompt ready to send to Seedance 2.0. No preamble, no explanation, no labels.`;
+${EX_TALKING_HEAD}`;
 
 const FORMAT_SYSTEM_PROMPTS: Record<string, string> = {
   UGC: UGC_PROMPT,
   'UGC Virtual Try On': UGC_TRYON_PROMPT,
   Tutorial: TUTORIAL_PROMPT,
   Unboxing: UNBOXING_PROMPT,
-  // Legacy / not-yet-rewritten formats keep their previous lightweight prompts
-  'Pro Virtual Try On': `You write polished editorial try-on scripts. Street-style energy, fashion-photographer aesthetic, slow camera pushes, light natural dialog or beat-cut silence.`,
+  AVATAR_TALKING_HEAD: AVATAR_TALKING_HEAD_PROMPT,
+  // Legacy formats keep lightweight prompts
+  'Pro Virtual Try On': `You write polished editorial try-on scripts. Street-style energy, fashion-photographer aesthetic, slow camera pushes, light natural dialog or beat-cut silence. Voice = CREATOR_PERSONA.`,
   'Hyper Motion': `You write CGI / hyper-motion product scripts. NO avatar dialog. Pure cinematic: liquid, particles, macro, 360 orbits, speed ramps, packshot. Studio background, hyper-real, 8k aesthetic.`,
-  'Product Review': `You write hands-on product review scripts. Avatar holds, demonstrates, gives an honest 10-second take. Natural skepticism then convinced.`,
+  'Product Review': `You write hands-on product review scripts. Avatar holds, demonstrates, gives an honest 10-second take. Voice = CREATOR_PERSONA.`,
   'TV Spot': `You write 15s cinematic TV spot scripts. 3-act narrative, voiceover (not on-camera dialog), beautiful camera work, brand moment at the end.`,
   'Wild Card': `You write surreal, scroll-stopping ad scripts that break expectations. Surprising beat, unexpected setting, memorable single line.`,
 };
 
+// ---------- Banned word check ----------
+const BANNED_RX = /\b(introducing|game[- ]changer|elevate|unleash|revolutionary|transform your|experience the|level up|must[- ]have|you'll love|perfect for|this is your sign|don't miss|limited time|step one|step two|as you can see|in this video|today I'm reviewing|unbox with me|today I'm unboxing|let's take a look|outfit inspo|style tip|new collection|effortlessly stylish)\b/i;
+
+function isWeak(finalPrompt: string, details: string[]): { weak: boolean; reason: string } {
+  if (!finalPrompt || finalPrompt.length < 350) return { weak: true, reason: 'too short' };
+  if (BANNED_RX.test(finalPrompt)) return { weak: true, reason: 'banned phrase' };
+  if (!/"[^"\n]{2,140}"/.test(finalPrompt)) return { weak: true, reason: 'no quoted dialogue' };
+  if (details && details.length >= 2) {
+    const hits = details.filter((d) => d && finalPrompt.toLowerCase().includes(String(d).toLowerCase().split(' ').slice(0, 2).join(' '))).length;
+    if (hits === 0) return { weak: true, reason: 'no product detail mentioned' };
+  }
+  return { weak: false, reason: '' };
+}
+
+// ---------- LLM call helper ----------
+async function callWriter(args: {
+  model: string;
+  systemPrompt: string;
+  userTextBlock: string;
+  imageUrls: string[];
+  hasProduct: boolean;
+}) {
+  const userContent: any[] = [];
+  for (const url of args.imageUrls.slice(0, 4)) {
+    userContent.push({ type: 'image_url', image_url: { url } });
+  }
+  userContent.push({ type: 'text', text: args.userTextBlock });
+
+  const required = args.hasProduct
+    ? ['final_prompt', 'voiceover_script', 'concrete_product_details', 'persona_used']
+    : ['final_prompt', 'voiceover_script', 'persona_used'];
+
+  const aiRes = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${LOVABLE_API_KEY}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      model: args.model,
+      messages: [
+        { role: 'system', content: args.systemPrompt },
+        { role: 'user', content: userContent },
+      ],
+      tools: [
+        {
+          type: 'function',
+          function: {
+            name: 'video_prompt',
+            description: 'Return a Seedance 2.0 ready video prompt that strictly follows the system message rules.',
+            parameters: {
+              type: 'object',
+              properties: {
+                concrete_product_details: {
+                  type: 'array',
+                  items: { type: 'string' },
+                  description: 'At least 4 concrete physical details extracted from the product images: exact color names, materials, hardware pieces, printed text, distinctive features. Empty array allowed only if no product was provided.',
+                },
+                scene_description: { type: 'string', description: 'Setting + avatar appearance (or POV hands description) + product description (2–4 sentences).' },
+                voiceover_script: { type: 'string', description: 'All spoken lines in order, each in double quotes, separated by line breaks. Empty string if pure ASMR/silent.' },
+                camera_notes: { type: 'string', description: 'Camera setup: front/back/overhead, handheld feel, lighting, aspect.' },
+                on_screen_beats: { type: 'array', items: { type: 'string' }, description: 'One entry per beat (4 or 5 entries).' },
+                persona_used: { type: 'string', description: 'The exact CREATOR_PERSONA id you wrote for.' },
+                final_prompt: {
+                  type: 'string',
+                  description: 'Complete single-paragraph Seedance 2.0 prompt. Must literally contain the PRODUCT_NAME and AVATAR_NAME from input (when provided). Must follow the format structure and example tone. No headings, no bullets, no labels.',
+                },
+              },
+              required,
+              additionalProperties: false,
+            },
+          },
+        },
+      ],
+      tool_choice: { type: 'function', function: { name: 'video_prompt' } },
+    }),
+  });
+  return aiRes;
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response(null, { headers: corsHeaders });
   try {
-    const { productId, avatarId, format, surface, aspect, duration, userPrompt, exactVoiceover } = await req.json();
+    const { productId, avatarId, format, surface, aspect, duration, userPrompt, exactVoiceover, userDirection } = await req.json();
     const admin = createClient(SUPABASE_URL, SERVICE_KEY);
 
-    // Build structured product context (token-style so the LLM uses literal values)
+    // ---------- Build product context + collect product image URLs ----------
     let productCtx = '';
-    const refUrls: string[] = [];
+    let visionFactsCtx = '';
+    const productImageUrls: string[] = [];
+    let avatarImageUrl: string | null = null;
+    const allRefUrls: string[] = [];
+    let productMeta: any = null;
+
     if (productId) {
       const { data: p } = await admin.from('ms_products').select('*').eq('id', productId).maybeSingle();
       if (p) {
+        productMeta = p;
         productCtx =
           `PRODUCT_NAME: ${p.name}\n` +
-          `PRODUCT_COLOR: ${p.brand_color ?? 'unspecified — infer from images'}\n` +
-          `PRODUCT_MATERIAL: unspecified — infer from images\n` +
-          `PRODUCT_DESCRIPTION: ${p.description ?? 'n/a'}\n` +
-          `PACKAGING_DESCRIPTION: unspecified — infer from images if visible, otherwise invent a plausible premium package matching the brand color`;
+          `PRODUCT_COLOR: ${p.brand_color ?? '(see images)'}\n` +
+          `PRODUCT_DESCRIPTION: ${p.description ?? '(see images)'}\n`;
+        if ((p as any).vision_analysis) {
+          try {
+            const v = (p as any).vision_analysis;
+            visionFactsCtx = `PRODUCT_VISION_FACTS (already extracted from images — use these literally):\n${typeof v === 'string' ? v : JSON.stringify(v, null, 2)}\n`;
+          } catch { /* ignore */ }
+        }
       }
       const { data: imgs } = await admin
         .from('ms_product_images')
@@ -228,10 +321,14 @@ Deno.serve(async (req) => {
         .order('is_primary', { ascending: false });
       for (const img of imgs ?? []) {
         const { data: signed } = await admin.storage.from('ms-products').createSignedUrl(img.storage_path, 60 * 60);
-        if (signed?.signedUrl) refUrls.push(signed.signedUrl);
+        if (signed?.signedUrl) {
+          productImageUrls.push(signed.signedUrl);
+          allRefUrls.push(signed.signedUrl);
+        }
       }
     }
 
+    // ---------- Avatar context ----------
     let avatarCtx = '';
     if (avatarId) {
       const { data: a } = await admin.from('ms_avatars').select('*').eq('id', avatarId).maybeSingle();
@@ -241,88 +338,122 @@ Deno.serve(async (req) => {
           `AVATAR_GENDER: ${a.gender ?? 'unspecified'}\n` +
           `AVATAR_DESCRIPTION: ${(a as any).description ?? 'mid-20s, natural look, real skin tones'}`;
         if (a.public_url) {
-          const url = a.public_url.startsWith('http') ? a.public_url : `${new URL(req.url).origin}${a.public_url}`;
-          refUrls.push(url);
+          avatarImageUrl = a.public_url.startsWith('http') ? a.public_url : `${new URL(req.url).origin}${a.public_url}`;
         } else if (a.storage_path) {
           const { data: signed } = await admin.storage.from('ms-avatars').createSignedUrl(a.storage_path, 60 * 60);
-          if (signed?.signedUrl) refUrls.push(signed.signedUrl);
+          if (signed?.signedUrl) avatarImageUrl = signed.signedUrl;
         }
+        if (avatarImageUrl) allRefUrls.push(avatarImageUrl);
       }
     }
 
-    // If exactVoiceover, skip LLM — use the user's prompt verbatim
+    // ---------- Exact-voiceover bypass ----------
     if (exactVoiceover && userPrompt) {
       return new Response(
         JSON.stringify({
           prompt: userPrompt,
-          script: { voiceover: userPrompt, exact: true },
-          reference_urls: refUrls,
+          script: { voiceover_script: userPrompt, exact: true, persona_used: 'exact-voiceover' },
+          reference_urls: allRefUrls,
+          script_persona: 'exact-voiceover',
         }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
       );
     }
 
+    // ---------- Roll persona ----------
+    const persona = rollPersona();
+    const personaBlock = `CREATOR_PERSONA: ${persona.id} — ${persona.name}\nVOICE GUIDE: ${persona.voice}\n`;
+
+    // ---------- POV hands branch ----------
+    const isPovHands = !avatarId && !!productId && (format === 'UGC' || format === 'Tutorial' || format === 'Unboxing');
+    const modeNote = isPovHands ? `MODE: POV_HANDS (no avatar — only hands visible, no face)\n` : '';
+
+    // ---------- Direction (creative core) vs setting hint ----------
+    const direction = (userDirection || userPrompt || '').trim();
+    const directionBlock = direction
+      ? `USER_DIRECTION (treat as the creative core — build the scene around this; format rules govern camera/structure only): ${direction}\n`
+      : `USER_DIRECTION: (none — invent a product-specific creative angle from the visible product details)\n`;
+
     const sys = `${HUMAN_UGC_FIREWALL}\n\n${FORMAT_SYSTEM_PROMPTS[format] || FORMAT_SYSTEM_PROMPTS.UGC}`;
 
-    const userMsg =
-      `${productCtx}\n\n${avatarCtx}\n\n` +
-      `SETTING_HINT: ${userPrompt ? userPrompt : '(none — choose a setting that fits the product naturally)'}\n` +
+    const userTextBlock =
+      `${personaBlock}\n` +
+      `${modeNote}` +
+      `${productCtx}\n` +
+      `${visionFactsCtx}\n` +
+      `${avatarCtx}\n\n` +
+      `${directionBlock}` +
       `ASPECT: ${aspect}\n` +
       `DURATION: ${duration}s\n\n` +
-      `Generate the final Seedance 2.0 prompt now, following every rule in the system message. ` +
-      `Use the literal PRODUCT_NAME and AVATAR_NAME above — do not invent a different product or person. ` +
-      `If reference images exist, treat them only as visual anchors; create a new UGC scene with real action, not a still copy of those images. ` +
-      `Make the voiceover_script painfully human: short, specific, imperfect, tied to visible product details, never generic ad praise. ` +
-      `Output one continuous paragraph in the final_prompt field. No preamble, no labels, no headings.`;
+      `Look at the attached reference images carefully. Extract real visible details (colors, textures, hardware, printed text, distinctive features) into concrete_product_details — do not invent. ` +
+      `Then write the Seedance 2.0 prompt following every system rule. ` +
+      `Voice MUST match CREATOR_PERSONA exactly. ` +
+      `Output one continuous paragraph in final_prompt. No preamble, no labels, no headings.`;
 
-    const aiRes = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${LOVABLE_API_KEY}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model: 'google/gemini-3-flash-preview',
-        messages: [
-          { role: 'system', content: sys },
-          { role: 'user', content: userMsg },
-        ],
-        tools: [
-          {
-            type: 'function',
-            function: {
-              name: 'video_prompt',
-              description: 'Return a Seedance 2.0 ready video prompt that strictly follows the system message rules.',
-              parameters: {
-                type: 'object',
-                properties: {
-                  scene_description: { type: 'string', description: 'Setting + avatar appearance + product description (2–4 sentences).' },
-                  voiceover_script: { type: 'string', description: 'All spoken lines, in order, each in double quotes, separated by line breaks.' },
-                  camera_notes: { type: 'string', description: 'Camera setup: front/back/overhead, handheld feel, lighting, aspect.' },
-                  on_screen_beats: { type: 'array', items: { type: 'string' }, description: 'One entry per beat (4 or 5 entries).' },
-                  final_prompt: {
-                    type: 'string',
-                    description:
-                      'The complete single-paragraph Seedance 2.0 prompt. Must literally contain the PRODUCT_NAME and AVATAR_NAME from input. Must follow the word count and beat structure from the system message. No headings, no bullets, no labels.',
-                  },
-                },
-                required: ['final_prompt', 'voiceover_script', 'scene_description', 'on_screen_beats'],
-                additionalProperties: false,
-              },
-            },
-          },
-        ],
-        tool_choice: { type: 'function', function: { name: 'video_prompt' } },
-      }),
+    const imageUrlsForLLM = [...productImageUrls.slice(0, 3)];
+    if (avatarImageUrl) imageUrlsForLLM.push(avatarImageUrl);
+
+    // ---------- First attempt: primary model ----------
+    let aiRes = await callWriter({
+      model: PRIMARY_MODEL,
+      systemPrompt: sys,
+      userTextBlock,
+      imageUrls: imageUrlsForLLM,
+      hasProduct: !!productId,
     });
+
+    // Fallback to flash on rate/credit issues
+    if (aiRes.status === 429 || aiRes.status === 402 || aiRes.status >= 500) {
+      console.warn(`[generate-script] primary ${PRIMARY_MODEL} returned ${aiRes.status}, trying fallback`);
+      aiRes = await callWriter({
+        model: FALLBACK_MODEL,
+        systemPrompt: sys,
+        userTextBlock,
+        imageUrls: imageUrlsForLLM,
+        hasProduct: !!productId,
+      });
+    }
+
     if (aiRes.status === 429) return new Response(JSON.stringify({ error: 'rate limited' }), { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     if (aiRes.status === 402) return new Response(JSON.stringify({ error: 'AI credits exhausted' }), { status: 402, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
-    const aiJson = await aiRes.json();
-    const argStr = aiJson?.choices?.[0]?.message?.tool_calls?.[0]?.function?.arguments;
-    const script = argStr ? JSON.parse(argStr) : { final_prompt: userPrompt || '' };
+
+    let aiJson = await aiRes.json();
+    let argStr = aiJson?.choices?.[0]?.message?.tool_calls?.[0]?.function?.arguments;
+    let script: any = argStr ? JSON.parse(argStr) : { final_prompt: userPrompt || '' };
+
+    // ---------- Retry once if weak ----------
+    const details = Array.isArray(script.concrete_product_details) ? script.concrete_product_details : [];
+    const weakCheck = isWeak(script.final_prompt || '', details);
+    if (weakCheck.weak && (productId || avatarId)) {
+      console.warn(`[generate-script] weak output (${weakCheck.reason}), retrying`);
+      const stricter =
+        userTextBlock +
+        `\n\nYour previous attempt was rejected: ${weakCheck.reason}. ` +
+        `Rewrite. Every spoken line MUST be tied to a concrete physical detail you can see in the images. ` +
+        `Avoid every banned phrase. Voice MUST be unmistakably ${persona.name}.`;
+      const retryRes = await callWriter({
+        model: PRIMARY_MODEL,
+        systemPrompt: sys,
+        userTextBlock: stricter,
+        imageUrls: imageUrlsForLLM,
+        hasProduct: !!productId,
+      });
+      if (retryRes.ok) {
+        aiJson = await retryRes.json();
+        argStr = aiJson?.choices?.[0]?.message?.tool_calls?.[0]?.function?.arguments;
+        if (argStr) script = JSON.parse(argStr);
+      }
+    }
+
+    script.persona_used = script.persona_used || persona.id;
 
     return new Response(
       JSON.stringify({
         prompt: script.final_prompt || userPrompt || '',
         script,
-        reference_urls: refUrls,
+        reference_urls: allRefUrls,
+        script_persona: script.persona_used,
+        concrete_product_details: script.concrete_product_details || [],
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
     );

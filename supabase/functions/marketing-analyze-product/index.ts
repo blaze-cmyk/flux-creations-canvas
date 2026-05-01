@@ -13,7 +13,14 @@ const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
 const SYSTEM = `You are a product cataloguer for a short-form video ad platform.
 Look at the product in the image and return:
 - name: 3–8 word commercial product name (Title Case). If a brand name or model is visible on the product or packaging, USE IT VERBATIM. Otherwise infer a plausible product name from category + key visual features (color, material). Never include the word "Product".
-- description: ONE concise sentence (max 30 words) describing what the product physically IS — category, color, material, finish, distinctive features, any visible text/logos. Written so a downstream image-generation model can re-render it accurately. No marketing fluff, no benefits, no adjectives like "premium" or "elegant".`;
+- description: ONE concise sentence (max 30 words) describing what the product physically IS — category, color, material, finish, distinctive features, any visible text/logos. Written so a downstream image-generation model can re-render it accurately. No marketing fluff.
+- visual_facts: an object with concrete, render-ready details extracted from what you actually SEE:
+  - dominant_colors: array of 1–4 specific color names (e.g. "mint green", "cobalt blue", "warm tan")
+  - materials: array of 1–3 material/finish names (e.g. "pebbled leather", "brushed aluminum", "matte silicone")
+  - hardware: array of 0–4 hardware pieces visible (e.g. "gold lobster clasp", "silver chain strap", "white grip tape")
+  - visible_text: array of 0–4 strings of text/logos PRINTED on the product or packaging (verbatim, with capitalization)
+  - distinctive_features: array of 2–5 short phrases naming what makes this product visually unique (e.g. "orange cross-string pattern", "rainbow border with confetti stars", "tiny teddy bears in clear sole")
+  - product_category: one short noun phrase (e.g. "tennis racket", "phone case", "skincare serum")`;
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response(null, { headers: corsHeaders });
@@ -47,14 +54,27 @@ Deno.serve(async (req) => {
           type: 'function',
           function: {
             name: 'product_meta',
-            description: 'Return product name and physical description.',
+            description: 'Return product name, physical description, and structured visual facts.',
             parameters: {
               type: 'object',
               properties: {
                 name: { type: 'string', description: '3–8 word commercial product name in Title Case.' },
                 description: { type: 'string', description: 'One concise physical description sentence, max 30 words.' },
+                visual_facts: {
+                  type: 'object',
+                  properties: {
+                    dominant_colors: { type: 'array', items: { type: 'string' } },
+                    materials: { type: 'array', items: { type: 'string' } },
+                    hardware: { type: 'array', items: { type: 'string' } },
+                    visible_text: { type: 'array', items: { type: 'string' } },
+                    distinctive_features: { type: 'array', items: { type: 'string' } },
+                    product_category: { type: 'string' },
+                  },
+                  required: ['dominant_colors', 'materials', 'distinctive_features', 'product_category'],
+                  additionalProperties: false,
+                },
               },
-              required: ['name', 'description'],
+              required: ['name', 'description', 'visual_facts'],
               additionalProperties: false,
             },
           },
@@ -74,7 +94,7 @@ Deno.serve(async (req) => {
       });
     }
     const parsed = JSON.parse(argStr);
-    return new Response(JSON.stringify({ name: parsed.name, description: parsed.description }), {
+    return new Response(JSON.stringify({ name: parsed.name, description: parsed.description, visual_facts: parsed.visual_facts ?? null }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   } catch (e) {
