@@ -70,11 +70,13 @@ type AvatarMeta = { name?: string | null; description?: string | null; gender?: 
 async function gatherReferenceUrls(admin: any, opts: {
   productId?: string | null;
   avatarId?: string | null;
+  maxProductImages?: number;
 }): Promise<{ refs: string[]; thumb: string | null; product: ProductMeta; avatar: AvatarMeta }> {
   const refs: string[] = [];
   let thumb: string | null = null;
   let product: ProductMeta = null;
   let avatar: AvatarMeta = null;
+  const productCap = Math.max(1, opts.maxProductImages ?? 999);
 
   if (opts.productId) {
     const { data: prod } = await admin
@@ -89,11 +91,14 @@ async function gatherReferenceUrls(admin: any, opts: {
       .select('storage_path, is_primary')
       .eq('product_id', opts.productId)
       .order('is_primary', { ascending: false });
+    let added = 0;
     for (const img of imgs ?? []) {
+      if (added >= productCap) break;
       const url = await signedStorageUrl(admin, 'ms-products', (img as any).storage_path);
       if (url) {
         refs.push(url);
         if (!thumb) thumb = url;
+        added++;
       }
     }
   }
