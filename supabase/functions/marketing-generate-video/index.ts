@@ -48,6 +48,58 @@ function clampDuration(d: unknown) {
   return Math.max(4, Math.min(15, n));
 }
 
+// Lazily generate (and cache) a smooth-warm female reference voice clip for the
+// "second speaker" in Podcast Mode A. Cached as a public object in
+// `video-inputs/system/podcast-second-jessica.mp3` so we only pay ElevenLabs
+// once across all podcast renders. Uses Jessica (cgSgspJ2msm6clMCkdW9) — the
+// closest match to the smooth, warm Jade-like tone the user asked for.
+async function ensurePodcastSecondVoiceUrl(
+  admin: ReturnType<typeof createClient>,
+): Promise<string | null> {
+  const ELEVENLABS_API_KEY = Deno.env.get('ELEVENLABS_API_KEY');
+  if (!ELEVENLABS_API_KEY) return null;
+  const path = 'system/podcast-second-jessica.mp3';
+  const { data: pub } = admin.storage.from('video-inputs').getPublicUrl(path);
+  const publicUrl = pub?.publicUrl;
+  if (!publicUrl) return null;
+  try {
+    const head = await fetch(publicUrl, { method: 'HEAD' });
+    if (head.ok) return publicUrl;
+  } catch { /* fall through to generate */ }
+  try {
+    const text =
+      "Yeah... I mean, I really love this. It just feels good, you know? Like, the moment you put it on you just kinda sink into it. That's the whole vibe.";
+    const tts = await fetch(
+      `https://api.elevenlabs.io/v1/text-to-speech/cgSgspJ2msm6clMCkdW9?output_format=mp3_44100_128`,
+      {
+        method: 'POST',
+        headers: { 'xi-api-key': ELEVENLABS_API_KEY, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          text,
+          model_id: 'eleven_multilingual_v2',
+          voice_settings: { stability: 0.55, similarity_boost: 0.8, style: 0.25, use_speaker_boost: true, speed: 1.0 },
+        }),
+      },
+    );
+    if (!tts.ok) {
+      log('WARN', 'podcast 2nd voice: ElevenLabs failed', { status: tts.status });
+      return null;
+    }
+    const audio = new Uint8Array(await tts.arrayBuffer());
+    const { error: upErr } = await admin.storage
+      .from('video-inputs')
+      .upload(path, audio, { contentType: 'audio/mpeg', upsert: true });
+    if (upErr) {
+      log('WARN', 'podcast 2nd voice: upload failed', { err: upErr.message });
+      return null;
+    }
+    return publicUrl;
+  } catch (e) {
+    log('WARN', 'podcast 2nd voice: exception', { err: e instanceof Error ? e.message : String(e) });
+    return null;
+  }
+}
+
 function isValidHttpUrl(value: unknown) {
   if (typeof value !== 'string' || !value.trim()) return false;
   try {
