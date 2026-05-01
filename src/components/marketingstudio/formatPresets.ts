@@ -173,6 +173,14 @@ export const FORMAT_PRESETS: Record<string, FormatPreset> = {
     productName: 'Nude Lab',
     avatarName: 'Ava',
   },
+  f10: {
+    mode: 'Podcast',
+    prompt: PODCAST_COMFRT,
+    duration: '25s',
+    aspect: '9:16',
+    productName: 'Comfrt Olive Set',
+    avatarName: 'Guy 1 + Guy 2',
+  },
 };
 
 export const RECREATE_EVENT = 'ms:recreate';
