@@ -281,7 +281,8 @@ Deno.serve(async (req) => {
         duration_seconds,
         resolution,
         prompt: finalPrompt,
-        script_text: finalPrompt,
+        script: scriptPayload ?? { final_prompt: finalPrompt, voiceover_script: voiceoverText },
+        script_text: voiceoverText || finalPrompt,
         reference_paths: refs,
         thumb_url: thumb,
         status: 'queued',
@@ -309,7 +310,7 @@ Deno.serve(async (req) => {
           format,
           surface,
           projectId,
-          script_text: finalPrompt,
+          script_text: voiceoverText || finalPrompt,
         });
         if (!vidRes.ok) {
           throw new Error(`video submit failed: ${vidRes.text.slice(0, 300)}`);
