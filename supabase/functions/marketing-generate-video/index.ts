@@ -469,7 +469,7 @@ Deno.serve(async (req) => {
       const audio_urls: string[] = [];
       if (row.avatar_id) {
         const { data: av } = await admin.from('ms_avatars').select('voice_sample_url').eq('id', row.avatar_id).maybeSingle();
-        if (isValidHttpUrl(av?.voice_sample_url)) audio_urls.push(av.voice_sample_url.trim());
+        if (isValidHttpUrl(av?.voice_sample_url)) audio_urls.push(String(av?.voice_sample_url).trim());
       }
       const result = await submitWithFallback({
         prompt: row.prompt,
@@ -554,7 +554,7 @@ Deno.serve(async (req) => {
         .select('voice_sample_url')
         .eq('id', avatarId)
         .maybeSingle();
-      if (isValidHttpUrl(av?.voice_sample_url)) audio_urls.push(av.voice_sample_url.trim());
+      if (isValidHttpUrl(av?.voice_sample_url)) audio_urls.push(String(av?.voice_sample_url).trim());
     }
 
     // 1) Persist row immediately (so client polling has a real id) — or reuse one created by the orchestrator
