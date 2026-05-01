@@ -151,6 +151,19 @@ export function useAvatars() {
 
       setAvatars((current) => [resolvedCreated, ...current.filter((avatar) => avatar.id !== resolvedCreated.id)]);
       await refresh({ force: true });
+
+      // Fire-and-forget: generate the ElevenLabs voice sample so Seedance has
+      // a per-avatar reference voice instead of falling back to whatever the
+      // last-cached voice was. We don't await — modal closes immediately and
+      // the clip lands by the time the user queues a generation.
+      supabase.functions
+        .invoke('marketing-generate-voice-sample', { body: { avatarId: created.id } })
+        .then(({ error }) => {
+          if (error) console.warn('[avatar] voice sample generation failed', error);
+          else refresh({ force: true });
+        })
+        .catch((err) => console.warn('[avatar] voice sample invoke failed', err));
+
       return resolvedCreated;
     },
     [refresh],
