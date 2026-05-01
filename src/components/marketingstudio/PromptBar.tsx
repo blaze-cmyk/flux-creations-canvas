@@ -259,6 +259,7 @@ export function PromptBar({ projectId }: Props) {
       // 4. Navigate now (only if we created a new project here)
       if (pslug) navigate(`/marketingstudio/${pslug}`);
       setPrompt('');
+      setExtraRefs([]);
       toast({ title: 'Generation started', description: 'Rendering on Seedance 2.0…' });
     } catch (e: any) {
       toast({ title: 'Generation failed', description: e?.message ?? 'Unknown error', variant: 'destructive' });
