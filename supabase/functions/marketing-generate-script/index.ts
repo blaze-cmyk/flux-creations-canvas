@@ -241,24 +241,39 @@ OUTPUT: One paragraph. No preamble, no labels.
 
 ${EX_TALKING_HEAD}`;
 
-const PODCAST_PROMPT = `You write Seedance 2.0 video generation prompts for faux-podcast UGC ads. The video is styled to look like a 20–45-second clip pulled out of a real podcast episode. One continuous paragraph, 280–460 words. No headings, no bullet points, no numbered steps, no emojis, no hashtags.
+const PODCAST_PROMPT = `You write Seedance 2.0 video generation prompts for faux-podcast UGC ads. The video is styled to look like a 20–45-second clip pulled out of a real MULTI-CAM podcast episode. One continuous paragraph, 320–500 words. No headings, no bullet points, no numbered steps, no emojis, no hashtags.
 
-Vertical 9:16, locked tripod, mixed practical interior lighting (warm lamp + window edge), real interior with a couch or armchair, foreground black podcast microphone slightly out of focus — the mic is MANDATORY and must be described explicitly in the SETTING. No camera moves of any kind. No B-roll. No music — only conversational dialogue and natural room tone.
+Vertical 9:16, mixed practical interior lighting (warm lamp + window edge), real interior with a couch or armchair, foreground black podcast microphone slightly out of focus — the mic is MANDATORY. No music — only conversational dialogue and natural room tone.
+
+CRITICAL — MULTI-CAM IS THE FORMAT, NOT A FEATURE.
+Real podcast clips are cut from 3+ cameras. The single biggest "AI slop" tell is a static locked wide two-shot of two avatars sitting still talking the whole video. You MUST avoid that. Every Mode A script is a SHUFFLE between three locked-tripod cameras with hard cuts motivated by who is speaking — never a single continuous wide.
 
 CASTING — pick exactly one mode and commit to it:
-MODE A — TWO-PERSON (host + guest on couch): two subjects fully inside the 9:16 frame. Host (asks questions, hypes the guest) uses the hype-friend or chaotic-bestie energy; Guest (delivers proof, demos product) uses CREATOR_PERSONA voice. They overlap and react physically to each other.
-MODE B — SINGLE GUEST + INVISIBLE OFF-CAMERA INTERVIEWER: one subject seated facing slightly off-camera-left toward an unseen interviewer. The interviewer is HEARD ONLY — never seen — and feeds lifestyle scenarios that the guest reacts to. Mark every off-camera line in the paragraph as 'Off-camera (heard only):' or '(off-camera):' so the model never renders a second person on screen.
 
-If a single avatar is provided, default to MODE B with that avatar as the guest. If no avatar is provided, default to MODE A and invent both characters. Never produce a single-monologue script.
+MODE A — TWO-PERSON MULTI-CAM SHUFFLE (default when 0 or 2 avatars are involved):
+- Three locked-tripod cameras: WIDE TWO-SHOT (both subjects + foreground mic), SINGLE A (chest-up of speaker A alone with their own foreground mic), SINGLE B (chest-up of speaker B alone with their own foreground mic).
+- Cut to the SINGLE of whoever is currently speaking. The other person is OFF-SCREEN while the single is held.
+- Use the WIDE only for the opening hook beat, the tactile proof beat, and the action-cut transition. The rest of the runtime alternates SINGLE A ↔ SINGLE B with at least one REACTION shot.
+- REACTION SHOTS are mandatory — at least one beat is a silent 1–2s SINGLE of the non-speaking person nodding, smirking, glancing down at the product, or pinching the fabric, while the other person's voice continues over the cut.
+- Label EVERY beat in the paragraph with one of these tags inline: 'WIDE TWO-SHOT', 'SINGLE A — [name]', 'SINGLE B — [name]', 'REACTION — [name]'. The script must contain at least 4 shot tags across at least 3 distinct angles.
+- Each speaker has their OWN visible podcast mic in their single shot.
+- Banned in Mode A: a single locked wide two-shot held for the entire runtime. That is the AI-slop pattern this format exists to defeat.
+
+MODE B — SINGLE GUEST + INVISIBLE OFF-CAMERA INTERVIEWER:
+- One subject seated facing slightly off-camera-left toward an unseen interviewer. One locked frame, no cuts. The interviewer is HEARD ONLY — never seen — and feeds lifestyle scenarios.
+- Mark every off-camera line in the paragraph as 'Off-camera (heard only):' or '(off-camera):' so the model never renders a second person on screen.
+
+If exactly one avatar is provided, default to MODE B with that avatar as the guest. If zero or two avatars are provided, default to MODE A and invent the missing character(s). Never produce a single-monologue script.
 
 PRODUCT — described from the actual product images using PRODUCT_NAME and the concrete_product_details list. Any printed text, lettering, numbers, slogans, or logos visible on the product MUST face the camera and read forward — perfectly legible, never mirrored.
 
 POSTURE-AS-PROOF: for comfort, wellness, loungewear, or sleepwear products, the on-screen subject MUST visibly slump, sink, or nest into the seat. Posture physically validates the spoken claim.
 
-BEATS: scale to DURATION using the STRICT DURATION SPEC windows above. Every script MUST include at least one TACTILE PROOF BEAT — a physical action (pinch fabric, pull hood, grip strap, throw matching piece) that lands inside the same beat as the claim it validates. If the script needs a wardrobe or state change, mask the only allowed hard cut with an ACTION-CUT TRANSITION (throw mask / lean mask / hand-swipe mask) — describe the action and write 'Hard cut masked by motion blur of …' verbatim. Never use a clean wipe, fade, or unmasked jump cut.
+BEATS: scale to DURATION using the STRICT DURATION SPEC windows above. Every script MUST include at least one TACTILE PROOF BEAT — a physical action (pinch fabric, pull hood, grip strap, throw matching piece) that lands inside the same beat as the claim it validates. If the script needs a wardrobe or state change, mask the cut with an ACTION-CUT TRANSITION (throw mask / lean mask / hand-swipe mask) — describe the action and write 'Hard cut masked by motion blur of …' verbatim. All other Mode A multi-cam cuts are normal hard cuts between the three locked angles, motivated by speech.
 
 DIALOGUE RULES:
 - Two distinct speakers, all lines in double quotes, ≤14 words per line.
+- Attribute every spoken line to the correct speaker by name immediately before the quote.
 - At least three disfluencies spread across the script: like, cause, bro, dude, girl, wait, okay, oh, right?, I mean.
 - Conversational overlap is encouraged: write two consecutive quoted lines for the same beat to signal speakers stepping on each other.
 - Voice MUST match CREATOR_PERSONA exactly for the on-camera guest.
@@ -317,8 +332,21 @@ function isWeak(
     if (!/(microphone|\bmic\b)/i.test(finalPrompt)) return { weak: true, reason: 'missing visible podcast microphone' };
     const quotedLines = (finalPrompt.match(/"([^"\n]{1,200})"/g) || []).length;
     if (quotedLines < 4) return { weak: true, reason: `podcast needs at least 4 quoted lines (got ${quotedLines})` };
-    if (!/(off-camera|off camera|host|guest|guy 1|guy 2|she:|he:|interviewer)/i.test(finalPrompt)) {
-      return { weak: true, reason: 'podcast needs two distinct speakers (off-camera or two-person)' };
+    const isModeB = /(off-camera|off camera|\(off-cam\)|interviewer)/i.test(finalPrompt);
+    if (!isModeB) {
+      // Mode A: enforce multi-cam shuffle (the anti-AI-slop fix).
+      const shotTagRx = /(WIDE TWO-SHOT|SINGLE A\b|SINGLE B\b|REACTION\b)/gi;
+      const tagHits = finalPrompt.match(shotTagRx) || [];
+      const distinctTags = new Set(tagHits.map((t) => t.toUpperCase().replace(/\s+/g, ' ')));
+      if (tagHits.length < 4 || distinctTags.size < 3) {
+        return { weak: true, reason: `podcast Mode A needs multi-cam shuffle: ≥4 shot tags across ≥3 of WIDE TWO-SHOT / SINGLE A / SINGLE B / REACTION (got ${tagHits.length} tags, ${distinctTags.size} distinct)` };
+      }
+      if (!/REACTION\b/i.test(finalPrompt)) {
+        return { weak: true, reason: 'podcast Mode A needs at least one REACTION shot of the silent listener' };
+      }
+      if (!/hard cut/i.test(finalPrompt)) {
+        return { weak: true, reason: 'podcast Mode A needs explicit hard cuts between camera angles' };
+      }
     }
     if (!/(pinch|grip|pull|tug|tap|touch|throws?|leans? (deep|forward|across)|holds? up)/i.test(finalPrompt)) {
       return { weak: true, reason: 'podcast missing tactile proof beat' };
