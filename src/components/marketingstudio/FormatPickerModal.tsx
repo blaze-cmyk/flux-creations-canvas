@@ -47,7 +47,7 @@ export function FormatPickerModal({ open, onOpenChange, selected, onSelect }: Pr
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
-        className="p-0 border-0 bg-transparent shadow-none max-w-[1180px] w-[calc(100vw-2rem)] max-h-[92vh] overflow-hidden"
+        className="p-0 border-0 bg-transparent shadow-none max-w-[1180px] w-[calc(100vw-2rem)] max-h-[92vh] overflow-hidden [&>button.absolute.right-4.top-4]:hidden"
         style={{ fontFamily: '"Montserrat", system-ui, sans-serif' }}
       >
         <div className="relative ms-glass rounded-3xl overflow-hidden">
