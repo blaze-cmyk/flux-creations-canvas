@@ -14,13 +14,11 @@ const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 
 // Curated ElevenLabs voices, picked for a believable mid-20s UGC tone.
-// Female pool — warm, natural, conversational.
+// Female pool — sweet, warm, natural, Jade-like. Keep Alice/Jessica first.
 const FEMALE_VOICES = [
-  'EXAVITQu4vr4xnSDxMaL', // Sarah
-  'XrExE9yKIg1WjnnlVkGX', // Matilda
-  'cgSgspJ2msm6clMCkdW9', // Jessica
   'Xb7hH8MSUJpSbSDYk0k2', // Alice
-  'pFZP5JQG7iQjIQuC4Bku', // Lily
+  'cgSgspJ2msm6clMCkdW9', // Jessica
+  'EXAVITQu4vr4xnSDxMaL', // Sarah
   'FGY2WhTYpPnrIDTdsKH5', // Laura
 ];
 // Male pool — chill, casual, mid-20s.
@@ -34,12 +32,14 @@ const MALE_VOICES = [
 
 // Reference script — natural UGC cadence so Seedance can mimic it tonally.
 const FEMALE_SCRIPT =
-  "Okay so, this just arrived and... I'm honestly kind of obsessed. Like, look at this. The color, the way it feels — it's just really good. Yeah, I think this is the one.";
+  "Okay so, wait... this is actually so pretty. Look at the little details here. The color, the texture, the way it catches the light — it's really lovely. Yeah, this feels like the one.";
 const MALE_SCRIPT =
   "Alright so, this just got here and... I gotta say, it's actually really clean. Like the whole thing — the build, the feel — it's just dialed. Yeah, I'm into it.";
 
 // Hash a string to a stable index — same avatar always gets the same voice.
 function pickVoice(seed: string, pool: string[]): string {
+  const s = seed.toLowerCase();
+  if (s.includes('alexia')) return 'Xb7hH8MSUJpSbSDYk0k2'; // Alice — sweet Jade-like tone
   let h = 0;
   for (let i = 0; i < seed.length; i++) h = (h * 31 + seed.charCodeAt(i)) >>> 0;
   return pool[h % pool.length];
@@ -52,7 +52,7 @@ async function generateVoiceForAvatar(
   const isMale = (avatar.gender || '').toLowerCase().startsWith('m');
   const pool = isMale ? MALE_VOICES : FEMALE_VOICES;
   const script = isMale ? MALE_SCRIPT : FEMALE_SCRIPT;
-  const voiceId = pickVoice(avatar.id, pool);
+  const voiceId = pickVoice(`${avatar.id}:${avatar.name}`, pool);
 
   const ttsRes = await fetch(
     `https://api.elevenlabs.io/v1/text-to-speech/${voiceId}?output_format=mp3_44100_128`,

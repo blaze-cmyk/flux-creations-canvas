@@ -72,6 +72,10 @@ function uniqueValidUrls(urls: unknown[], limit = 9) {
   return out;
 }
 
+function avatarIdentityCropUrl(url: string) {
+  return `https://wsrv.nl/?url=${encodeURIComponent(url)}&w=640&h=640&fit=cover&a=top&output=jpg`;
+}
+
 async function signedStorageUrl(admin: any, bucket: string, path: string, ttl = 60 * 60 * 24) {
   const { data } = await admin.storage.from(bucket).createSignedUrl(path, ttl);
   return data?.signedUrl ?? null;
@@ -118,7 +122,7 @@ async function gatherFreshReferenceUrls(admin: any, opts: {
       .eq('id', opts.avatarId)
       .maybeSingle();
     const avatarUrl = (av as any)?.public_url || ((av as any)?.storage_path ? await signedStorageUrl(admin, 'ms-avatars', (av as any).storage_path) : null);
-    if (typeof avatarUrl === 'string') refs.push(avatarUrl);
+    if (typeof avatarUrl === 'string') refs.push(avatarIdentityCropUrl(avatarUrl));
   }
 
   return uniqueValidUrls(refs.length ? refs : (opts.fallbackUrls ?? []), 3);

@@ -82,14 +82,29 @@ function rollPersona(): Persona {
   return PERSONAS[Math.floor(Math.random() * PERSONAS.length)];
 }
 
+const CREATIVE_ANGLES = [
+  'Pattern Interrupt: start mid-action with the product unexpectedly entering frame, then reveal the specific detail that makes it worth stopping for.',
+  'Day-in-the-Life: show the product moving through one realistic premium moment, with a tactile proof beat and a quiet payoff.',
+  'Feature Cascade: open on the most visual feature, then stack two close-up proof beats before the creator reacts naturally.',
+  'Before/After: begin with a plain everyday moment, add the product, then show the improved styling/result in one clean payoff.',
+  'POV Hook: make the viewer feel like Alexia is texting/showing her best friend one unusually good find, with camera switches and close-ups.',
+  'Social Proof Stack without stats: frame it as "I get it now" — visible detail first, use/wear test second, honest final reaction third.',
+];
+
+function rollCreativeAngle() {
+  return CREATIVE_ANGLES[Math.floor(Math.random() * CREATIVE_ANGLES.length)];
+}
+
 // ---------- Hard rules that override every format ----------
 const HUMAN_UGC_FIREWALL = `You are not writing ad copy. You are writing the exact prompt a strong UGC director would send to a video model.
 
 Hard rules that override every format below:
 - Make a fresh scene, not a recreation of the uploaded reference images. References are identity/product anchors only.
+- AVATAR REFERENCE POLICY: the avatar image is ONLY for facial identity / likeness. Never copy its room, wall color, furniture, door, background, wardrobe, pose, lighting, camera crop, or selfie composition into final_prompt. Invent a new outfit and a new product-context setting every time.
 - The creator's spoken lines must sound like a real person talking to a friend, not a brand, narrator, influencer script, or marketing voiceover.
 - No generic praise unless attached to a CONCRETE physical detail you can SEE in the product images. Empty lines like "I'm obsessed", "so good", "love this" are banned UNLESS the next words name an exact color, texture, fit, hardware piece, movement, sound, or visible result.
 - Every beat must contain real physical action: tilt, tap, trace, pull, peel, wear, use, rotate, pour, draw, lace, zip, clasp, sip, test, compare, or reveal.
+- Every output must have a real ad idea from the Creatify framework: a hook, a body structure, and a payoff. Static "hold product, tilt, say verdict" scripts are rejected unless the user explicitly asked for a plain product hold-up.
 - Mention the product by its literal PRODUCT_NAME, but do not repeat the name in every sentence.
 - USER_DIRECTION (when present) is the creative core. Build the beats and dialogue AROUND it. Format rules govern camera/structure only — they NEVER override the user's creative direction.
 - If USER_DIRECTION is blank, invent a product-specific creative angle from the visible product details. Never default to a static hold-up.
@@ -98,6 +113,13 @@ Hard rules that override every format below:
 - The CREATOR_PERSONA voice is mandatory — every line of dialogue must sound like that specific archetype, not a generic UGC creator.
 - The concrete_product_details array MUST contain at least 4 items extracted from the actual product images (color names, materials, hardware pieces, printed text, distinctive features). Do not invent details that aren't visible.
 - READABLE TEXT RULE: any printed text, lettering, numbers, slogans, or logos visible on the product, garment, or packaging MUST be described as facing the camera and reading FORWARD — perfectly legible. NEVER use mirror reflections, mirror selfies, or any framing where on-product text would appear reversed/flipped/mirrored. If the camera angle would mirror the text, change the camera angle. State explicitly inside the prompt that the text reads forward.`;
+
+const CREATIFY_RUNTIME_DIRECTIVE = `CREATIFY STRATEGY PASS (mandatory before writing final_prompt):
+- Pick ONE hook formula from the Creatify skill that fits the product: Pattern Interrupt, POV Hook, Bold Claim, Before/After, Day-in-the-Life, or Social Proof Stack.
+- Pick ONE body structure: Problem-Agitate-Solve, Feature Cascade, Before/After, Day-in-the-Life, or Social Proof Stack.
+- Turn that strategy into visible UGC actions, not marketing words: an opening physical interruption, a tactile proof beat, a product-use or styling beat, and a payoff/reaction beat.
+- No generic CTA copy in the generated video. The payoff can be a quiet human line, but never "shop now" or polished ad narration.
+- The creative concept must be different from the avatar upload photo and different from a basic bedroom selfie unless the user specifically requested that.`;
 
 // ---------- Few-shot example outputs (verbatim Higgsfield) ----------
 const EX_UGC = `EXAMPLE OUTPUT (study the structure, tone, persona-fit, concrete sensory detail — never copy literally):
@@ -232,6 +254,8 @@ function isWeak(finalPrompt: string, details: string[]): { weak: boolean; reason
   if (!finalPrompt || finalPrompt.length < 350) return { weak: true, reason: 'too short' };
   if (BANNED_RX.test(finalPrompt)) return { weak: true, reason: 'banned phrase' };
   if (!/"[^"\n]{2,140}"/.test(finalPrompt)) return { weak: true, reason: 'no quoted dialogue' };
+  if (!/Action and dialogue sequence|HOOK|JUMP CUT|BEAT|POV:|0[–-]\d|Before|After/i.test(finalPrompt)) return { weak: true, reason: 'no creatify-style structure' };
+  if (!/(switches to the back camera|back camera|close-up|macro|props the phone|jump cut|overhead|POV|sets the phone down|detail shot)/i.test(finalPrompt)) return { weak: true, reason: 'too static' };
   if (details && details.length >= 2) {
     const hits = details.filter((d) => d && finalPrompt.toLowerCase().includes(String(d).toLowerCase().split(' ').slice(0, 2).join(' '))).length;
     if (hits === 0) return { weak: true, reason: 'no product detail mentioned' };
@@ -476,7 +500,9 @@ Deno.serve(async (req) => {
 
     // ---------- Roll persona ----------
     const persona = rollPersona();
+    const creativeAngle = rollCreativeAngle();
     const personaBlock = `CREATOR_PERSONA: ${persona.id} — ${persona.name}\nVOICE GUIDE: ${persona.voice}\n`;
+    const creativeAngleBlock = `CREATIFY_CREATIVE_ANGLE_TO_USE: ${creativeAngle}\n`;
 
     // ---------- POV hands branch ----------
     const isPovHands = !avatarId && !!productId && (format === 'UGC' || format === 'Tutorial' || format === 'Unboxing');
@@ -488,16 +514,16 @@ Deno.serve(async (req) => {
       ? `USER_DIRECTION (treat as the creative core — build the scene around this; format rules govern camera/structure only): ${direction}\n`
       : `USER_DIRECTION: (none — invent a product-specific creative angle from the visible product details)\n`;
 
-    // System prompt = firewall + format prompt + Creatify skill (battle-tested ad frameworks).
-    // The skill goes LAST so format-specific rules dominate, but its frameworks (hooks, body
-    // structures, CTA patterns) are available as background reference.
+    // System prompt = firewall + Creatify strategy + format prompt + Creatify skill.
+    // The runtime directive makes the skill operational instead of passive reference.
     const skillBlock = CREATIFY_SKILL
-      ? `\n\n---\nBACKGROUND REFERENCE (Creatify "video-ad-generator" skill — use as inspiration for hook formulas, body structures, and CTA patterns; format rules above always win):\n${CREATIFY_SKILL}`
+      ? `\n\n---\nCREATIFY SKILL SOURCE (use the hook formulas, body structures, and testing mindset below to shape the ad idea; format rules still control camera/output syntax):\n${CREATIFY_SKILL}`
       : '';
-    const sys = `${HUMAN_UGC_FIREWALL}\n\n${FORMAT_SYSTEM_PROMPTS[format] || FORMAT_SYSTEM_PROMPTS.UGC}${skillBlock}`;
+    const sys = `${HUMAN_UGC_FIREWALL}\n\n${CREATIFY_RUNTIME_DIRECTIVE}\n\n${FORMAT_SYSTEM_PROMPTS[format] || FORMAT_SYSTEM_PROMPTS.UGC}${skillBlock}`;
 
     const userTextBlock =
       `${personaBlock}\n` +
+      `${creativeAngleBlock}` +
       `${modeNote}` +
       `${productCtx}\n` +
       `${visionFactsCtx}\n` +
@@ -505,7 +531,9 @@ Deno.serve(async (req) => {
       `${directionBlock}` +
       `ASPECT: ${aspect}\n` +
       `DURATION: ${duration}s\n\n` +
-      `Look at the attached reference images carefully. Extract real visible details (colors, textures, hardware, printed text, distinctive features) into concrete_product_details — do not invent. ` +
+      `Look at the attached reference images carefully. Product images are for exact visible product details. Avatar image is for facial identity only; do not use its background, clothes, pose, lighting, or framing as the scene. ` +
+      `Extract real visible product details (colors, textures, hardware, printed text, distinctive features) into concrete_product_details — do not invent. ` +
+      `Before writing, silently apply the Creatify hook/body framework and make the video concept feel designed, not like a static reference-image animation. ` +
       `Then write the Seedance 2.0 prompt following every system rule. ` +
       `Voice MUST match CREATOR_PERSONA exactly. ` +
       `Output one continuous paragraph in final_prompt. No preamble, no labels, no headings.`;

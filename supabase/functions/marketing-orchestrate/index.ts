@@ -27,16 +27,16 @@ function aspectToRatio(a: string) {
 // the model to compose a fresh environment from the script description
 // instead of copying the reference photo's pixels.
 const SCENE_SEEDS = [
-  'a sun-drenched bedroom with sheer linen curtains, late morning warm light',
-  'a minimalist white kitchen with a marble island, cool overcast daylight from a side window',
-  'a cozy living room corner with a tan leather sofa and a tall houseplant, golden-hour side light',
-  'a small balcony with potted plants and a rattan chair, soft afternoon sun',
-  'a Scandinavian home office with a light wood desk and a beige boucle chair, neutral north light',
-  'a tiled bathroom with warm vanity bulbs and a circular mirror, soft incandescent glow',
-  'a bright cafe corner with a marble bistro table and a window behind, warm window light',
-  'a loft entryway with exposed brick and a black framed mirror, directional cool daylight',
-  'a sage-green walled bedroom with a rumpled duvet and an oak nightstand, late-day warm light',
-  'a hallway with a runner rug and a console table holding a small lamp, soft ambient evening light',
+  'a boutique hotel vanity with marble counter, brass lamp, and soft morning side light',
+  'a stylish elevator lobby with stone walls, brushed metal doors, and clean overhead highlights',
+  'a sunlit city cafe table by a large window, glassware sparkle, warm street reflections',
+  'a luxury walk-in closet with walnut shelves, cream rug, and soft directional spotlights',
+  'a rooftop terrace at golden hour with pale concrete, plants, and city blur far behind',
+  'a clean studio table setup with linen backdrop, negative space, and controlled softbox light',
+  'a modern car passenger seat in natural daylight, leather texture, city movement outside',
+  'a boutique dressing-room corner with velvet curtain, brass hooks, and flattering warm light',
+  'a minimal gallery hallway with white walls, polished floor, and a single shaft of daylight',
+  'a bright hotel bathroom mirror-free vanity angle with warm bulbs and textured stone',
 ];
 function pickSceneSeed() {
   return SCENE_SEEDS[Math.floor(Math.random() * SCENE_SEEDS.length)];
@@ -53,9 +53,10 @@ function applyAntiReplicationDirective(prompt: string, opts: { hasAvatar: boolea
   const preamble = [
     'IDENTITY-ONLY REFERENCES — DO NOT COPY THE REFERENCE PHOTOS:',
     refsLine,
-    'Build a NEW scene from scratch using the description below. The environment, camera angles, framing, wardrobe, and lighting must NOT match the reference images.',
+    'Build a NEW scene from scratch using the description below. The environment, camera angles, framing, wardrobe, pose, background objects, wall color, doors, furniture, and lighting must NOT match the avatar reference image.',
     `If the description does not specify a location, use this fresh setting: ${seed}.`,
-    'Vary wardrobe, hair styling, and pose from the reference photo. The creator should be wearing different clothes than in the reference image unless the script explicitly says otherwise.',
+    'Vary wardrobe, hair styling, expression, distance from camera, and pose from the reference photo. The creator should be wearing different clothes than in the reference image unless the script explicitly says otherwise.',
+    'Do not animate the avatar upload as a still portrait. Use it only to preserve facial likeness while directing a new UGC ad with multiple shot types, product close-ups, and a payoff beat.',
     '',
   ].join('\n');
   return `${preamble}${prompt}`;
