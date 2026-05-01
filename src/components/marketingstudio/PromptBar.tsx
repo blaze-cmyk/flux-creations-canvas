@@ -79,10 +79,89 @@ export function PromptBar({ projectId }: Props) {
   const [exactVoiceover, setExactVoiceover] = useState(false);
   const [generating, setGenerating] = useState(false);
 
+  // Extra reference images (drag/drop, paste, finder upload, @-mentionable)
+  const [extraRefs, setExtraRefs] = useState<ExtraRef[]>([]);
+  const [uploadingRefs, setUploadingRefs] = useState(0);
+  const refIdCounterRef = useRef(0);
+  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+
+  // @-mention autocomplete
+  const [mentionOpen, setMentionOpen] = useState(false);
+  const [mentionQuery, setMentionQuery] = useState('');
+  const [mentionAnchor, setMentionAnchor] = useState<number>(0); // index in prompt where '@' is
+
   const [assetsOpen, setAssetsOpen] = useState(false);
   const [productOpen, setProductOpen] = useState(false);
   const [avatarOpen, setAvatarOpen] = useState(false);
   const [formatOpen, setFormatOpen] = useState(false);
+
+  // Renumber names "Image 1", "Image 2"... so deletes/reorders stay consistent.
+  const renumber = (list: ExtraRef[]): ExtraRef[] =>
+    list.map((r, i) => ({ ...r, name: `Image ${i + 1}` }));
+
+  const addRefFiles = async (files: File[]) => {
+    setUploadingRefs((n) => n + files.length);
+    try {
+      const dataUris = await Promise.all(
+        files.map(
+          (f) =>
+            new Promise<string>((resolve, reject) => {
+              const r = new FileReader();
+              r.onload = () => resolve(String(r.result));
+              r.onerror = reject;
+              r.readAsDataURL(f);
+            }),
+        ),
+      );
+      const urls = await Promise.all(dataUris.map((d) => resolveToUrl(d).catch(() => null)));
+      setExtraRefs((prev) => {
+        const next = [
+          ...prev,
+          ...urls
+            .filter((u): u is string => !!u)
+            .map((url) => ({
+              id: `ref-${++refIdCounterRef.current}-${Date.now()}`,
+              url,
+              name: '',
+            })),
+        ];
+        return renumber(next);
+      });
+    } catch (e: any) {
+      toast({ title: 'Upload failed', description: e?.message ?? 'Unknown error', variant: 'destructive' });
+    } finally {
+      setUploadingRefs((n) => Math.max(0, n - files.length));
+    }
+  };
+
+  const removeRef = (id: string) => {
+    setExtraRefs((prev) => {
+      const removed = prev.find((r) => r.id === id);
+      const next = renumber(prev.filter((r) => r.id !== id));
+      // Strip any @mentions that referenced the removed image (by old name).
+      if (removed) {
+        setPrompt((p) => p.replace(new RegExp(`@${removed.name}\\b`, 'g'), '').replace(/\s{2,}/g, ' ').trim());
+      }
+      return next;
+    });
+  };
+
+  const reorderRefs = (from: number, to: number) => {
+    setExtraRefs((prev) => {
+      const next = [...prev];
+      const [m] = next.splice(from, 1);
+      next.splice(to, 0, m);
+      return renumber(next);
+    });
+  };
+
+  const insertMentionFor = (ref: ExtraRef) => {
+    setPrompt((p) => {
+      const sep = p.length === 0 || p.endsWith(' ') || p.endsWith('\n') ? '' : ' ';
+      return `${p}${sep}@${ref.name} `;
+    });
+    setTimeout(() => textareaRef.current?.focus(), 0);
+  };
 
   const { addGeneration, updateGeneration } = useMarketingStudioStore();
   const navigate = useNavigate();
