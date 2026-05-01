@@ -119,7 +119,13 @@ async function uploadAtlasMedia(url: string, index: number, kind: 'image' | 'aud
     body: form,
   });
   const json = await res.json().catch(() => ({}));
-  const uploaded = json?.url ?? json?.data?.url ?? json?.data?.file_url ?? json?.data?.media_url;
+  // Per Atlas docs the upload response is { data: { download_url, file_name, ... } }.
+  const uploaded =
+    json?.data?.download_url ??
+    json?.data?.url ??
+    json?.data?.file_url ??
+    json?.data?.media_url ??
+    json?.url;
   if (!res.ok || !isValidHttpUrl(uploaded)) {
     throw new Error(`Atlas uploadMedia rejected ${kind} ${index + 1}: ${json?.msg || json?.message || res.status}`);
   }
@@ -142,16 +148,6 @@ async function toFalDataUri(url: string, index: number, kind: 'image' | 'audio')
   const contentType = source.headers.get('content-type') || (kind === 'audio' ? 'audio/mpeg' : 'image/jpeg');
   const data = arrayBufferToBase64(await source.arrayBuffer());
   return `data:${contentType};base64,${data}`;
-}
-
-function falSafeImageUrls(opts: { image_urls: string[]; productId?: string | null; avatarId?: string | null }) {
-  if (!opts.avatarId) return opts.image_urls;
-  // fal/Seedance currently accepts the queue request but rejects real-person avatar
-  // references during processing. Keep product refs so a balanced fal account can
-  // still render the ad instead of failing every card.
-  if (opts.productId && opts.image_urls.length > 1) return opts.image_urls.slice(0, -1);
-  if (!opts.productId && opts.image_urls.length > 0) return [];
-  return opts.image_urls;
 }
 
 function hasAudioUrlError(raw: unknown) {
