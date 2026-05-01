@@ -201,7 +201,11 @@ export function useProducts() {
       // best-effort: remove image rows + product row (storage objects left to lifecycle)
       await supabase.from('ms_product_images').delete().eq('product_id', id);
       await supabase.from('ms_products').delete().eq('id', id);
-      setProducts((prev) => prev.filter((p) => p.id !== id));
+      setProducts((prev) => {
+        const next = prev.filter((p) => p.id !== id);
+        _productsCache = next;
+        return next;
+      });
     },
     [],
   );
