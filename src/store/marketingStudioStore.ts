@@ -10,7 +10,8 @@ export type MSMode =
   | 'TV Spot'
   | 'Wild Card'
   | 'UGC Virtual Try On'
-  | 'Pro Virtual Try On';
+  | 'Pro Virtual Try On'
+  | 'Podcast';
 export type MSAspect = 'Auto' | '16:9' | '9:16' | '4:3' | '3:4' | '1:1' | '21:9';
 export type MSResolution = '480p' | '720p' | '1080p';
 export type MSDuration = string; // e.g. "8s" — supports 1s..15s

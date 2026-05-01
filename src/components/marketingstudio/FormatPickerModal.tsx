@@ -12,7 +12,8 @@ export type FormatId =
   | 'TV Spot'
   | 'Wild Card'
   | 'UGC Virtual Try On'
-  | 'Pro Virtual Try On';
+  | 'Pro Virtual Try On'
+  | 'Podcast';
 
 export interface FormatItem {
   id: FormatId;
@@ -32,6 +33,7 @@ export const FORMAT_ITEMS: FormatItem[] = [
   { id: 'Wild Card',          label: 'Wild Card',          desc: 'A unique and creative video',   src: '/formats/wild-card.mp4',      preview: '/formats/preview-tutorial.png' },
   { id: 'UGC Virtual Try On', label: 'UGC Virtual Try On', desc: 'Try before you buy',            src: '/formats/ugc-tryon.mp4',      preview: '/formats/preview-ugc.png' },
   { id: 'Pro Virtual Try On', label: 'Pro Virtual Try On', desc: 'Advanced virtual try-on',       src: '/formats/pro-tryon.mp4',      preview: '/formats/preview-ugc.png' },
+  { id: 'Podcast',            label: 'Podcast',            desc: 'Faux-podcast clip — two-person ad', src: '/formats/podcast-1.mp4',  preview: '/formats/preview-ugc.png' },
 ];
 
 interface Props {

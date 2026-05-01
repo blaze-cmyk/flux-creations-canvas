@@ -14,6 +14,7 @@ const FORMATS = [
   { id: 'f7', label: 'Unboxing', src: '/formats/unboxing-2.mp4' },
   { id: 'f8', label: 'UGC Virtual Try On', src: '/formats/ugc-tryon-2.mp4' },
   { id: 'f9', label: 'Tutorial', src: '/formats/tutorial-1.mp4' },
+  { id: 'f10', label: 'Podcast', src: '/formats/podcast-1.mp4' },
 ];
 
 function BoltIcon({ className = 'w-4 h-4' }: { className?: string }) {
