@@ -266,7 +266,7 @@ Deno.serve(async (req) => {
     const ratio = aspectToRatio(aspect);
     const userPromptTrimmed = (userPrompt || '').trim();
 
-    if (!userPromptTrimmed && !productId && !avatarId) {
+    if (!userPromptTrimmed && !productId && !avatarId && userExtraRefs.length === 0) {
       return new Response(JSON.stringify({ error: 'prompt required' }), {
         status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
