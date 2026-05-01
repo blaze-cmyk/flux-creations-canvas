@@ -9,7 +9,7 @@ import { FailedGenerationPanel } from '@/components/marketingstudio/FailedGenera
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 
-const MAX_GEN_DURATION_MS = 12 * 60 * 1000; // 12 minutes
+const MAX_GEN_DURATION_MS = 10 * 60 * 1000; // 10 minutes
 
 function stageLabel(g: MSGeneration): string {
   if (g.status === 'failed') return 'Failed';
@@ -166,10 +166,16 @@ export default function MarketingStudioProject() {
         // Client-side timeout
         const started = g.submittedAt || g.createdAt;
         if (Date.now() - started > MAX_GEN_DURATION_MS) {
+          const timeoutMessage = 'Timed out after 10 minutes while rendering. The provider did not return a final result; retry will submit a fresh job.';
           updateGeneration(project.id, g.id, {
             status: 'failed',
-            error: 'Timed out after 12 minutes. Try again.',
+            stage: 'failed',
+            error: timeoutMessage,
           });
+          await supabase
+            .from('ms_generations')
+            .update({ status: 'failed', stage: 'failed', error: timeoutMessage })
+            .eq('id', g.id);
           continue;
         }
 
