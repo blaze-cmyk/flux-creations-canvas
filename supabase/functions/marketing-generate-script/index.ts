@@ -304,11 +304,29 @@ function isWeak(
   details: string[],
   maxSpokenWords?: number,
   durSec?: number,
+  format?: string,
 ): { weak: boolean; reason: string } {
   if (!finalPrompt || finalPrompt.length < 350) return { weak: true, reason: 'too short' };
   if (BANNED_RX.test(finalPrompt)) return { weak: true, reason: 'banned phrase' };
   if (!/Action and dialogue sequence|HOOK|JUMP CUT|BEAT|POV:|0[–-]\d|Before|After/i.test(finalPrompt)) return { weak: true, reason: 'no creatify-style structure' };
-  if (!/(switches to the back camera|back camera|close-up|macro|props the phone|jump cut|overhead|POV|sets the phone down|detail shot)/i.test(finalPrompt)) return { weak: true, reason: 'too static' };
+
+  // Podcast format has its own structural checks (locked tripod, no jump cuts).
+  // Skip the camera-movement "too static" check that's tuned for selfie UGC.
+  if (format === 'Podcast') {
+    if (!/podcast/i.test(finalPrompt)) return { weak: true, reason: 'missing podcast framing' };
+    if (!/(microphone|\bmic\b)/i.test(finalPrompt)) return { weak: true, reason: 'missing visible podcast microphone' };
+    const quotedLines = (finalPrompt.match(/"([^"\n]{1,200})"/g) || []).length;
+    if (quotedLines < 4) return { weak: true, reason: `podcast needs at least 4 quoted lines (got ${quotedLines})` };
+    if (!/(off-camera|off camera|host|guest|guy 1|guy 2|she:|he:|interviewer)/i.test(finalPrompt)) {
+      return { weak: true, reason: 'podcast needs two distinct speakers (off-camera or two-person)' };
+    }
+    if (!/(pinch|grip|pull|tug|tap|touch|throws?|leans? (deep|forward|across)|holds? up)/i.test(finalPrompt)) {
+      return { weak: true, reason: 'podcast missing tactile proof beat' };
+    }
+  } else {
+    if (!/(switches to the back camera|back camera|close-up|macro|props the phone|jump cut|overhead|POV|sets the phone down|detail shot)/i.test(finalPrompt)) return { weak: true, reason: 'too static' };
+  }
+
   if (details && details.length >= 2) {
     const hits = details.filter((d) => d && finalPrompt.toLowerCase().includes(String(d).toLowerCase().split(' ').slice(0, 2).join(' '))).length;
     if (hits === 0) return { weak: true, reason: 'no product detail mentioned' };
