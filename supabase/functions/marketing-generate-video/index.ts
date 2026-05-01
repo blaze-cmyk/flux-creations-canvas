@@ -18,7 +18,7 @@ const ATLAS_KEY = Deno.env.get('ATLASCLOUD_API_KEY') ?? '';
 const FAL_KEY = Deno.env.get('FAL_KEY') ?? '';
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-const PROVIDER_TIMEOUT_MS = 10 * 60 * 1000;
+const PROVIDER_TIMEOUT_MS = 6 * 60 * 1000;
 
 type Provider = 'atlascloud' | 'fal';
 
