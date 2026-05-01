@@ -226,37 +226,48 @@ Deno.serve(async (req) => {
       });
     }
 
-    // 1) Resolve refs + product/avatar metadata up front so we can build a
-    // concrete Higgsfield-style prompt anchored on real visual details.
-    // When the user did NOT type a prompt, cap product refs to 1 (primary
-    // image only). Sending every reference image makes Seedance frame-blend
-    // them into a static AI-slop output instead of directing a real scene.
+    // 1) Resolve refs + product/avatar metadata. Always send up to 6 product
+    // reference images to Seedance — capping to 1 caused the model to just
+    // re-animate the single reference photo (the AI-slop pattern). The script
+    // writer only sees up to 3 of them (multimodal call).
     const { refs, thumb, product, avatar } = await gatherReferenceUrls(admin, {
       productId,
       avatarId,
-      maxProductImages: userPromptTrimmed ? 6 : 1,
+      maxProductImages: 6,
     });
 
-    // 2) Use the AI script writer for human, format-specific UGC. If it fails
-    // or returns weak copy, fall back to a deterministic Higgsfield-style prompt
-    // instead of sending raw user text or static reference-image instructions.
+    // 2) Route Scenario E (avatar + user prompt, no product) to a dedicated
+    // talking-head format that doesn't require product references.
+    let effectiveFormat = format;
+    if (!productId && avatarId && userPromptTrimmed) {
+      effectiveFormat = 'AVATAR_TALKING_HEAD';
+    }
+
+    // 3) Use the AI script writer for human, format-specific UGC. If it fails
+    // or returns weak copy, fall back to a deterministic Higgsfield-style prompt.
     let scriptPayload: any = null;
     let finalPrompt = userPromptTrimmed;
+    let scriptPersona: string | null = null;
     if (productId || avatarId) {
       const scriptRes = await invokeFn('marketing-generate-script', {
         productId,
         avatarId,
-        format,
+        format: effectiveFormat,
         surface,
         aspect: ratio,
         duration: duration_seconds,
         userPrompt: userPromptTrimmed,
+        userDirection: userPromptTrimmed,
       });
       const candidate = scriptRes.ok ? scriptRes.json?.prompt : null;
       scriptPayload = scriptRes.ok ? scriptRes.json?.script : { error: scriptRes.text };
-      finalPrompt = isWeakGeneratedScript(candidate)
+      scriptPersona = scriptRes.ok ? (scriptRes.json?.script_persona ?? null) : null;
+      const details: string[] = scriptRes.ok ? (scriptRes.json?.concrete_product_details ?? []) : [];
+      const candidateStr = typeof candidate === 'string' ? candidate : '';
+      const lacksDetails = productId && details.length > 0 && !details.some((d) => d && candidateStr.toLowerCase().includes(String(d).toLowerCase().split(' ').slice(0, 2).join(' ')));
+      finalPrompt = (isWeakGeneratedScript(candidate) || lacksDetails)
         ? buildFallbackPrompt({
-            format,
+            format: effectiveFormat,
             product,
             avatar,
             userPrompt: userPromptTrimmed,
