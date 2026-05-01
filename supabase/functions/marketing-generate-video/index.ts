@@ -431,8 +431,15 @@ Deno.serve(async (req) => {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
       }
-      // Send the composed keyframe first, then the raw product/avatar refs so identity stays locked.
-      const refs = uniqueValidUrls(row.keyframe_url ? [row.keyframe_url, ...(row.reference_paths || [])] : (row.reference_paths || []), 9);
+      // Re-sign stored private assets on every retry. fal requires publicly accessible URLs;
+      // Atlas docs recommend uploading media first, which submitAtlas handles after this step.
+      const refs = await gatherFreshReferenceUrls(admin, {
+        productId: row.product_id,
+        avatarId: row.avatar_id,
+        keyframePath: row.keyframe_path,
+        keyframeUrl: row.keyframe_url,
+        fallbackUrls: row.reference_paths || [],
+      });
       const audio_urls: string[] = [];
       if (row.avatar_id) {
         const { data: av } = await admin.from('ms_avatars').select('voice_sample_url').eq('id', row.avatar_id).maybeSingle();
@@ -504,8 +511,14 @@ Deno.serve(async (req) => {
     const resolutionN = normalizeRes(resolution);
     const ratio = aspectToRatio(aspect);
 
-    // Send the composed keyframe first, then the raw product/avatar refs so Seedance keeps identity and product fidelity.
-    const finalImageUrls = uniqueValidUrls(keyframe_url ? [keyframe_url, ...image_urls] : image_urls, 9);
+    // Re-sign stored private assets and send the composed keyframe first, then raw
+    // product/avatar refs so Seedance keeps identity and product fidelity.
+    const finalImageUrls = await gatherFreshReferenceUrls(admin, {
+      productId,
+      avatarId,
+      keyframeUrl: keyframe_url,
+      fallbackUrls: keyframe_url ? [keyframe_url, ...image_urls] : image_urls,
+    });
 
     // Pull the avatar's pre-generated reference voice clip.
     const audio_urls: string[] = [];
