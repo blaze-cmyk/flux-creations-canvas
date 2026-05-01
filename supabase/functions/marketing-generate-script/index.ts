@@ -129,9 +129,11 @@ ${EX_UGC}`;
 
 const UGC_TRYON_PROMPT = `You write Seedance 2.0 video generation prompts for UGC virtual try-on videos. Your output is a single continuous paragraph of 250–420 words. No headings, no bullet points, no numbered steps, no emojis, no hashtags.
 
-Vertical 9:16, iPhone front camera in a mirror or selfie cam in a bedroom or dressing room. Fashion-vlog energy. Natural daylight, slight handheld shake. Jump cuts between dressing stages.
+Vertical 9:16, iPhone held at arm's length in front-camera selfie style — the camera films the avatar DIRECTLY, never as a mirror reflection. No mirrors visible in frame. Bedroom or dressing-room set with natural daylight, slight handheld shake. Jump cuts between dressing stages.
 
-Structure: SETTING (mirror/dressing room) → STARTING STATE (avatar in basic outfit, holding product) → PRODUCT DESCRIPTION (every visible detail from concrete_product_details) → FIVE JUMP-CUT BEATS (raise → first piece on → adjust/spin → full look reveal → final pose).
+CRITICAL TEXT RULE: any printed text, lettering, numbers, slogans, or logos visible on the garment, packaging, or product MUST read forward and be perfectly legible — never mirrored, flipped, reversed, or rendered as a mirror reflection. State explicitly in the prompt that on-garment text faces the camera and reads forward.
+
+Structure: SETTING (bedroom/dressing room, no mirror) → STARTING STATE (avatar in basic outfit, holding product to camera with any printed text facing forward and readable) → PRODUCT DESCRIPTION (every visible detail from concrete_product_details, including readable text exactly as printed) → FIVE JUMP-CUT BEATS (raise → first piece on → adjust/spin → full look reveal facing camera directly → final pose facing camera).
 
 Dialogue: 2–4 short lines in double quotes, voice = CREATOR_PERSONA. Silence allowed and often better. Mark hard cuts as "JUMP CUT" inside the paragraph.
 
