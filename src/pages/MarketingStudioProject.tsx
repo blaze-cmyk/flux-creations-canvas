@@ -362,8 +362,7 @@ export default function MarketingStudioProject() {
                 >
                   {g.videoUrl && !isPending && !isFailed ? (
                     <video
-                      src={g.videoUrl}
-                      poster={g.thumbUrl}
+                      src={`${g.videoUrl}#t=0.1`}
                       muted
                       loop
                       playsInline
@@ -375,9 +374,9 @@ export default function MarketingStudioProject() {
                       onMouseLeave={(e) => {
                         const v = e.currentTarget;
                         v.pause();
-                        v.currentTime = 0;
+                        v.currentTime = 0.1;
                       }}
-                      className="w-full h-full object-cover"
+                      className="w-full h-full object-cover bg-[#0a0a0a]"
                     />
                   ) : g.thumbUrl && !isPending && !isFailed ? (
                     <img
