@@ -164,7 +164,7 @@ export function AvatarModal({
                   <div>Search: {query || 'none'}</div>
                   <div>Sort: {sortMode}</div>
                   <div>Result: {filtered.length}/{avatars.length}</div>
-                  <button onClick={refresh} className="mt-2 inline-flex h-7 items-center gap-1.5 rounded-full ms-chip-glass px-3 text-foreground">
+                  <button onClick={() => refresh({ force: true })} className="mt-2 inline-flex h-7 items-center gap-1.5 rounded-full ms-chip-glass px-3 text-foreground">
                     <RefreshCw className="w-3 h-3" /> Refresh
                   </button>
                 </div>
