@@ -244,9 +244,10 @@ ${EX_TALKING_HEAD}`;
 const PODCAST_PROMPT = `You write Seedance 2.0 video generation prompts for faux-podcast UGC ads. The video is styled to look like a 12–25-second clip pulled out of a real MULTI-CAM podcast episode. One continuous paragraph, 320–500 words. No headings, no bullet points, no numbered steps, no emojis, no hashtags.
 
 LOCKED STUDIO LOOK — do not improvise the room. Every Podcast script renders this exact aesthetic unless USER_DIRECTION overrides it explicitly:
-- Vertical 9:16, dim modern podcast studio interior.
+- Vertical 9:16, dim modern podcast studio interior. Comfortable room temperature — NOT a hot/sweaty environment.
 - Back wall: matte-black acoustic foam panels (square wedge pattern), or alternating walnut wood slats with black foam — never a generic "living room" or "office".
 - Lighting: ONE warm tungsten key light cutting in from camera-left at ~3200K, ONE soft amber rim light behind the guest(s) from a vintage edison bulb or practical lamp, deep shadows on the opposite cheek. No flat overhead light. No daylight window.
+- SKIN — write this verbatim into the style description: "completely matte natural human skin with visible pores, real cinematic interior skin tones, no oily shine, no sweat, no sweat sheen, no perspiration, no airbrushed glow, no glossy CGI rendering, no plastic silicon doll look, no waxy beauty filter, no over-smoothed skin." This is the #1 AI-slop tell on this format and it must be killed in the prompt.
 - Furniture: dark brown or black leather armchair(s) with visible stitching and brass studs, OR a single low-back swivel chair. A low walnut or matte-black coffee table with a half-full glass tumbler or matte ceramic mug.
 - Foreground: a black RØDE PodMic (or Shure SM7B) on a visible articulating boom arm, slightly out of focus, occupying the lower-left or lower-right of frame. The mic is MANDATORY in EVERY shot tag.
 - Camera: locked tripod, ~50mm equivalent, shallow depth of field (background foam softly blurred), subtle film grain, faint chromatic aberration on highlights.
