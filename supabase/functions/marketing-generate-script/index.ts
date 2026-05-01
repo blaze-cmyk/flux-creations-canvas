@@ -617,7 +617,7 @@ Deno.serve(async (req) => {
 
     // ---------- Retry once if weak ----------
     const details = Array.isArray(script.concrete_product_details) ? script.concrete_product_details : [];
-    const weakCheck = isWeak(script.final_prompt || '', details);
+    const weakCheck = isWeak(script.final_prompt || '', details, maxSpokenWords, durSec);
     if (weakCheck.weak && (productId || avatarId)) {
       console.warn(`[generate-script] weak output (${weakCheck.reason}), retrying`);
       const stricter =
