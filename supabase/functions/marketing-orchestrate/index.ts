@@ -396,7 +396,7 @@ Deno.serve(async (req) => {
           finalPrompt = `${userPromptTrimmed}\n\nCRITICAL: any printed text, lettering, numbers, or logos visible on the product, packaging, or clothing must always read forward and be perfectly legible — never mirrored, flipped, reversed, or rendered as a mirror reflection.`;
           scriptPayload = { source: 'user_raw', final_prompt: finalPrompt, voiceover_script: extractSpokenLines(userPromptTrimmed) };
           scriptPersona = 'user-supplied';
-        } else if (productId || avatarId) {
+        } else if (productId || avatarId || userExtraRefs.length > 0) {
           const scriptRes = await invokeFn('marketing-generate-script', {
             productId,
             avatarId,
@@ -406,6 +406,8 @@ Deno.serve(async (req) => {
             duration: duration_seconds,
             userPrompt: userPromptTrimmed,
             userDirection: userPromptTrimmed,
+            extraRefImages: userExtraRefs,
+            extraRefNames: userExtraNames,
           });
           const candidate = scriptRes.ok ? scriptRes.json?.prompt : null;
           scriptPayload = scriptRes.ok ? scriptRes.json?.script : { error: scriptRes.text };
