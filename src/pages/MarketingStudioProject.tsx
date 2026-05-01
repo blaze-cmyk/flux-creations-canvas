@@ -5,6 +5,7 @@ import { PromptBar } from '@/components/marketingstudio/PromptBar';
 import { useMarketingStudioStore, MSGeneration } from '@/store/marketingStudioStore';
 import { Heart, Maximize2, Play, Loader2, AlertCircle, RefreshCw } from 'lucide-react';
 import { VideoDetailModal } from '@/components/marketingstudio/VideoDetailModal';
+import { FailedGenerationPanel } from '@/components/marketingstudio/FailedGenerationPanel';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 
