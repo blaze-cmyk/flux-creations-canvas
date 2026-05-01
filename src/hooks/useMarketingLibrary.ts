@@ -1,6 +1,54 @@
 import { useCallback, useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 
+const SIGNED_URL_TTL_SECONDS = 60 * 60;
+const CACHE_MAX_AGE_MS = 45 * 60 * 1000;
+const PRELOAD_LIMIT = 40;
+
+function asImageThumbUrl(url: string, width: number) {
+  if (!url) return '';
+  try {
+    const parsed = new URL(url);
+    parsed.pathname = parsed.pathname.replace('/storage/v1/object/sign/', '/storage/v1/render/image/sign/');
+    parsed.searchParams.set('width', String(width));
+    parsed.searchParams.set('quality', '72');
+    return parsed.toString();
+  } catch {
+    return url;
+  }
+}
+
+function warmImageCache(urls: string[]) {
+  if (typeof window === 'undefined') return;
+  urls.filter(Boolean).slice(0, PRELOAD_LIMIT).forEach((url) => {
+    const img = new Image();
+    img.decoding = 'async';
+    img.src = url;
+  });
+}
+
+async function signedBatch(paths: string[], bucket: string, thumbWidth: number) {
+  const uniquePaths = Array.from(new Set(paths.filter(Boolean)));
+  const signedByPath: Record<string, string> = {};
+  if (!uniquePaths.length) return signedByPath;
+
+  const { data, error } = await supabase.storage.from(bucket).createSignedUrls(uniquePaths, SIGNED_URL_TTL_SECONDS);
+  if (!error && data) {
+    data.forEach((item: any, index) => {
+      const path = item.path ?? uniquePaths[index];
+      signedByPath[path] = asImageThumbUrl(item.signedUrl ?? '', thumbWidth);
+    });
+    return signedByPath;
+  }
+
+  await Promise.all(
+    uniquePaths.map(async (path) => {
+      signedByPath[path] = await signed(path, bucket, thumbWidth);
+    }),
+  );
+  return signedByPath;
+}
+
 export interface DBAvatar {
   id: string;
   name: string;
@@ -26,19 +74,28 @@ export interface DBProduct {
   images: { id: string; storage_path: string; signed_url: string; is_primary: boolean }[];
 }
 
-async function signed(path: string, bucket: string) {
-  const { data } = await supabase.storage.from(bucket).createSignedUrl(path, 60 * 60);
-  return data?.signedUrl ?? '';
+async function signed(path: string, bucket: string, thumbWidth = 360) {
+  const { data } = await supabase.storage.from(bucket).createSignedUrl(path, SIGNED_URL_TTL_SECONDS);
+  return asImageThumbUrl(data?.signedUrl ?? '', thumbWidth);
 }
 
 // Module-level cache so reopening the avatar picker shows results instantly.
 let _avatarsCache: DBAvatar[] | null = null;
+let _avatarsLoadedAt = 0;
 
 export function useAvatars() {
   const [avatars, setAvatars] = useState<DBAvatar[]>(() => _avatarsCache ?? []);
   const [loading, setLoading] = useState(_avatarsCache === null);
 
-  const refresh = useCallback(async () => {
+  const refresh = useCallback(async (options: { force?: boolean } = {}) => {
+    const cacheIsFresh = _avatarsCache && Date.now() - _avatarsLoadedAt < CACHE_MAX_AGE_MS;
+    if (!options.force && cacheIsFresh) {
+      setAvatars(_avatarsCache);
+      setLoading(false);
+      warmImageCache(_avatarsCache.map((avatar) => avatar.thumb));
+      return;
+    }
+
     if (_avatarsCache === null) setLoading(true);
     const { data, error } = await supabase
       .from('ms_avatars')
@@ -51,15 +108,19 @@ export function useAvatars() {
       setLoading(false);
       return;
     }
-    const resolved: DBAvatar[] = await Promise.all(
-      data.map(async (a: any) => {
-        let thumb = a.public_url || '';
-        if (!thumb && a.storage_path) thumb = await signed(a.storage_path, 'ms-avatars');
-        return { ...a, thumb };
-      }),
+    const signedByPath = await signedBatch(
+      data.map((a: any) => (!a.public_url && a.storage_path ? a.storage_path : '')).filter(Boolean),
+      'ms-avatars',
+      320,
     );
+    const resolved: DBAvatar[] = data.map((a: any) => ({
+      ...a,
+      thumb: a.public_url || (a.storage_path ? signedByPath[a.storage_path] : '') || '',
+    }));
     _avatarsCache = resolved;
+    _avatarsLoadedAt = Date.now();
     setAvatars(resolved);
+    warmImageCache(resolved.map((avatar) => avatar.thumb));
     setLoading(false);
   }, []);
 
@@ -85,11 +146,11 @@ export function useAvatars() {
 
       const resolvedCreated: DBAvatar = {
         ...created,
-        thumb: created.public_url || (created.storage_path ? await signed(created.storage_path, 'ms-avatars') : ''),
+        thumb: created.public_url || (created.storage_path ? await signed(created.storage_path, 'ms-avatars', 320) : ''),
       } as DBAvatar;
 
       setAvatars((current) => [resolvedCreated, ...current.filter((avatar) => avatar.id !== resolvedCreated.id)]);
-      await refresh();
+      await refresh({ force: true });
       return resolvedCreated;
     },
     [refresh],
@@ -101,12 +162,21 @@ export function useAvatars() {
 // Module-level cache so reopening the product picker shows results
 // instantly instead of flashing "Loading…" while we re-query.
 let _productsCache: DBProduct[] | null = null;
+let _productsLoadedAt = 0;
 
 export function useProducts() {
   const [products, setProducts] = useState<DBProduct[]>(() => _productsCache ?? []);
   const [loading, setLoading] = useState(_productsCache === null);
 
-  const refresh = useCallback(async () => {
+  const refresh = useCallback(async (options: { force?: boolean } = {}) => {
+    const cacheIsFresh = _productsCache && Date.now() - _productsLoadedAt < CACHE_MAX_AGE_MS;
+    if (!options.force && cacheIsFresh) {
+      setProducts(_productsCache);
+      setLoading(false);
+      warmImageCache(_productsCache.map((product) => product.primary_thumb || ''));
+      return;
+    }
+
     if (_productsCache === null) setLoading(true);
     const { data: prods } = await supabase
       .from('ms_products')
@@ -127,19 +197,10 @@ export function useProducts() {
       }
     }
 
-    // Sign every URL in parallel rather than serially per product.
-    const signedByImageId: Record<string, string> = {};
-    const signTasks: Promise<void>[] = [];
-    for (const imgs of Object.values(imagesByProduct)) {
-      for (const img of imgs) {
-        signTasks.push(
-          signed(img.storage_path, 'ms-products').then((url) => {
-            signedByImageId[img.id] = url;
-          }),
-        );
-      }
-    }
-    await Promise.all(signTasks);
+    // The picker only needs the visible primary thumbnail, so sign one image
+    // per product in a single batch and request a small rendered thumbnail URL.
+    const primaryRows = Object.values(imagesByProduct).map((imgs) => imgs.find((img) => img.is_primary) || imgs[0]).filter(Boolean);
+    const signedByPath = await signedBatch(primaryRows.map((img) => img.storage_path), 'ms-products', 360);
 
     const list: DBProduct[] = productList.map((p: any) => {
       const imgs = imagesByProduct[p.id] ?? [];
@@ -147,13 +208,15 @@ export function useProducts() {
         id: i.id,
         storage_path: i.storage_path,
         is_primary: i.is_primary,
-        signed_url: signedByImageId[i.id] ?? '',
+        signed_url: signedByPath[i.storage_path] ?? '',
       }));
       const primary = resolved.find((r) => r.is_primary) || resolved[0];
       return { ...p, images: resolved, primary_thumb: primary?.signed_url ?? null };
     });
     _productsCache = list;
+    _productsLoadedAt = Date.now();
     setProducts(list);
+    warmImageCache(list.map((product) => product.primary_thumb || ''));
     setLoading(false);
   }, []);
 
@@ -182,7 +245,7 @@ export function useProducts() {
           .from('ms_product_images')
           .insert({ product_id: prod.id, user_id: uid, storage_path: path, is_primary: i === 0 });
       }
-      await refresh();
+      await refresh({ force: true });
       return prod.id as string;
     },
     [refresh],
@@ -194,7 +257,7 @@ export function useProducts() {
         body: { url },
       });
       if (error) throw error;
-      await refresh();
+      await refresh({ force: true });
       return data?.product_id as string | undefined;
     },
     [refresh],
