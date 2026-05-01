@@ -43,11 +43,15 @@ This is the highest-trust ad format we ship. It only works if every detail feels
 
 ## 3. SHOT GRAMMAR
 
-- **Two-shot composition:** both subjects fit fully inside the 9:16 frame, seated on the same couch, mic in left or right foreground, slightly out of focus.
-- **Single-guest composition:** one subject seated in chair/couch facing slightly off-camera-left (toward invisible interviewer), mic in foreground, full body or chest-up.
+Real podcasts are MULTI-CAM. The clip you see online is cut from 3+ camera angles — wide two-shot, single A, single B. The biggest AI-slop tell is locking on a single static wide two-shot for the whole runtime: it reads as "two avatars stitched into one frame," not "podcast." Default to the multi-cam cut.
+
+- **Multi-cam shuffle (DEFAULT for two-person Mode A):** alternate between three angle types — (1) WIDE TWO-SHOT showing both subjects + foreground mic, (2) SINGLE A — chest-up of speaker A talking close to their own mic, speaker B not in frame, (3) SINGLE B — chest-up of speaker B talking close to their own mic, speaker A not in frame. Cut to the SINGLE of whoever is speaking. When the OTHER person is speaking off-screen, you may also cut to a REACTION SHOT — a silent single of the listener nodding, smirking, glancing down, or holding the product. Each speaker has their OWN visible mic in their single shot. Cuts are hard, motivated by who is talking.
+- **Two-shot composition (used as anchor only):** both subjects fit fully inside the 9:16 frame, seated on the same couch, mic in left or right foreground, slightly out of focus. Use it for the opening hook beat and one anchor mid-clip — not for the entire runtime.
+- **Single-guest composition (Mode B):** one subject seated in chair/couch facing slightly off-camera-left (toward invisible interviewer), mic in foreground, full body or chest-up. One locked frame, no cuts, the off-camera voice carries the conversation.
+- **Reaction shots are mandatory** in Mode A. While speaker A is delivering a line, cut briefly to a 1–2s silent single of speaker B nodding, raising eyebrows, half-smiling, glancing down at the product, or pinching the fabric. This is the #1 thing that separates real podcast clips from AI-generated two-shots.
 - **Posture is proof.** Comfort-product subjects must visibly slump, sink, or nest into the seat. Posture should physically validate the spoken claim.
-- **No camera moves.** No pans, no tilts, no zooms. The locked frame is what sells "real podcast."
-- **No B-roll.** Stay on the master shot. (On-screen kinetic captions and brand-graphic pop-ups are allowed and encouraged.)
+- **Locked tripod per camera.** Within any single shot, no pans, no tilts, no zooms. Each camera angle is its own locked frame. The cuts BETWEEN cameras are the only motion.
+- **No B-roll outside the room.** Stay on master + singles + reactions. (On-screen kinetic captions and brand-graphic pop-ups are allowed and encouraged.)
 
 ---
 
@@ -130,12 +134,14 @@ Two casting modes — pick one per script.
 
 ## 9. MANDATORY ELEMENTS (every podcast script must contain)
 
-1. **Visible foreground podcast microphone** — described explicitly. Slightly out of focus. Black, on a boom or desktop arm.
+1. **Visible foreground podcast microphone** — described explicitly. Slightly out of focus. Black, on a boom or desktop arm. In Mode A, EACH speaker has their own mic visible in their single-shot.
 2. **At least one tactile proof beat** — a hand pinching fabric, pulling a hood, gripping a strap, pressing a button. Within the same beat as the spoken claim it validates.
-3. **Two distinct speakers** — either both on camera, or one on-camera + one heard-only off-camera. Single-monologue podcast scripts are rejected.
-4. **Disfluencies** — at least three of: `like`, `cause`, `bro`, `dude`, `girl`, `wait`, `okay`, `oh`, `right?`, `I mean`. Spread naturally, not stacked.
-5. **Posture/body language as proof** — for comfort/wellness products, the on-screen subject must visibly slump, sink, or nest into the seat.
-6. **No mirrors. No selfies. No phone in hand.** This is a podcast clip, not a UGC selfie review.
+3. **Two distinct speakers** — either both on camera (Mode A multi-cam shuffle), or one on-camera + one heard-only off-camera (Mode B). Single-monologue podcast scripts are rejected.
+4. **Mode A only — multi-cam cuts:** the script MUST contain at least 3 explicit camera cuts between WIDE two-shot, SINGLE A, and SINGLE B. Label each beat with one of: `WIDE TWO-SHOT`, `SINGLE A — [name]`, `SINGLE B — [name]`, or `REACTION — [name]`. A single-angle locked-wide-shot Mode A script is rejected as AI slop.
+5. **Mode A only — at least one reaction shot:** at least one beat must be a silent REACTION single of the non-speaking person nodding, smirking, glancing down, or pinching the product while the other person's voice continues over.
+6. **Disfluencies** — at least three of: `like`, `cause`, `bro`, `dude`, `girl`, `wait`, `okay`, `oh`, `right?`, `I mean`. Spread naturally, not stacked.
+7. **Posture/body language as proof** — for comfort/wellness products, the on-screen subject must visibly slump, sink, or nest into the seat.
+8. **No mirrors. No selfies. No phone in hand.** This is a podcast clip, not a UGC selfie review.
 
 ---
 
