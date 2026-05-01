@@ -367,6 +367,8 @@ Deno.serve(async (req) => {
         ratio: aspectToRatio(row.aspect),
         duration: row.duration_seconds || 8,
         resolution: normalizeRes(row.resolution),
+        productId: row.product_id,
+        avatarId: row.avatar_id,
       });
       if ('error' in result) {
         await admin
@@ -501,6 +503,8 @@ Deno.serve(async (req) => {
       ratio,
       duration,
       resolution: resolutionN,
+      productId,
+      avatarId,
     });
 
     if ('error' in result) {
