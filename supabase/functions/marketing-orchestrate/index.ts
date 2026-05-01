@@ -319,7 +319,7 @@ Deno.serve(async (req) => {
           resolution,
           productId,
           avatarId,
-          format,
+          format: effectiveFormat,
           surface,
           projectId,
           script_text: voiceoverText || finalPrompt,
