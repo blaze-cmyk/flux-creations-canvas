@@ -18,7 +18,8 @@ const ATLAS_KEY = Deno.env.get('ATLASCLOUD_API_KEY') ?? '';
 const FAL_KEY = Deno.env.get('FAL_KEY') ?? '';
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-const PROVIDER_TIMEOUT_MS = 6 * 60 * 1000;
+const MIN_PROVIDER_TIMEOUT_MS = 8 * 60 * 1000;
+const MAX_PROVIDER_TIMEOUT_MS = 15 * 60 * 1000;
 
 type Provider = 'atlascloud' | 'fal';
 
@@ -27,8 +28,19 @@ function log(level: 'INFO' | 'WARN' | 'ERROR' | 'DEBUG', msg: string, ctx: Recor
 }
 
 function aspectToRatio(a: string) {
-  if (!a || a === 'Auto') return '9:16';
+  if (!a || a === 'Auto') return 'adaptive';
   return a;
+}
+
+function ratioForProvider(provider: Provider, ratio: string) {
+  if (!ratio || ratio === 'Auto') return provider === 'fal' ? 'auto' : 'adaptive';
+  if (ratio === 'adaptive') return provider === 'fal' ? 'auto' : 'adaptive';
+  return ratio;
+}
+
+function providerTimeoutMs(durationSeconds: unknown) {
+  const duration = clampDuration(durationSeconds);
+  return Math.max(MIN_PROVIDER_TIMEOUT_MS, Math.min(MAX_PROVIDER_TIMEOUT_MS, (6 * 60 + duration * 30) * 1000));
 }
 
 function clampDuration(d: unknown) {
