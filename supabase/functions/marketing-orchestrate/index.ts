@@ -347,11 +347,13 @@ Deno.serve(async (req) => {
     const runPipeline = async () => {
       try {
         // 4a) Gather full reference URLs + product/avatar metadata.
-        const { refs, product, avatar } = await gatherReferenceUrls(admin, {
+        const { refs: baseRefs, product, avatar } = await gatherReferenceUrls(admin, {
           productId,
           avatarId,
           maxProductImages: 6,
         });
+        // Append user-supplied extra reference images (drag/drop / @mention).
+        const refs = uniqueValidUrls([...baseRefs, ...userExtraRefs]);
 
         // 4b) One-time vision backfill for the product.
         if (productId && refs.length > 0) {
