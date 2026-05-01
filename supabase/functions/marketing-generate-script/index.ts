@@ -586,20 +586,20 @@ Deno.serve(async (req) => {
       `- Do NOT label this as 15s/22s/etc. unless that matches DURATION. Use the windows above verbatim.\n`;
 
     const userTextBlock =
+      // Duration spec FIRST so it dominates everything that follows.
+      `${durationSpec}\n` +
+      `ASPECT: ${aspect}\n` +
+      `DURATION: ${durSec}s\n\n` +
       `${personaBlock}\n` +
       `${creativeAngleBlock}` +
       `${modeNote}` +
       `${productCtx}\n` +
       `${visionFactsCtx}\n` +
       `${avatarCtx}\n\n` +
-      `${directionBlock}` +
-      `ASPECT: ${aspect}\n` +
-      `DURATION: ${durSec}s\n\n` +
-      `${durationSpec}\n` +
+      `${directionBlock}\n` +
       `Look at the attached reference images carefully. Product images are for exact visible product details. Avatar image is for facial identity only; do not use its background, clothes, pose, lighting, or framing as the scene. ` +
       `Extract real visible product details (colors, textures, hardware, printed text, distinctive features) into concrete_product_details — do not invent. ` +
-      `Before writing, silently apply the Creatify hook/body framework and make the video concept feel designed, not like a static reference-image animation. ` +
-      `Then write the Seedance 2.0 prompt following every system rule AND the STRICT DURATION SPEC above. ` +
+      `Write the Seedance 2.0 prompt as ONE continuous paragraph that fits inside ${durSec} seconds, uses exactly ${beatCount} beats with windows ${beatWindows.join(', ')}, and stays under ${maxSpokenWords} spoken words total. ` +
       `Voice MUST match CREATOR_PERSONA exactly. ` +
       `Output one continuous paragraph in final_prompt. No preamble, no labels, no headings.`;
 
