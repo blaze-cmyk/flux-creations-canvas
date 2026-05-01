@@ -471,7 +471,13 @@ Deno.serve(async (req) => {
       ? `USER_DIRECTION (treat as the creative core — build the scene around this; format rules govern camera/structure only): ${direction}\n`
       : `USER_DIRECTION: (none — invent a product-specific creative angle from the visible product details)\n`;
 
-    const sys = `${HUMAN_UGC_FIREWALL}\n\n${FORMAT_SYSTEM_PROMPTS[format] || FORMAT_SYSTEM_PROMPTS.UGC}`;
+    // System prompt = firewall + format prompt + Creatify skill (battle-tested ad frameworks).
+    // The skill goes LAST so format-specific rules dominate, but its frameworks (hooks, body
+    // structures, CTA patterns) are available as background reference.
+    const skillBlock = CREATIFY_SKILL
+      ? `\n\n---\nBACKGROUND REFERENCE (Creatify "video-ad-generator" skill — use as inspiration for hook formulas, body structures, and CTA patterns; format rules above always win):\n${CREATIFY_SKILL}`
+      : '';
+    const sys = `${HUMAN_UGC_FIREWALL}\n\n${FORMAT_SYSTEM_PROMPTS[format] || FORMAT_SYSTEM_PROMPTS.UGC}${skillBlock}`;
 
     const userTextBlock =
       `${personaBlock}\n` +
@@ -490,26 +496,14 @@ Deno.serve(async (req) => {
     const imageUrlsForLLM = [...productImageUrls.slice(0, 3)];
     if (avatarImageUrl) imageUrlsForLLM.push(avatarImageUrl);
 
-    // ---------- First attempt: primary model ----------
-    let aiRes = await callWriter({
-      model: PRIMARY_MODEL,
+    // ---------- First attempt: Claude Sonnet 4.5 (Anthropic → OpenRouter → Gemini) ----------
+    let { res: aiRes, provider } = await callWriter({
       systemPrompt: sys,
       userTextBlock,
       imageUrls: imageUrlsForLLM,
       hasProduct: !!productId,
     });
-
-    // Fallback to flash on rate/credit issues
-    if (aiRes.status === 429 || aiRes.status === 402 || aiRes.status >= 500) {
-      console.warn(`[generate-script] primary ${PRIMARY_MODEL} returned ${aiRes.status}, trying fallback`);
-      aiRes = await callWriter({
-        model: FALLBACK_MODEL,
-        systemPrompt: sys,
-        userTextBlock,
-        imageUrls: imageUrlsForLLM,
-        hasProduct: !!productId,
-      });
-    }
+    console.log(`[generate-script] writer provider=${provider} status=${aiRes.status}`);
 
     if (aiRes.status === 429) return new Response(JSON.stringify({ error: 'rate limited' }), { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     if (aiRes.status === 402) return new Response(JSON.stringify({ error: 'AI credits exhausted' }), { status: 402, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
@@ -528,21 +522,22 @@ Deno.serve(async (req) => {
         `\n\nYour previous attempt was rejected: ${weakCheck.reason}. ` +
         `Rewrite. Every spoken line MUST be tied to a concrete physical detail you can see in the images. ` +
         `Avoid every banned phrase. Voice MUST be unmistakably ${persona.name}.`;
-      const retryRes = await callWriter({
-        model: PRIMARY_MODEL,
+      const retry = await callWriter({
         systemPrompt: sys,
         userTextBlock: stricter,
         imageUrls: imageUrlsForLLM,
         hasProduct: !!productId,
       });
-      if (retryRes.ok) {
-        aiJson = await retryRes.json();
+      if (retry.res.ok) {
+        aiJson = await retry.res.json();
         argStr = aiJson?.choices?.[0]?.message?.tool_calls?.[0]?.function?.arguments;
         if (argStr) script = JSON.parse(argStr);
+        provider = retry.provider;
       }
     }
 
     script.persona_used = script.persona_used || persona.id;
+    script.writer_provider = provider;
 
     return new Response(
       JSON.stringify({
