@@ -1,8 +1,7 @@
 // Orchestrate the marketing-video pipeline as one call.
-// SCRIPT WRITER DISABLED — the user-typed prompt is sent directly to the
-// video provider. The avatar's voice sample URL is auto-attached inside
-// marketing-generate-video. Per-format inspo system prompts in
-// marketing-generate-script are kept on disk but no longer called from here.
+// Generates a human, format-specific UGC script first, then submits the
+// resulting Seedance prompt to the video provider. Reference images are used
+// only as product/avatar anchors, not as the creative idea.
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0';
 
 const corsHeaders = {
@@ -123,11 +122,24 @@ async function gatherReferenceUrls(admin: any, opts: {
   return { refs: uniqueValidUrls(refs), thumb, product, avatar };
 }
 
-// Build a Higgsfield-style, single continuous shot prompt. Anchors on real
-// product/avatar metadata so Seedance gets concrete visual cues instead of
-// having to invent everything (which causes AI slop, especially with both
-// product + avatar references attached).
-function buildHiggsfieldPrompt(args: {
+function extractSpokenLines(text: string) {
+  const matches = [...text.matchAll(/"([^"\n]{2,160})"/g)].map((m) => m[1].trim());
+  return matches.slice(0, 6).join('\n');
+}
+
+function isWeakGeneratedScript(text: unknown) {
+  if (typeof text !== 'string') return true;
+  const t = text.trim();
+  if (t.length < 450) return true;
+  if (!/Action and dialogue sequence|BEAT|0[–-]|JUMP CUT|HOOK/i.test(t)) return true;
+  if (!/"[^"\n]{2,120}"/.test(t)) return true;
+  if (/introducing|game-changer|elevate|revolutionary|level up|must-have|perfect for|you'll love/i.test(t)) return true;
+  return false;
+}
+
+// Deterministic fallback only if the AI script writer is unavailable. This is
+// intentionally specific and action-led, but the normal path is the AI writer.
+function buildFallbackPrompt(args: {
   format?: string;
   product: ProductMeta;
   avatar: AvatarMeta;
@@ -144,7 +156,7 @@ function buildHiggsfieldPrompt(args: {
   const avatarSubject = (args.avatar?.gender || '').toLowerCase() === 'male' ? 'a young man' : 'a young woman';
   const userExtra = (args.userPrompt || '').trim();
 
-  // Format-specific cinematography header (single continuous shot, no edits).
+  // Format-specific cinematography header.
   let header = '';
   let beats = '';
 
@@ -167,7 +179,7 @@ function buildHiggsfieldPrompt(args: {
     beats = `${avatarName ? avatarName : avatarSubject} interacts naturally with the ${productName ?? 'product'}${productDesc ? ` (${productDesc})` : ''} in one continuous flowing shot — the camera glides around them, holds on a clean hero beauty frame of the product at the end.`;
   } else {
     // Default: UGC selfie review — the highest-success template per the reference set.
-    header = `Vertical 9:16 selfie-style UGC review, shot on iPhone front camera, natural daylight, handheld authentic energy, casual "showing a friend" vibe, warm natural light, real skin tones, no filters, single continuous take.`;
+    header = `Vertical 9:16 selfie-style UGC review, shot on iPhone front and back camera mix, natural daylight, handheld authentic energy, casual "showing a friend" vibe, warm natural light, real skin tones, no filters.`;
     if (args.hasAvatar && args.hasProduct) {
       beats = `${avatarName ? avatarName : avatarSubject} holds the ${productName ?? 'product'} up to the front camera with one hand${productDesc ? ` — ${productDesc}` : ''}, tilts it slowly so the light catches every surface, speaking naturally and warmly: "okay so this just arrived and I am obsessed." ${avatarPronoun.charAt(0).toUpperCase() + avatarPronoun.slice(1)} turns it to show another side, brings it close to the lens for a detail beat, then holds it up beside ${avatarPronoun === 'he' ? 'his' : 'her'} face one final time, smiles directly into the lens: "yeah, this is the one."`;
     } else if (args.hasProduct) {
