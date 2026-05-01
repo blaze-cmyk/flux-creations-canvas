@@ -207,11 +207,10 @@ async function submitAtlas(opts: {
     watermark: false,
   };
   if (hasRefs) {
+    // Atlas Seedance 2.0 schema: reference_images (1-9) + optional reference_audios (1-3).
+    // Source: https://www.atlascloud.ai/models/bytedance/seedance-2.0/reference-to-video
     body.reference_images = atlasImageUrls;
-    body.images = atlasImageUrls;
-    body.image_urls = atlasImageUrls;
-    body.image_url = atlasImageUrls[0];
-    if (atlasAudioUrls.length) body.audio_urls = atlasAudioUrls;
+    if (atlasAudioUrls.length) body.reference_audios = atlasAudioUrls;
   }
 
   const res = await fetch('https://api.atlascloud.ai/api/v1/model/generateVideo', {
