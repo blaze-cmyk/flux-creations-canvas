@@ -48,17 +48,22 @@ function clampDuration(d: unknown) {
   return Math.max(4, Math.min(15, n));
 }
 
-// Lazily generate (and cache) a smooth-warm female reference voice clip for the
-// "second speaker" in Podcast Mode A. Cached as a public object in
-// `video-inputs/system/podcast-second-jessica.mp3` so we only pay ElevenLabs
-// once across all podcast renders. Uses Jessica (cgSgspJ2msm6clMCkdW9) — the
-// closest match to the smooth, warm Jade-like tone the user asked for.
+// Lazily generate (and cache) a SHORT smooth-warm female reference voice clip
+// for the "second speaker" in Podcast Mode A. Uses Jessica
+// (cgSgspJ2msm6clMCkdW9) — the closest match to the smooth, warm Jade-like
+// tone the user asked for.
+//
+// CRITICAL: Atlas/Seedance reference_audios spec is "duration [2,15]s, max 3
+// audios, TOTAL duration ≤15s". The avatar's own voice clip is typically
+// ~10s, so the second voice MUST stay short (~3s) so combined ≤15s, otherwise
+// Seedance silently drops the audio refs and invents a generic high-pitched
+// voice. Bumping the cache key forces a regen of the old 10.9s clip.
 async function ensurePodcastSecondVoiceUrl(
   admin: ReturnType<typeof createClient>,
 ): Promise<string | null> {
   const ELEVENLABS_API_KEY = Deno.env.get('ELEVENLABS_API_KEY');
   if (!ELEVENLABS_API_KEY) return null;
-  const path = 'system/podcast-second-jessica.mp3';
+  const path = 'system/podcast-second-jessica-v2.mp3';
   const { data: pub } = admin.storage.from('video-inputs').getPublicUrl(path);
   const publicUrl = pub?.publicUrl;
   if (!publicUrl) return null;
@@ -67,8 +72,9 @@ async function ensurePodcastSecondVoiceUrl(
     if (head.ok) return publicUrl;
   } catch { /* fall through to generate */ }
   try {
-    const text =
-      "Yeah... I mean, I really love this. It just feels good, you know? Like, the moment you put it on you just kinda sink into it. That's the whole vibe.";
+    // Short ~3-4s clip — keeps total reference_audios ≤15s when paired with
+    // a typical 10s avatar voice sample.
+    const text = "Yeah, no, I get that. That's actually so true.";
     const tts = await fetch(
       `https://api.elevenlabs.io/v1/text-to-speech/cgSgspJ2msm6clMCkdW9?output_format=mp3_44100_128`,
       {
@@ -77,7 +83,7 @@ async function ensurePodcastSecondVoiceUrl(
         body: JSON.stringify({
           text,
           model_id: 'eleven_multilingual_v2',
-          voice_settings: { stability: 0.55, similarity_boost: 0.8, style: 0.25, use_speaker_boost: true, speed: 1.0 },
+          voice_settings: { stability: 0.55, similarity_boost: 0.85, style: 0.2, use_speaker_boost: true, speed: 1.0 },
         }),
       },
     );
