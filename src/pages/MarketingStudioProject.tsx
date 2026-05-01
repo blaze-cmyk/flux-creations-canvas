@@ -5,6 +5,7 @@ import { PromptBar } from '@/components/marketingstudio/PromptBar';
 import { useMarketingStudioStore, MSGeneration } from '@/store/marketingStudioStore';
 import { Heart, Maximize2, Play, Loader2, AlertCircle, RefreshCw } from 'lucide-react';
 import { VideoDetailModal } from '@/components/marketingstudio/VideoDetailModal';
+import { FailedGenerationPanel } from '@/components/marketingstudio/FailedGenerationPanel';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 
@@ -35,6 +36,7 @@ export default function MarketingStudioProject() {
   const updateGeneration = useMarketingStudioStore((s) => s.updateGeneration);
   const [tab, setTab] = useState<'all' | 'liked'>('all');
   const [selected, setSelected] = useState<MSGeneration | null>(null);
+  const [failedDetail, setFailedDetail] = useState<MSGeneration | null>(null);
   const [hydratingProject, setHydratingProject] = useState(false);
   const retrying = useRef<Set<string>>(new Set());
 
@@ -406,18 +408,30 @@ export default function MarketingStudioProject() {
                       <div className="text-[10px] text-muted-foreground line-clamp-3">
                         {g.error || 'Try again'}
                       </div>
-                      {/^[0-9a-f-]{36}$/i.test(g.id) && (
+                      <div className="mt-1 flex items-center gap-1.5">
+                        {/^[0-9a-f-]{36}$/i.test(g.id) && (
+                          <span
+                            role="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleRetry(g);
+                            }}
+                            className="inline-flex items-center gap-1 px-2.5 h-7 rounded-full bg-white/10 hover:bg-white/20 text-[11px] font-medium cursor-pointer"
+                          >
+                            <RefreshCw className="w-3 h-3" /> Retry
+                          </span>
+                        )}
                         <span
                           role="button"
                           onClick={(e) => {
                             e.stopPropagation();
-                            handleRetry(g);
+                            setFailedDetail(g);
                           }}
-                          className="mt-1 inline-flex items-center gap-1 px-2.5 h-7 rounded-full bg-white/10 hover:bg-white/20 text-[11px] font-medium cursor-pointer"
+                          className="inline-flex items-center gap-1 px-2.5 h-7 rounded-full bg-white/10 hover:bg-white/20 text-[11px] font-medium cursor-pointer"
                         >
-                          <RefreshCw className="w-3 h-3" /> Retry
+                          Details
                         </span>
-                      )}
+                      </div>
                     </div>
                   )}
 
@@ -457,6 +471,13 @@ export default function MarketingStudioProject() {
         onOpenChange={(v) => !v && setSelected(null)}
         generation={selected}
         projectId={project.id}
+      />
+
+      <FailedGenerationPanel
+        open={!!failedDetail}
+        generation={failedDetail}
+        onClose={() => setFailedDetail(null)}
+        onRetry={(g) => handleRetry(g)}
       />
     </MarketingStudioLayout>
   );

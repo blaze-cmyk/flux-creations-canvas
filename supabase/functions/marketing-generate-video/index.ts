@@ -210,6 +210,18 @@ async function pollFal(requestId: string): Promise<{
 }
 
 // ---------------- Provider chain ----------------
+// Input-aware routing rules:
+//   - avatarId present  → AtlasCloud only (fal Seedance blocks real-person refs).
+//                          If Atlas fails, retry once on fal WITHOUT the avatar ref.
+//   - reference images, no avatar → AtlasCloud → fal (full refs).
+//   - product only / text-only    → AtlasCloud → fal.
+function buildChain(opts: { productId?: string | null; avatarId?: string | null; image_urls: string[] }): Provider[] {
+  const chain: Provider[] = [];
+  if (ATLAS_KEY) chain.push('atlascloud');
+  if (FAL_KEY) chain.push('fal');
+  return chain;
+}
+
 async function submitWithFallback(opts: {
   prompt: string;
   image_urls: string[];
@@ -219,11 +231,9 @@ async function submitWithFallback(opts: {
   resolution: string;
   productId?: string | null;
   avatarId?: string | null;
-}): Promise<{ provider: Provider; requestId: string } | { error: string; details: unknown }> {
-  const chain: Provider[] = [];
-  if (ATLAS_KEY) chain.push('atlascloud');
-  if (FAL_KEY) chain.push('fal');
-  if (chain.length === 0) return { error: 'no_providers_configured', details: null };
+}): Promise<{ provider: Provider; requestId: string } | { error: string; details: unknown; stage: string }> {
+  const chain = buildChain(opts);
+  if (chain.length === 0) return { error: 'no_providers_configured', details: null, stage: 'submit' };
 
   let lastErr: unknown = null;
   const reasons: string[] = [];
@@ -270,7 +280,7 @@ async function submitWithFallback(opts: {
       reasons.push(`${provider}: ${e instanceof Error ? e.message : 'threw'}`);
     }
   }
-  return { error: reasons.join(' | ') || 'all_providers_failed', details: lastErr };
+  return { error: reasons.join(' | ') || 'all_providers_failed', details: lastErr, stage: 'submit' };
 }
 
 Deno.serve(async (req) => {
@@ -493,7 +503,31 @@ Deno.serve(async (req) => {
       audio: audio_urls.length,
     });
 
-    // 2) Try providers in order
+    // 2) Pre-flight: ask the health endpoint whether providers are usable.
+    //    If both are unhealthy we fail fast with an actionable message instead
+    //    of submitting and watching the queue reject every card.
+    try {
+      const healthRes = await fetch(`${SUPABASE_URL}/functions/v1/marketing-provider-health`, {
+        method: 'GET',
+        headers: { Authorization: `Bearer ${SERVICE_KEY}`, apikey: SERVICE_KEY },
+      });
+      const health = await healthRes.json().catch(() => null);
+      if (health?.blockGeneration) {
+        const msg = `All providers unavailable. Atlas: ${health.atlas?.status} (${health.atlas?.message}). fal: ${health.fal?.status} (${health.fal?.message}).`;
+        await admin
+          .from('ms_generations')
+          .update({ status: 'failed', stage: 'failed', error: msg })
+          .eq('id', row.id);
+        return new Response(
+          JSON.stringify({ id: row.id, status: 'failed', error: msg, blocked: true, health }),
+          { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+        );
+      }
+    } catch (e) {
+      log('WARN', 'submit: health check failed, proceeding anyway', { err: e instanceof Error ? e.message : String(e) });
+    }
+
+    // 3) Try providers in order
     const result = await submitWithFallback({
       prompt,
       image_urls: finalImageUrls,
