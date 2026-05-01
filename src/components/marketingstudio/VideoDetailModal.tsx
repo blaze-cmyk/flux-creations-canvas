@@ -25,7 +25,10 @@ export function VideoDetailModal({
   const toggleLike = useMarketingStudioStore((s) => s.toggleLike);
   if (!generation) return null;
 
-  const playSrc = generation.videoUrl ? proxiedVideoUrl(generation.videoUrl) : undefined;
+  // Play directly from the upstream CDN — much faster first-byte than going
+  // through our edge proxy. Proxy is only used for the Download action so we
+  // can force a `content-disposition: attachment` filename.
+  const playSrc = generation.videoUrl;
 
   const handleDownload = async () => {
     if (!generation.videoUrl) return;
