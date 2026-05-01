@@ -214,7 +214,7 @@ async function submitAtlas(opts: {
     prompt: opts.prompt,
     duration: opts.duration,
     resolution: opts.resolution,
-    ratio: opts.ratio,
+    ratio: ratioForProvider('atlascloud', opts.ratio),
     generate_audio: true,
     watermark: false,
   };
@@ -277,7 +277,7 @@ async function submitFal(opts: {
     : [];
   const payload: Record<string, unknown> = {
     prompt: opts.prompt,
-    aspect_ratio: opts.ratio,
+    aspect_ratio: ratioForProvider('fal', opts.ratio),
     duration: String(opts.duration),
     resolution: opts.resolution === '1080p' ? '1080p' : '720p',
     generate_audio: true,
