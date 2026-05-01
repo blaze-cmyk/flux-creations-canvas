@@ -125,6 +125,24 @@ async function uploadAtlasMedia(url: string, index: number, kind: 'image' | 'aud
   return String(uploaded);
 }
 
+function arrayBufferToBase64(buffer: ArrayBuffer) {
+  const bytes = new Uint8Array(buffer);
+  let binary = '';
+  const chunkSize = 0x8000;
+  for (let i = 0; i < bytes.length; i += chunkSize) {
+    binary += String.fromCharCode(...bytes.subarray(i, i + chunkSize));
+  }
+  return btoa(binary);
+}
+
+async function toFalDataUri(url: string, index: number, kind: 'image' | 'audio') {
+  const source = await fetch(url);
+  if (!source.ok) throw new Error(`source ${kind} ${index + 1} not downloadable (${source.status})`);
+  const contentType = source.headers.get('content-type') || (kind === 'audio' ? 'audio/mpeg' : 'image/jpeg');
+  const data = arrayBufferToBase64(await source.arrayBuffer());
+  return `data:${contentType};base64,${data}`;
+}
+
 function falSafeImageUrls(opts: { image_urls: string[]; productId?: string | null; avatarId?: string | null }) {
   if (!opts.avatarId) return opts.image_urls;
   // fal/Seedance currently accepts the queue request but rejects real-person avatar
