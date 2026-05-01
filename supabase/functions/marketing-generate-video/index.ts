@@ -59,6 +59,16 @@ function uniqueValidUrls(urls: unknown[], limit = 9) {
   return out;
 }
 
+function falSafeImageUrls(opts: { image_urls: string[]; productId?: string | null; avatarId?: string | null }) {
+  if (!opts.avatarId) return opts.image_urls;
+  // fal/Seedance currently accepts the queue request but rejects real-person avatar
+  // references during processing. Keep product refs so a balanced fal account can
+  // still render the ad instead of failing every card.
+  if (opts.productId && opts.image_urls.length > 1) return opts.image_urls.slice(0, -1);
+  if (!opts.productId && opts.image_urls.length > 0) return [];
+  return opts.image_urls;
+}
+
 function hasAudioUrlError(raw: unknown) {
   return /audio_url|reference_audio|reference_audios|invalid url/i.test(JSON.stringify(raw));
 }
@@ -192,7 +202,9 @@ async function pollFal(requestId: string): Promise<{
     return { status: 'failed', error: 'No video returned' };
   }
   if (status.status === 'FAILED' || status.status === 'ERROR') {
-    return { status: 'failed', error: 'fal reported failure' };
+    const detail = Array.isArray(status?.detail) ? status.detail[0] : status?.detail;
+    const msg = detail?.msg || status?.error || status?.message || 'fal reported failure';
+    return { status: 'failed', error: `fal: ${msg}` };
   }
   return { status: 'running' };
 }
@@ -205,6 +217,8 @@ async function submitWithFallback(opts: {
   ratio: string;
   duration: number;
   resolution: string;
+  productId?: string | null;
+  avatarId?: string | null;
 }): Promise<{ provider: Provider; requestId: string } | { error: string; details: unknown }> {
   const chain: Provider[] = [];
   if (ATLAS_KEY) chain.push('atlascloud');
@@ -215,7 +229,16 @@ async function submitWithFallback(opts: {
   const reasons: string[] = [];
   for (const provider of chain) {
     try {
-      const r = provider === 'atlascloud' ? await submitAtlas(opts) : await submitFal(opts);
+      const providerOpts = provider === 'fal'
+        ? { ...opts, image_urls: falSafeImageUrls(opts) }
+        : opts;
+      if (provider === 'fal' && providerOpts.image_urls.length !== opts.image_urls.length) {
+        log('WARN', 'submit: fal fallback dropping avatar ref to avoid Seedance real-person policy block', {
+          originalRefs: opts.image_urls.length,
+          falRefs: providerOpts.image_urls.length,
+        });
+      }
+      const r = provider === 'atlascloud' ? await submitAtlas(providerOpts) : await submitFal(providerOpts);
       if (r.ok && r.requestId) {
         log('INFO', 'submit: provider accepted', { provider, requestId: r.requestId });
         return { provider, requestId: r.requestId };
@@ -342,6 +365,8 @@ Deno.serve(async (req) => {
         ratio: aspectToRatio(row.aspect),
         duration: row.duration_seconds || 8,
         resolution: normalizeRes(row.resolution),
+        productId: row.product_id,
+        avatarId: row.avatar_id,
       });
       if ('error' in result) {
         await admin
@@ -476,6 +501,8 @@ Deno.serve(async (req) => {
       ratio,
       duration,
       resolution: resolutionN,
+      productId,
+      avatarId,
     });
 
     if ('error' in result) {
