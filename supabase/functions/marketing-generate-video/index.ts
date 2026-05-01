@@ -160,6 +160,9 @@ async function submitAtlas(opts: {
   const model = hasRefs
     ? 'bytedance/seedance-2.0/reference-to-video'
     : 'bytedance/seedance-2.0/text-to-video';
+  const atlasImageUrls = hasRefs
+    ? await Promise.all(opts.image_urls.slice(0, 9).map((url, index) => uploadAtlasMedia(url, index, 'image')))
+    : [];
   const body: Record<string, unknown> = {
     model,
     prompt: opts.prompt,
@@ -170,7 +173,8 @@ async function submitAtlas(opts: {
     watermark: false,
   };
   if (hasRefs) {
-    body.reference_images = opts.image_urls.slice(0, 9);
+    body.reference_images = atlasImageUrls;
+    body.image_urls = atlasImageUrls;
   }
   // Do not send avatar voice samples to Atlas here: Seedance/Atlas currently
   // rejects signed audio URLs during processing. Avatar identity is locked via
