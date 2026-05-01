@@ -375,11 +375,20 @@ async function callAnthropic(args: { systemPrompt: string; userTextBlock: string
 
   const res = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
-    headers: { 'x-api-key': ANTHROPIC_API_KEY, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' },
+    headers: {
+      'x-api-key': ANTHROPIC_API_KEY,
+      'anthropic-version': '2023-06-01',
+      // Prompt caching: the static system prompt (firewall + format rules + distilled
+      // Creatify) is identical across calls, so we cache it server-side at Anthropic.
+      // ~10× cheaper + faster on cache hits, no Skills beta needed.
+      'anthropic-beta': 'prompt-caching-2024-07-31',
+      'content-type': 'application/json',
+    },
     body: JSON.stringify({
       model: CLAUDE_MODEL_ANTHROPIC,
       max_tokens: 4096,
-      system: args.systemPrompt,
+      // System as a cacheable block (Anthropic's prompt-caching format).
+      system: [{ type: 'text', text: args.systemPrompt, cache_control: { type: 'ephemeral' } }],
       messages: [{ role: 'user', content: userContent }],
       tools: [{ name: tool.name, description: tool.description, input_schema: tool.parameters }],
       tool_choice: { type: 'tool', name: tool.name },
