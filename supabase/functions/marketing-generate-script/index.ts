@@ -23,14 +23,9 @@ const CLAUDE_MODEL_ANTHROPIC = 'claude-sonnet-4-5';
 const CLAUDE_MODEL_OPENROUTER = 'anthropic/claude-sonnet-4.5';
 const EMERGENCY_GEMINI_MODEL = 'google/gemini-2.5-pro';
 
-// Creatify "video-ad-generator" skill — battle-tested ad frameworks committed
-// at supabase/functions/_skills/creatify-video-ad.md. Inlined at deploy via Deno.readTextFile.
-let CREATIFY_SKILL = '';
-try {
-  CREATIFY_SKILL = await Deno.readTextFile(new URL('../_skills/creatify-video-ad.md', import.meta.url));
-} catch (e) {
-  console.warn('[generate-script] could not load creatify skill:', e);
-}
+// Creatify skill (full doc at supabase/functions/_skills/creatify-video-ad.md) is NOT
+// inlined anymore — it diluted the prompt and produced checkbox-y scripts. We keep
+// only a distilled cheat sheet (CREATIFY_DISTILLED below) as a passive reference.
 
 // ---------- Creator personas (rolled per call) ----------
 type Persona = {
