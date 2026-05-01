@@ -340,7 +340,11 @@ async function callOpenRouter(args: { systemPrompt: string; userTextBlock: strin
   if (!OPENROUTER_API_KEY) return new Response('no openrouter key', { status: 503 });
   const tool = buildToolSchema(args.hasProduct);
   const userContent: any[] = [];
-  for (const url of args.imageUrls.slice(0, 4)) userContent.push({ type: 'image_url', image_url: { url } });
+  // Use the same transcode-to-PNG path so OpenRouter→Claude doesn't choke on AVIF.
+  for (const url of args.imageUrls.slice(0, 4)) {
+    const safeUrl = `https://wsrv.nl/?url=${encodeURIComponent(url)}&output=png`;
+    userContent.push({ type: 'image_url', image_url: { url: safeUrl } });
+  }
   userContent.push({ type: 'text', text: args.userTextBlock });
   return await fetch('https://openrouter.ai/api/v1/chat/completions', {
     method: 'POST',
