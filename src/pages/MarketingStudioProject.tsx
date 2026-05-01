@@ -247,9 +247,20 @@ export default function MarketingStudioProject() {
         body: { retry: g.id },
       });
       if (error) throw error;
+      if (data?.status === 'failed') {
+        updateGeneration(project.id, g.id, {
+          status: 'failed',
+          stage: 'failed',
+          error: data.error || 'Retry failed',
+        });
+        toast({ title: 'Retry failed', description: data.error, variant: 'destructive' });
+        return;
+      }
       updateGeneration(project.id, g.id, {
         falRequestId: data?.fal_request_id,
         status: 'queued',
+        stage: 'videoing',
+        error: undefined,
         submittedAt: Date.now(),
       });
       toast({ title: 'Retrying generation' });
