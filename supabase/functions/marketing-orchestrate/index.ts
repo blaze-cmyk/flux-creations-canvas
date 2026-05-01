@@ -59,12 +59,12 @@ async function invokeFn(name: string, body: unknown) {
   return { ok: res.ok, status: res.status, json, text };
 }
 
-async function signedStorageUrl(admin: ReturnType<typeof createClient>, bucket: string, path: string) {
+async function signedStorageUrl(admin: any, bucket: string, path: string) {
   const { data } = await admin.storage.from(bucket).createSignedUrl(path, 60 * 60 * 24);
   return data?.signedUrl ?? null;
 }
 
-async function gatherReferenceUrls(admin: ReturnType<typeof createClient>, opts: {
+async function gatherReferenceUrls(admin: any, opts: {
   productId?: string | null;
   avatarId?: string | null;
 }): Promise<{ refs: string[]; thumb: string | null }> {
