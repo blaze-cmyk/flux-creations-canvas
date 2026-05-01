@@ -324,29 +324,124 @@ export function PromptBar({ projectId }: Props) {
                   )}
                 </div>
               )}
-              <textarea
-                ref={(el) => {
-                  if (!el) return;
-                  el.style.height = 'auto';
-                  el.style.height = Math.min(el.scrollHeight, 220) + 'px';
-                }}
-                value={prompt}
-                onChange={(e) => {
-                  setPrompt(e.target.value);
-                  e.currentTarget.style.height = 'auto';
-                  e.currentTarget.style.height = Math.min(e.currentTarget.scrollHeight, 220) + 'px';
-                }}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' && !e.shiftKey && (e.metaKey || e.ctrlKey)) {
-                    e.preventDefault();
-                    handleGenerate();
-                  }
-                }}
-                rows={3}
-                placeholder="Describe what happens in the ad..."
-                className="w-full bg-transparent border-0 text-sm leading-[1.6] text-foreground placeholder:text-muted-foreground/70 focus:outline-none resize-none ms-prompt-scroll min-h-[72px] max-h-[220px] overflow-y-auto"
-                style={{ fontFamily: 'Montserrat, system-ui, sans-serif' }}
-              />
+              {/* Extra reference image strip — drag/drop, paste, finder upload, @-mention */}
+              {(extraRefs.length > 0 || uploadingRefs > 0) && (
+                <div className="flex items-center gap-2">
+                  <ExtraRefStrip
+                    refs={extraRefs}
+                    onAdd={addRefFiles}
+                    onRemove={removeRef}
+                    onReorder={reorderRefs}
+                    onChipClick={insertMentionFor}
+                  />
+                  {uploadingRefs > 0 && (
+                    <span className="text-[11px] text-muted-foreground animate-pulse">
+                      Uploading {uploadingRefs}…
+                    </span>
+                  )}
+                </div>
+              )}
+
+              <div className="relative">
+                <textarea
+                  ref={(el) => {
+                    textareaRef.current = el;
+                    if (!el) return;
+                    el.style.height = 'auto';
+                    el.style.height = Math.min(el.scrollHeight, 220) + 'px';
+                  }}
+                  value={prompt}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setPrompt(val);
+                    e.currentTarget.style.height = 'auto';
+                    e.currentTarget.style.height = Math.min(e.currentTarget.scrollHeight, 220) + 'px';
+                    // @-mention detection: find the last '@token' that the cursor is currently typing.
+                    const caret = e.currentTarget.selectionStart ?? val.length;
+                    const upto = val.slice(0, caret);
+                    const m = upto.match(/(?:^|\s)@([A-Za-z0-9 ]{0,20})$/);
+                    if (m && extraRefs.length > 0) {
+                      setMentionOpen(true);
+                      setMentionQuery(m[1] || '');
+                      setMentionAnchor(caret - (m[1]?.length ?? 0) - 1); // position of '@'
+                    } else {
+                      setMentionOpen(false);
+                    }
+                  }}
+                  onPaste={(e) => {
+                    const items = Array.from(e.clipboardData?.items ?? []);
+                    const files = items
+                      .filter((it) => it.kind === 'file' && it.type.startsWith('image/'))
+                      .map((it) => it.getAsFile())
+                      .filter((f): f is File => !!f);
+                    if (files.length) {
+                      e.preventDefault();
+                      addRefFiles(files);
+                    }
+                  }}
+                  onDragOver={(e) => {
+                    if (e.dataTransfer.types.includes('Files')) e.preventDefault();
+                  }}
+                  onDrop={(e) => {
+                    if (e.dataTransfer.files?.length) {
+                      e.preventDefault();
+                      addRefFiles(Array.from(e.dataTransfer.files));
+                    }
+                  }}
+                  onKeyDown={(e) => {
+                    if (mentionOpen && (e.key === 'Escape' || e.key === 'ArrowLeft' || e.key === 'ArrowRight')) {
+                      setMentionOpen(false);
+                    }
+                    if (e.key === 'Enter' && !e.shiftKey && (e.metaKey || e.ctrlKey)) {
+                      e.preventDefault();
+                      handleGenerate();
+                    }
+                  }}
+                  rows={3}
+                  placeholder="Describe what happens in the ad… drop, paste, or @ to reference an image"
+                  className="w-full bg-transparent border-0 text-sm leading-[1.6] text-foreground placeholder:text-muted-foreground/70 focus:outline-none resize-none ms-prompt-scroll min-h-[72px] max-h-[220px] overflow-y-auto"
+                  style={{ fontFamily: 'Montserrat, system-ui, sans-serif' }}
+                />
+
+                {/* @mention autocomplete */}
+                {mentionOpen && (
+                  <div className="absolute left-0 bottom-full mb-2 z-30 w-56 rounded-xl bg-ms-surface-2 border border-ms-border shadow-2xl overflow-hidden">
+                    <div className="px-3 py-2 text-[10px] uppercase tracking-wider text-muted-foreground border-b border-ms-border">
+                      Reference an image
+                    </div>
+                    <div className="max-h-56 overflow-y-auto">
+                      {extraRefs
+                        .filter((r) => r.name.toLowerCase().includes(mentionQuery.toLowerCase()))
+                        .map((r) => (
+                          <button
+                            key={r.id}
+                            type="button"
+                            onClick={() => {
+                              // Replace "@partial" before caret with "@<name> "
+                              const before = prompt.slice(0, mentionAnchor);
+                              const after = prompt.slice(mentionAnchor).replace(/^@[A-Za-z0-9 ]*/, '');
+                              const next = `${before}@${r.name} ${after.replace(/^\s+/, '')}`;
+                              setPrompt(next);
+                              setMentionOpen(false);
+                              setTimeout(() => {
+                                const pos = (before + `@${r.name} `).length;
+                                textareaRef.current?.focus();
+                                textareaRef.current?.setSelectionRange(pos, pos);
+                              }, 0);
+                            }}
+                            className="w-full flex items-center gap-2 px-2.5 py-2 hover:bg-white/5 text-left"
+                          >
+                            <img src={r.url} alt="" className="w-7 h-7 rounded-md object-cover" />
+                            <span className="text-sm text-foreground">@{r.name}</span>
+                          </button>
+                        ))}
+                      {extraRefs.filter((r) => r.name.toLowerCase().includes(mentionQuery.toLowerCase())).length === 0 && (
+                        <div className="px-3 py-2 text-xs text-muted-foreground">No matches</div>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
 
             <div className="hidden md:flex items-stretch gap-2 self-start">
