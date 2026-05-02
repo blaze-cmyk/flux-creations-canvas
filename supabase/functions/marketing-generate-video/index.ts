@@ -198,6 +198,44 @@ async function fetchAvatarImageUrl(admin: any, avatarId: string): Promise<string
   return `https://wsrv.nl/?url=${encodeURIComponent(raw)}&w=640&h=640&fit=cover&a=top&output=jpg`;
 }
 
+async function createAtlasPortraitAsset(imageUrl: string, avatarId?: string | null): Promise<string | null> {
+  if (!ATLAS_KEY || !imageUrl) return null;
+  const res = await fetch(`${ATLAS_ASSET_BASE}/sd/assets`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${ATLAS_KEY}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ url: imageUrl, name: `avatar-${String(avatarId ?? 'ref').slice(0, 48)}`, asset_type: 'Image' }),
+  });
+  const text = await res.text();
+  let parsed: any = {};
+  try { parsed = JSON.parse(text); } catch { /* keep text */ }
+  if (!res.ok) {
+    log('WARN', 'atlas asset create failed', { status: res.status, error: parsed?.message ?? parsed?.msg ?? text.slice(0, 240) });
+    return null;
+  }
+  const data = parsed?.data ?? parsed;
+  const id = data?.id;
+  const immediateAsset = data?.atlas_asset_id ?? data?.ark_asset_id;
+  if (immediateAsset && String(data?.status ?? '').toLowerCase() === 'active') return `asset://${immediateAsset}`;
+  if (!id) return immediateAsset ? `asset://${immediateAsset}` : null;
+  for (let i = 0; i < 24; i++) {
+    await new Promise((resolve) => setTimeout(resolve, 2500));
+    const poll = await fetch(`${ATLAS_ASSET_BASE}/sd/assets/${id}`, { headers: { Authorization: `Bearer ${ATLAS_KEY}` } });
+    const pollText = await poll.text();
+    let pollJson: any = {};
+    try { pollJson = JSON.parse(pollText); } catch { /* keep text */ }
+    const asset = pollJson?.data ?? pollJson;
+    const status = String(asset?.status ?? '').toLowerCase();
+    const assetId = asset?.atlas_asset_id ?? asset?.ark_asset_id ?? immediateAsset;
+    if (status === 'active' && assetId) return `asset://${assetId}`;
+    if (status === 'failed') {
+      log('WARN', 'atlas asset failed', { id, error: asset?.error_message ?? asset?.error_code ?? pollText.slice(0, 240) });
+      return null;
+    }
+  }
+  log('WARN', 'atlas asset timeout', { avatarId });
+  return null;
+}
+
 async function gatherAudioSourceUrls(admin: any, opts: { avatarId?: string | null; format?: string | null }): Promise<string[]> {
   const out: string[] = [];
   if (opts.avatarId) {
