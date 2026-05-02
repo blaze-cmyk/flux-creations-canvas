@@ -970,21 +970,68 @@ Deno.serve(async (req) => {
       'POV FIRST-PERSON', 'MACRO TACTILE', 'OVERHEAD STILL-LIFE', 'OUTDOOR DAYLIGHT',
       'HAUL TRY-ON', 'SCARCITY DROP', 'FULL-SET REVEAL',
     ];
-    const shuffledLangs = [...UNBOXING_CAMERA_LANGUAGES].sort(() => Math.random() - 0.5);
     const productBlob = `${productMeta?.name || ''} ${productMeta?.description || ''}`.toLowerCase();
     const taxonomyHints: string[] = [];
-    if (/\b(toy|figure|figurine|vinyl|plush|collectible|art toy|blind box)\b/.test(productBlob)) taxonomyHints.push('designer collectible / art toy');
-    if (/\b(necklace|bracelet|ring|earring|pendant|jewelry|jewellery|chain|charm)\b/.test(productBlob)) taxonomyHints.push('fine jewelry');
-    if (/\b(watch|leather wallet|cardholder|small leather|fragrance|perfume|cologne)\b/.test(productBlob)) taxonomyHints.push('quiet-luxury small good');
-    if (/\b(bag|tote|crossbody|handbag|purse|sneaker|shoe|hoodie|jacket|tee|outfit|skirt|dress|sunglasses)\b/.test(productBlob)) taxonomyHints.push('fashion / wearable');
-    if (/\b(skincare|serum|cream|cleanser|lipstick|mascara|makeup|beauty|fragrance)\b/.test(productBlob)) taxonomyHints.push('beauty');
-    if (/\b(headphone|earbud|speaker|camera|gadget|charger|keyboard|mouse|tech|device)\b/.test(productBlob)) taxonomyHints.push('tech accessory');
-    if (/\b(bike|treadmill|equipment|gym|fitness|tumbler|bottle|blender|appliance)\b/.test(productBlob)) taxonomyHints.push('used-not-opened equipment');
+    // Taxonomy detection drives WHICH camera languages dominate the shuffle.
+    // The principle: silent/quiet families are the default; haul/scarcity is ONLY
+    // surfaced when the product is genuinely a fashion drop. This kills the slop
+    // where every unboxing turns into a Comfrt haul.
+    const isCollectible = /\b(toy|figure|figurine|vinyl|plush|collectible|art toy|blind box|sticker|trading card)\b/.test(productBlob);
+    const isJewelry = /\b(necklace|bracelet|ring|earring|pendant|jewelry|jewellery|chain|charm)\b/.test(productBlob);
+    const isQuietLux = /\b(watch|leather wallet|cardholder|small leather|fragrance|perfume|cologne|candle|ceramic|pen|notebook|stationery)\b/.test(productBlob);
+    const isFashion = /\b(bag|tote|crossbody|handbag|purse|sneaker|shoe|hoodie|jacket|tee|t-shirt|outfit|skirt|dress|sunglasses|pants|shorts|cardigan|sweater|coat|tank|legging)\b/.test(productBlob);
+    const isBeauty = /\b(skincare|serum|cream|cleanser|lipstick|mascara|makeup|beauty)\b/.test(productBlob);
+    const isTech = /\b(headphone|earbud|speaker|camera|gadget|charger|keyboard|mouse|tech|device|console)\b/.test(productBlob);
+    const isUsedNotOpened = /\b(bike|treadmill|equipment|gym|fitness|tumbler|bottle|blender|appliance)\b/.test(productBlob);
+    if (isCollectible) taxonomyHints.push('designer collectible / art toy');
+    if (isJewelry) taxonomyHints.push('fine jewelry');
+    if (isQuietLux) taxonomyHints.push('quiet-luxury small good');
+    if (isFashion) taxonomyHints.push('fashion / wearable');
+    if (isBeauty) taxonomyHints.push('beauty');
+    if (isTech) taxonomyHints.push('tech accessory');
+    if (isUsedNotOpened) taxonomyHints.push('used-not-opened equipment');
+
+    // Weight the palette by taxonomy. Silent families lead unless this is clearly
+    // a fashion / multi-piece haul situation. Always include some variety so the
+    // creative brain can still surprise — but the FIRST options Claude reads
+    // match the product's natural energy.
+    let weightedPalette: string[];
+    if (isCollectible || isJewelry) {
+      weightedPalette = [
+        'TOP-DOWN ASMR', 'THEATRICAL REVEAL', 'MACRO TACTILE', 'OVERHEAD STILL-LIFE',
+        'TABLETOP CINEMATIC', 'POV FIRST-PERSON', 'QUIET HANDHELD', 'EDITORIAL PAN',
+      ];
+    } else if (isQuietLux || isBeauty || isTech) {
+      weightedPalette = [
+        'QUIET HANDHELD', 'TABLETOP CINEMATIC', 'EDITORIAL PAN', 'TOP-DOWN ASMR',
+        'MACRO TACTILE', 'POV FIRST-PERSON', 'OVERHEAD STILL-LIFE', 'STREET DOC',
+      ];
+    } else if (isFashion) {
+      // Fashion is the ONE category where haul/try-on energy is on-brand.
+      // Still seed a quiet option first so Claude can pick silent ASMR if the
+      // packaging/product personality calls for it (e.g. quiet-luxury fashion).
+      weightedPalette = [
+        'HAUL TRY-ON', 'SCARCITY DROP', 'FULL-SET REVEAL', 'VLOG SELFIE',
+        'JUMP-CUT HAUL', 'QUIET HANDHELD', 'EDITORIAL PAN', 'OUTDOOR DAYLIGHT',
+      ];
+    } else if (isUsedNotOpened) {
+      weightedPalette = [
+        'VLOG SELFIE', 'STREET DOC', 'OUTDOOR DAYLIGHT', 'POV FIRST-PERSON',
+        'QUIET HANDHELD', 'TABLETOP CINEMATIC', 'EDITORIAL PAN', 'TOP-DOWN ASMR',
+      ];
+    } else {
+      // No taxonomy hit → mild shuffle, silent families slightly favored.
+      weightedPalette = [...UNBOXING_CAMERA_LANGUAGES].sort(() => Math.random() - 0.5).slice(0, 8);
+    }
+    // Light shuffle within the top 8 so consecutive runs don't always pick #1.
+    const shuffledTop = weightedPalette.sort(() => Math.random() - 0.5);
+
     const hasPackagingRef = isUnboxing && userExtraRefs.length > 0;
     const unboxingPresetBlock = isUnboxing
       ? `\nUNBOXING CREATIVE BRIEF — DO STEPS 1–4 SILENTLY, OUTPUT ONLY THE FINAL PARAGRAPH.\n` +
         `STEP 1 — name in one phrase what THIS product IS. ${taxonomyHints.length ? `Lightweight taxonomy hint: ${taxonomyHints.join(' / ')}.` : 'No taxonomy hint — read the images.'}\n` +
-        `STEP 2 — propose 3+ camera-language options that could honor THIS specific product+avatar combo. Camera-language palette (shuffled this call — pick the BEST FIT, not the first listed; invent a new one if needed): ${shuffledLangs.slice(0, 8).join(' · ')}. For each option name ONE reason it FITS and ONE reason it MIGHT NOT. Pick the winner.\n` +
+        `STEP 2 — propose 3+ camera-language options that could honor THIS specific product+avatar combo. PRIMARY palette for this product (ordered by fit, but you are NOT capped — invent a hybrid or a brand-new tag if it serves the product better): ${shuffledTop.join(' · ')}. For each option name ONE reason it FITS and ONE reason it MIGHT NOT. Pick the winner.\n` +
+        `IMPORTANT — match the product's personality. Collectibles, jewelry, quiet-luxury small goods, ceramics, fragrances, stationery → almost always SILENT or quiet-whisper families (TOP-DOWN ASMR, THEATRICAL REVEAL, MACRO TACTILE, QUIET HANDHELD, TABLETOP CINEMATIC). Fashion drops, multi-piece sets, sneaker drops, streetwear, lingerie haul → high-energy avatar families (HAUL TRY-ON, SCARCITY DROP, FULL-SET REVEAL). Used-not-opened gear (gym bike, blender, camera) → VLOG SELFIE / STREET DOC, the product is unboxed by being USED. NEVER force haul-energy onto a quiet collectible. NEVER force silent ASMR onto a fashion drop the user clearly wants try-on energy for.\n` +
         `STEP 3 — commit to that camera language. The opening line of your final paragraph MUST start with the camera-language tag in caps, an em-dash, then the duration ("TOP-DOWN ASMR — 10-second vertical 9:16…"). The structural gate verifies this.\n` +
         `STEP 4 — write the script in the exact shape of the REFERENCE LIBRARY: one-line camera/style header → setting+packaging+product paragraph (≥30% of words on the unopened packaging) → ${beatCount} timestamped beats with windows ${beatWindows.join(', ')}, each beat = action + named sound + sensory verb → closing style line.\n` +
         `${hasPackagingRef ? `PACKAGING ANCHOR: attached reference image #1 IS the packaging — preserve its color, finish, lid mechanism, ribbon, embossing, printed text, and seals EXACTLY. Do NOT invent a different box.\n` : ''}` +
