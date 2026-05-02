@@ -633,6 +633,7 @@ Deno.serve(async (req) => {
       projectId,
       script_text,
       reuseGenerationId,
+      image_urls,
     } = body;
 
     if (!prompt || typeof prompt !== 'string') {
@@ -652,6 +653,10 @@ Deno.serve(async (req) => {
     const resolutionN = normalizeResolution(resolution);
     const ratio = normalizeRatio(aspect);
 
+    const extraImageUrls: string[] = Array.isArray(image_urls)
+      ? (image_urls as unknown[]).filter(isValidHttpUrl).map(String)
+      : [];
+
     const audioSourceUrls = await gatherAudioSourceUrls(admin, { avatarId, format });
     const bundle = await buildReferenceBundle(admin, {
       productId,
@@ -660,6 +665,7 @@ Deno.serve(async (req) => {
       keyframeUrl: keyframe_url,
       format,
       audioSourceUrls,
+      extraImageUrls,
     });
     log('INFO', 'submit: bundle built', {
       mode: bundle.mode,
