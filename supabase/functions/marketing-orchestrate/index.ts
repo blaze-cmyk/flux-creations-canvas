@@ -42,9 +42,10 @@ function pickSceneSeed() {
   return SCENE_SEEDS[Math.floor(Math.random() * SCENE_SEEDS.length)];
 }
 
-function applyAntiReplicationDirective(prompt: string, opts: { hasAvatar: boolean; hasProduct: boolean }) {
+function applyAntiReplicationDirective(prompt: string, opts: { hasAvatar: boolean; hasProduct: boolean; format?: string | null }) {
   if (!prompt || typeof prompt !== 'string') return prompt;
   const seed = pickSceneSeed();
+  const isUnboxing = String(opts.format || '').toLowerCase() === 'unboxing';
   const refsLine = opts.hasAvatar && opts.hasProduct
     ? 'The reference images provide ONLY the creator\'s facial identity / likeness and the product\'s exact appearance. They are NOT the scene, background, framing, lighting, wardrobe, or composition.'
     : opts.hasAvatar
@@ -56,7 +57,9 @@ function applyAntiReplicationDirective(prompt: string, opts: { hasAvatar: boolea
     'Build a NEW scene from scratch using the description below. The environment, camera angles, framing, wardrobe, pose, background objects, wall color, doors, furniture, and lighting must NOT match the avatar reference image.',
     `If the description does not specify a location, use this fresh setting: ${seed}.`,
     'Vary wardrobe, hair styling, expression, distance from camera, and pose from the reference photo. The creator should be wearing different clothes than in the reference image unless the script explicitly says otherwise.',
-    'Do not animate the avatar upload as a still portrait. Use it only to preserve facial likeness while directing a new UGC ad with multiple shot types, product close-ups, and a payoff beat.',
+    isUnboxing
+      ? 'For Unboxing specifically: do NOT use the product/reference image as the first video frame or as a still packshot to animate. Film a fresh UGC unboxing scene: hands/avatar enter frame, packaging is handled, the camera reframes, tactile sounds happen, and the product is revealed/used in a new environment.'
+      : 'Do not animate the avatar upload as a still portrait. Use it only to preserve facial likeness while directing a new UGC ad with multiple shot types, product close-ups, and a payoff beat.',
     '',
   ].join('\n');
   return `${preamble}${prompt}`;
@@ -435,7 +438,7 @@ Deno.serve(async (req) => {
               })
             : String(candidate).trim();
         }
-        finalPrompt = applyAntiReplicationDirective(finalPrompt, { hasAvatar: !!avatarId, hasProduct: !!productId });
+        finalPrompt = applyAntiReplicationDirective(finalPrompt, { hasAvatar: !!avatarId, hasProduct: !!productId, format: effectiveFormat });
         const voiceoverText = scriptPayload?.voiceover_script || extractSpokenLines(finalPrompt);
 
         // 4d) Persist script + advance stage to 'videoing' so the UI knows

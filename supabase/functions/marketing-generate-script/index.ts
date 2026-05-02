@@ -330,7 +330,7 @@ Before writing, silently choose a real SCENE LANGUAGE that fits the product: coz
 STEP 3 — DECIDE WHO UNBOXES IT.
 - AVATAR PROVIDED → cast them. Their persona drives the dialogue voice (= CREATOR_PERSONA). Outfit, hands, posture must visually fit the chosen camera language and product palette.
 - NO AVATAR → invent the hands/persona that visually FITS the product (sage sweater sleeves for cozy collectibles, bare wrist with one thin gold ring for fine jewelry, oversized hoodie sleeves for streetwear, a man's plain ash-grey crew tee + leather watch for quiet-luxury small goods). Match nail color and sleeve color to the product palette.
-- USER ATTACHED A PACKAGING REFERENCE IMAGE (USER_EXTRA_REFERENCE_IMAGES) → that image IS the packaging. Preserve it EXACTLY — color, finish, lid mechanism, ribbon, embossing, text, seals. Do NOT invent a different box. The first extra reference image is the packaging anchor unless USER_DIRECTION says otherwise.
+- USER ATTACHED EXTRA REFERENCE IMAGES → they are taste / prop / packaging anchors only when USER_DIRECTION or the image name says so. Never copy their full composition, background, crop, or lighting as the final video. If an image is explicitly a packaging reference, preserve packaging color/finish/lid/ribbon/embossing/text/seals; otherwise treat it as inspiration, not a frame to recreate.
 
 STEP 4 — WRITE IT IN THE EXACT REFERENCE SHAPE (this is the only HARD structural rule).
 Match the SHAPE of the REFERENCE LIBRARY entries below — they are how every great Higgsfield-style unboxing script is shaped. The output is NOT a single flowing paragraph. It is a structured script with these blocks, in this order:
@@ -375,6 +375,8 @@ DIALOGUE — driven by camera language, NEVER by template:
 AVATAR-VOICE TASTE is family-specific, never universal. HIGH-ENERGY fashion/avatar families (HAUL TRY-ON, SCARCITY DROP, FULL-SET REVEAL, JUMP-CUT HAUL) MUST stage at least 2 named authentic micro-actions from this vocabulary: nail-tap on the unopened polymailer/box, hair-fluff or hair-pull-out-from-under-collar after putting the piece on, hugging-self into the fabric, hood-pull-overhead, sleeve-tug-outward, index-finger-tap on the embossed logo, both-index-fingers-down at the chest naming the color, downward-chop-gesture on the scarcity word, both-fingers-pointing-into-lens on the CTA, 360°-spin, ta-da open-palms close, leans-into-lens-then-hard-cut. QUIET avatar families (QUIET HANDHELD, EDITORIAL PAN, VLOG SELFIE when not fashion) must NOT use haul gestures; they use restrained physical blocking instead: fingertip tracing embossing, lid lifted with both hands, tissue folded back, product turned toward window light, thumb across a finished edge, small breath, quiet half-smile. Silent ASMR families use no avatar-voice gate at all.
 
 PRODUCT FIDELITY: the script MUST mention at least 4 concrete details from the product images verbatim (exact colors named, materials, hardware pieces, printed text exactly as on the product, distinctive features). NEVER invent details that aren't visible.
+
+REFERENCE IMAGE NON-RENDER RULE: product/reference images are identity anchors for the physical object, not the shot. The final prompt must direct a NEW live-action UGC scene where the product is handled, opened, used, worn, or revealed. Never write a script that simply recreates the uploaded product photo, packaging photo, catalog pose, flat product render, same background, same crop, or same lighting.
 
 VARIETY MANDATE: across consecutive generations for similar products you MUST vary the camera language. AI slop = every clip looking identical. Surprise the viewer.
 
@@ -645,6 +647,9 @@ function isWeak(
     const genericCineRx = /\b(generic cinematic|cinematic background|aesthetic background|clean setup|beautiful setup|premium background|minimal setup)\b/i;
     const genericCineHit = finalPrompt.match(genericCineRx);
     if (genericCineHit) return { weak: true, reason: `unboxing contains generic cinematography slop: "${genericCineHit[0]}"` };
+    const renderSlopRx = /\b(product render|catalog (?:shot|photo)|packshot|studio render|3d render|floating product|same reference (?:image|photo)|recreate(?:s|d)? the reference|matching the reference (?:image|photo)|static product (?:shot|image)|product sits alone)\b/i;
+    const renderHit = finalPrompt.match(renderSlopRx);
+    if (renderHit) return { weak: true, reason: `unboxing treats references like a render target: "${renderHit[0]}"` };
     // 7. Packaging-as-hero — ≥1 packaging noun must appear before the first time-anchor beat.
     const firstBeatIdx = finalPrompt.search(/\b\d{1,2}(?:\.\d)?\s*[–-]\s*\d{1,2}(?:\.\d)?\s*s/i);
     if (firstBeatIdx > 0) {
@@ -1026,25 +1031,18 @@ Deno.serve(async (req) => {
 
     // Build the LLM image attachment list first so we can describe @mentions
     // by their position in that list.
-    // ── UNBOXING: the user's first extra ref is the PACKAGING anchor — bump it
-    // to attachment slot #1 so the model sees the box before anything else. ──
+    // ── UNBOXING: keep product images first. Extra refs are taste/prop anchors
+    // unless explicitly named/mentioned as packaging. Putting an extra image in
+    // slot #1 made Seedance/script generation over-copy that image's composition.
     const isUnboxing = format === 'Unboxing';
     const imageUrlsForLLM: string[] = [];
-    if (isUnboxing && userExtraRefs.length > 0) {
-      imageUrlsForLLM.push(userExtraRefs[0]); // packaging anchor first
-      imageUrlsForLLM.push(...productImageUrls.slice(0, 3));
-    } else {
-      imageUrlsForLLM.push(...productImageUrls.slice(0, 3));
-    }
+    imageUrlsForLLM.push(...productImageUrls.slice(0, 3));
     if (avatarImageUrl) imageUrlsForLLM.push(avatarImageUrl);
     const extraStartIdx = imageUrlsForLLM.length; // 0-based index where extras begin
     const remainingSlots = Math.max(0, 8 - imageUrlsForLLM.length);
-    // For Unboxing we already used the first extra above — skip it here.
-    const extrasPool = isUnboxing && userExtraRefs.length > 0 ? userExtraRefs.slice(1) : userExtraRefs;
-    const extraForLLM = extrasPool.slice(0, remainingSlots);
+    const extraForLLM = userExtraRefs.slice(0, remainingSlots);
     imageUrlsForLLM.push(...extraForLLM);
     extraForLLM.forEach((u) => allRefUrls.push(u));
-    if (isUnboxing && userExtraRefs.length > 0) allRefUrls.unshift(userExtraRefs[0]);
 
     const extraRefBlock = extraForLLM.length
       ? `\nUSER_EXTRA_REFERENCE_IMAGES (in order, exposed to the user as @mentions):\n` +
@@ -1165,11 +1163,12 @@ Deno.serve(async (req) => {
         `${tagsBriefBlock}` +
         `STEP 1 — name in one phrase what THIS product IS. ${taxonomyHints.length ? `Lightweight taxonomy hint: ${taxonomyHints.join(' / ')}.` : 'No taxonomy hint — read the images.'}\n` +
         `STEP 2 — propose 3+ camera-language options that could honor THIS specific product+avatar combo. PRIMARY palette for this product (ordered by fit, but you are NOT capped — invent a hybrid or a brand-new tag if it serves the product better): ${shuffledTop.join(' · ')}. For each option name ONE reason it FITS and ONE reason it MIGHT NOT. Pick the winner.\n` +
-        `CINEMATOGRAPHY IS THE MAIN THING: before writing, choose a real scene language and make it visible in the prompt — surface, motivated light, lens/camera feel, frame composition, background life, hand/avatar blocking, color harmony. Good examples: light wooden desk + sage sweater sleeves for a toy; white silk + warm diffused daylight for jewelry; ash-grey tee + oak table + window light for quiet luxury; iPhone front camera + modern aesthetic gym + tired breath for equipment; lived-in bedroom window UGC only when fashion needs it. Bad examples: generic cinematic, aesthetic background, clean setup, random voiceover in a blank room.\n` +
+        `CINEMATOGRAPHY IS THE MAIN THING: write like a real UGC director, not a product renderer. Before writing, choose a fresh live-action scene language and make it visible in the prompt — named room/location, surface, motivated light, lens/camera feel, frame composition, background life, hand/avatar blocking, color harmony, and one imperfect human detail. Good examples: messy bedroom window UGC with the parcel on an unmade duvet; light wooden desk + sage sweater sleeves for a toy; white silk + warm diffused daylight for jewelry; ash-grey tee + oak table + window light for quiet luxury; iPhone front camera + modern aesthetic gym + tired breath for equipment; car-seat street-drop with city reflections on leather. Bad examples: generic cinematic, aesthetic background, clean setup, random voiceover in a blank room, or copying the product/reference photo as the actual shot.\n` +
+        `REFERENCE IMAGE RULE: the attached product/avatar/extra images are only anchors for what the product/avatar/prop looks like. They are NOT the video frame. Do not recreate the uploaded product image, packaging image, catalog photo, same crop, same background, same pose, same lighting, or same flat render. The video must feel newly filmed: hands enter, camera reframes, product leaves/enters packaging, avatar reacts, background has lived-in depth.\n` +
         `IMPORTANT — match the product's personality. Collectibles, jewelry, quiet-luxury small goods, ceramics, fragrances, stationery → almost always SILENT or quiet-whisper families (TOP-DOWN ASMR, THEATRICAL REVEAL, MACRO TACTILE, QUIET HANDHELD, TABLETOP CINEMATIC). Fashion drops, multi-piece sets, sneaker drops, streetwear, lingerie haul → high-energy avatar families (HAUL TRY-ON, SCARCITY DROP, FULL-SET REVEAL). Used-not-opened gear (gym bike, blender, camera) → VLOG SELFIE / STREET DOC, the product is unboxed by being USED. NEVER force haul-energy onto a quiet collectible. NEVER force silent ASMR onto a fashion drop the user clearly wants try-on energy for.\n` +
         `STEP 3 — commit to that camera language. Inside the VIDEO block the opening line MUST start with the reference tags + camera-language tag + duration in this EXACT shape: "${productTag || '@product:UUID'} ${avatarTag ? avatarTag + ' ' : ''}VIDEO — <CAMERA_LANGUAGE_TAG> — ${durSec}-second vertical (9:16) <one-phrase concept>". The structural gate verifies this.\n` +
         `STEP 4 — write the script in the EXACT shape of the REFERENCE LIBRARY (NOT one paragraph): ${avatarTag ? 'optional one-line ACTION HEADER with @avatar:/@image_/@product: tags inline → ' : ''}${avatarTag ? '"Dialogue (tone1, tone2, tone3):" block with each spoken line on its OWN line in double quotes (omit for pure silent ASMR) → ' : '(silent / POV hands mode — skip the action-header and Dialogue blocks) → '}standalone "NO MUSIC, ONLY SFX" line → VIDEO block opening with the reference tags + camera-language tag + duration → inline-labelled body: "Product: …" (≥30% of body words on the unopened packaging) then "Format: …" then ${beatCount} "Scene N — Title (window): …" entries with windows ${beatWindows.join(', ')} (each beat = action + named sound + sensory verb) then closing "Overall style: …" sentence.\n` +
-        `${hasPackagingRef ? `PACKAGING ANCHOR: attached reference image #1 (${imageTagsList[0] || '@image_1'}) IS the packaging — preserve its color, finish, lid mechanism, ribbon, embossing, printed text, and seals EXACTLY. Do NOT invent a different box. Reference it inline as @image_1 in the action-header line when there is one.\n` : ''}` +
+        `${hasPackagingRef ? `EXTRA REFERENCE IMAGES: if USER_DIRECTION or the image name says @image_1 is packaging, preserve that packaging's color, finish, lid mechanism, ribbon, embossing, printed text, and seals EXACTLY — but still invent a NEW live-action scene around it. If not explicitly packaging, use @image_1 only as taste/prop inspiration, not as a frame to copy.\n` : ''}` +
         `Variety rule: across consecutive generations vary the camera language. AI slop = every clip looking identical. Surprise the viewer.\n`
       : '';
 
