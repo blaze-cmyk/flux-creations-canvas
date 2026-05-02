@@ -1,4 +1,5 @@
 import { useGeneratorStore } from '@/store/generatorStore';
+import { useLayoutStore, ZOOM_COLUMNS } from '@/store/layoutStore';
 import { AlertCircle, Eye, RefreshCw, Trash2, Loader2, Download, Link2, Heart, MoreHorizontal, Maximize2 } from 'lucide-react';
 import { useState, useRef, useEffect } from 'react';
 
@@ -17,6 +18,7 @@ function thumbUrl(url: string | undefined, width = 480, quality = 70): string | 
 
 export function ImageGrid() {
   const { images } = useGeneratorStore();
+  const zoom = useLayoutStore((s) => s.zoom);
 
   if (images.length === 0) {
     return (
