@@ -958,6 +958,7 @@ Deno.serve(async (req) => {
       `${avatarCtx}\n\n` +
       `${extraRefBlock}` +
       `${podcastPresetBlock}` +
+      `${unboxingPresetBlock}` +
       `${directionBlock}\n` +
       `Look at the attached reference images carefully. Product images are for exact visible product details. Avatar image is for facial identity only; do not use its background, clothes, pose, lighting, or framing as the scene. ` +
       `Extract real visible product details (colors, textures, hardware, printed text, distinctive features) into concrete_product_details — do not invent. ` +
