@@ -254,11 +254,13 @@ async function buildReferenceBundle(admin: any, opts: {
 function withReferenceMap(prompt: string, bundle: ReferenceBundle) {
   if (bundle.mode !== 'reference-to-video' || bundle.referenceImages.length === 0) return prompt;
   const lines: string[] = [];
-  if (bundle.hasAvatar) {
-    lines.push('Reference map: image 1 is the creator/avatar identity. Preserve facial likeness only; do not copy the uploaded photo composition, background, pose, lighting, or wardrobe.');
-    if (bundle.hasProduct) lines.push('Product references start at image 2. Preserve the product shape, color, material, packaging, and visible details exactly.');
+  const productCount = bundle.hasProduct ? Math.max(1, bundle.referenceImages.length - (bundle.hasAvatar ? 1 : 0)) : 0;
+  if (bundle.hasProduct && bundle.hasAvatar) {
+    lines.push(`Reference map: images 1${productCount > 1 ? `–${productCount}` : ''} are product references — preserve product shape, color, material, packaging, and visible details exactly. Image ${productCount + 1} is the creator/avatar identity — preserve facial likeness only; do not copy the uploaded photo composition, background, pose, lighting, or wardrobe.`);
   } else if (bundle.hasProduct) {
-    lines.push('Reference map: images 1 onward are product references. Preserve product shape, color, material, packaging, and visible details exactly.');
+    lines.push('Reference map: all images are product references. Preserve product shape, color, material, packaging, and visible details exactly.');
+  } else if (bundle.hasAvatar) {
+    lines.push('Reference map: the image is the creator/avatar identity. Preserve facial likeness only; do not copy the uploaded photo composition, background, pose, lighting, or wardrobe.');
   } else {
     lines.push('Reference map: use the provided images as visual anchors, not as a first frame to animate.');
   }
