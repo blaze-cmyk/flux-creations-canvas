@@ -146,6 +146,7 @@ async function gatherFreshReferenceUrls(admin: any, opts: {
   keyframeUrl?: string | null;
   fallbackUrls?: unknown[];
   maxProductImages?: number;
+  maxReferenceImages?: number;
 }) {
   const refs: string[] = [];
   if (opts.keyframePath) {
@@ -183,7 +184,9 @@ async function gatherFreshReferenceUrls(admin: any, opts: {
     if (typeof avatarUrl === 'string') refs.push(avatarIdentityCropUrl(avatarUrl));
   }
 
-  return uniqueValidUrls(refs.length ? refs : (opts.fallbackUrls ?? []), 3);
+  // Keep the core product/avatar refs first, but DO NOT drop user-added prompt
+  // reference images. Seedance 2.0 accepts up to 9 reference_images per Atlas docs.
+  return uniqueValidUrls([...refs, ...(opts.fallbackUrls ?? [])], opts.maxReferenceImages ?? 9);
 }
 
 async function uploadAtlasMedia(url: string, index: number, kind: 'image' | 'audio') {
@@ -233,6 +236,16 @@ async function toFalDataUri(url: string, index: number, kind: 'image' | 'audio')
 
 function hasAudioUrlError(raw: unknown) {
   return /audio_url|reference_audio|reference_audios|invalid url/i.test(JSON.stringify(raw));
+}
+
+function canPollFallbackToFal(row: any, result: { status: 'running' | 'done' | 'failed'; error?: string }) {
+  return (
+    result.status === 'failed' &&
+    row?.provider === 'atlascloud' &&
+    !row?.fallback_attempted &&
+    !!FAL_KEY &&
+    ((row?.reference_paths || []).length > 0 || row?.product_id || row?.avatar_id || row?.keyframe_url || row?.keyframe_path)
+  );
 }
 
 function normalizeRes(r: string) {
@@ -488,7 +501,7 @@ Deno.serve(async (req) => {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
       }
-      if (row.status === 'done' || row.status === 'failed') {
+      if (row.status === 'done' || (row.status === 'failed' && !canPollFallbackToFal(row, { status: 'failed', error: row.error ?? 'failed' }))) {
         return new Response(JSON.stringify(row), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
@@ -531,9 +544,71 @@ Deno.serve(async (req) => {
         });
       }
       if (result.status === 'failed') {
+        let fallbackError: string | null = null;
+        if (canPollFallbackToFal(row, result)) {
+          const refs = await gatherFreshReferenceUrls(admin, {
+            productId: row.product_id,
+            avatarId: row.avatar_id,
+            keyframePath: row.keyframe_path,
+            keyframeUrl: row.keyframe_url,
+            fallbackUrls: row.reference_paths || [],
+          });
+          const audio_urls: string[] = [];
+          if (row.avatar_id) {
+            const { data: av } = await admin.from('ms_avatars').select('voice_sample_url').eq('id', row.avatar_id).maybeSingle();
+            if (isValidHttpUrl(av?.voice_sample_url)) audio_urls.push(String(av?.voice_sample_url).trim());
+          }
+          if (String(row.format).toLowerCase() === 'podcast') {
+            const secondVoice = await ensurePodcastSecondVoiceUrl(admin);
+            if (secondVoice && !audio_urls.includes(secondVoice)) audio_urls.push(secondVoice);
+          }
+          try {
+            const fallback = await submitFal({
+              prompt: row.prompt,
+              image_urls: refs,
+              audio_urls,
+              ratio: aspectToRatio(row.aspect),
+              duration: row.duration_seconds || 8,
+              resolution: normalizeRes(row.resolution),
+            });
+            if (fallback.ok && fallback.requestId) {
+              const endpoint = providerEndpoint('fal', refs.length > 0);
+              const { data: updated } = await admin
+                .from('ms_generations')
+                .update({
+                  status: 'queued',
+                  stage: 'videoing',
+                  provider: 'fal',
+                  provider_endpoint: endpoint,
+                  fal_request_id: fallback.requestId,
+                  fallback_attempted: true,
+                  reference_paths: refs,
+                  error: null,
+                })
+                .eq('id', row.id)
+                .select()
+                .single();
+              log('INFO', 'poll: atlas failed, submitted fal fallback', { jobId: row.id, endpoint, refs: refs.length });
+              return new Response(JSON.stringify(updated), {
+                headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+              });
+            }
+            const raw: any = fallback.raw;
+            fallbackError = raw?.detail || raw?.message || raw?.msg || JSON.stringify(raw);
+            log('WARN', 'poll: fal fallback rejected', { jobId: row.id, raw: fallback.raw });
+          } catch (e) {
+            fallbackError = e instanceof Error ? e.message : String(e);
+            log('ERROR', 'poll: fal fallback threw', { jobId: row.id, err: e instanceof Error ? e.message : String(e) });
+          }
+        }
         const { data: updated } = await admin
           .from('ms_generations')
-          .update({ status: 'failed', stage: 'failed', error: result.error ?? 'failed' })
+          .update({
+            status: 'failed',
+            stage: 'failed',
+            fallback_attempted: !!fallbackError || row.fallback_attempted,
+            error: fallbackError ? `${result.error ?? 'AtlasCloud failed'} | fal fallback failed: ${fallbackError}` : result.error ?? 'failed',
+          })
           .eq('id', row.id)
           .select()
           .single();
@@ -570,6 +645,7 @@ Deno.serve(async (req) => {
         keyframePath: row.keyframe_path,
         keyframeUrl: row.keyframe_url,
         fallbackUrls: row.reference_paths || [],
+        maxReferenceImages: 9,
       });
       const audio_urls: string[] = [];
       if (row.avatar_id) {
@@ -608,6 +684,8 @@ Deno.serve(async (req) => {
           provider: result.provider,
           provider_endpoint: result.endpoint,
           fal_request_id: result.requestId,
+          fallback_attempted: false,
+          reference_paths: refs,
           error: null,
           video_url: null,
         })
@@ -660,6 +738,7 @@ Deno.serve(async (req) => {
       keyframeUrl: keyframe_url,
       fallbackUrls: keyframe_url ? [keyframe_url, ...image_urls] : image_urls,
       maxProductImages: 1,
+      maxReferenceImages: 9,
     });
 
     // Pull the avatar's pre-generated reference voice clip. For Podcast Mode A
@@ -691,6 +770,12 @@ Deno.serve(async (req) => {
           reference_paths: finalImageUrls,
           status: 'queued',
           stage: 'videoing',
+            provider: null,
+            provider_endpoint: null,
+            fal_request_id: null,
+            fallback_attempted: false,
+            error: null,
+            video_url: null,
           aspect: ratio,
           duration_seconds: duration,
           resolution: resolutionN,
