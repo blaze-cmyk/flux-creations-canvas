@@ -2,6 +2,19 @@ import { useGeneratorStore } from '@/store/generatorStore';
 import { AlertCircle, Eye, RefreshCw, Trash2, Loader2, Download, Link2, Heart, MoreHorizontal, Maximize2 } from 'lucide-react';
 import { useState, useRef, useEffect } from 'react';
 
+// Build a resized variant of a Supabase Storage public URL using the
+// `/render/image/` transform endpoint. Falls back to original on non-Supabase URLs.
+function thumbUrl(url: string | undefined, width = 480, quality = 70): string | undefined {
+  if (!url) return url;
+  try {
+    if (url.includes('/storage/v1/object/public/')) {
+      return url.replace('/storage/v1/object/public/', '/storage/v1/render/image/public/')
+        + (url.includes('?') ? '&' : '?') + `width=${width}&quality=${quality}&resize=contain`;
+    }
+  } catch {}
+  return url;
+}
+
 export function ImageGrid() {
   const { images } = useGeneratorStore();
 
@@ -147,7 +160,9 @@ function ImageCard({ image }: {
         <div className="absolute inset-0 bg-muted animate-pulse" />
       )}
       <img
-        src={image.imageUrl}
+        src={thumbUrl(image.imageUrl, 480, 70)}
+        srcSet={image.imageUrl ? `${thumbUrl(image.imageUrl, 480, 70)} 1x, ${thumbUrl(image.imageUrl, 960, 72)} 2x` : undefined}
+        sizes="(max-width: 640px) 50vw, 220px"
         alt=""
         className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-300 ${loaded ? 'opacity-100' : 'opacity-0'}`}
         loading="lazy"
