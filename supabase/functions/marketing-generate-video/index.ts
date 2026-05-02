@@ -148,6 +148,16 @@ function isAvatarStorageUrl(url: string) {
   return /\/storage\/v1\/object\/sign\/ms-avatars\//i.test(url) || /\/storage\/v1\/object\/public\/ms-avatars\//i.test(url);
 }
 
+function isSelectedProductStorageUrl(url: string, productId?: string | null) {
+  if (!productId) return false;
+  const encoded = encodeURIComponent(productId);
+  return (
+    url.includes(`/storage/v1/object/sign/ms-products/`) && (url.includes(`/${productId}/`) || url.includes(`%2F${encoded}%2F`))
+  ) || (
+    url.includes(`/storage/v1/object/public/ms-products/`) && url.includes(`/${productId}/`)
+  );
+}
+
 async function signedStorageUrl(admin: any, bucket: string, path: string, ttl = 60 * 60 * 24): Promise<string | null> {
   const { data } = await admin.storage.from(bucket).createSignedUrl(path, ttl);
   return data?.signedUrl ?? null;
@@ -244,6 +254,7 @@ async function buildReferenceBundle(admin: any, opts: {
     // URL trips Atlas/Seedance real-person moderation during polling.
     if (url === avatarUrl) return false;
     if (url.includes('wsrv.nl') && url.includes('ms-avatars')) return false;
+    if (isSelectedProductStorageUrl(url, opts.productId)) return false;
     return !isAvatarStorageUrl(url);
   });
 
