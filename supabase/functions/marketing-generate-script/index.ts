@@ -1177,9 +1177,13 @@ Deno.serve(async (req) => {
       `${directionBlock}\n` +
       `Look at the attached reference images carefully. Product images are for exact visible product details. Avatar image is for facial identity only; do not use its background, clothes, pose, lighting, or framing as the scene. ` +
       `Extract real visible product details (colors, textures, hardware, printed text, distinctive features) into concrete_product_details — do not invent. ` +
-      `Write the Seedance 2.0 prompt as ONE continuous paragraph that fits inside ${durSec} seconds, uses exactly ${beatCount} beats with windows ${beatWindows.join(', ')}, and stays under ${maxSpokenWords} spoken words total. ` +
+      `${isUnboxing
+        ? `Write the Seedance 2.0 script in the EXACT structured shape defined in the UNBOXING CREATIVE BRIEF (action header → Dialogue block → NO MUSIC, ONLY SFX → VIDEO block with Product:/Format:/Scene 1–N/Overall style: inline labels). It MUST fit inside ${durSec} seconds, use exactly ${beatCount} scenes with windows ${beatWindows.join(', ')}, and stay under ${maxSpokenWords} spoken words total. Use the literal PRODUCT_TAG / AVATAR_TAG values — do NOT print the placeholder strings "PRODUCT_UUID" or "AVATAR_UUID". `
+        : `Write the Seedance 2.0 prompt as ONE continuous paragraph that fits inside ${durSec} seconds, uses exactly ${beatCount} beats with windows ${beatWindows.join(', ')}, and stays under ${maxSpokenWords} spoken words total. `}` +
       `Voice MUST match CREATOR_PERSONA exactly. ` +
-      `Output one continuous paragraph in final_prompt. No preamble, no labels, no headings.`;
+      `${isUnboxing
+        ? `Output the structured script in final_prompt exactly as specified — preserve line breaks between blocks. No preamble, no "Option 1/2/3" reasoning, no markdown headings.`
+        : `Output one continuous paragraph in final_prompt. No preamble, no labels, no headings.`}`;
 
 
     // ---------- First attempt: Claude Sonnet 4.5 (Anthropic → OpenRouter → Gemini) ----------
