@@ -16,6 +16,7 @@ const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 
 const ATLAS_BASE = 'https://api.atlascloud.ai/api/v1/model';
+const ATLAS_ASSET_BASE = 'https://console.atlascloud.ai/api/v1';
 const FAL_QUEUE = 'https://queue.fal.run';
 const SEEDANCE_REF = 'bytedance/seedance-2.0/reference-to-video';
 const SEEDANCE_TEXT = 'bytedance/seedance-2.0/text-to-video';
@@ -26,6 +27,7 @@ type VideoMode = 'text-to-video' | 'reference-to-video';
 type ReferenceBundle = {
   mode: VideoMode;
   referenceImages: string[];
+  atlasReferenceImages?: string[];
   referenceAudios: string[];
   hasAvatar: boolean;
   hasProduct: boolean;
@@ -144,6 +146,20 @@ function providerLabel(p: Provider) {
   return p === 'atlascloud' ? 'AtlasCloud' : 'fal.ai';
 }
 
+function isAvatarStorageUrl(url: string) {
+  return /\/storage\/v1\/object\/sign\/ms-avatars\//i.test(url) || /\/storage\/v1\/object\/public\/ms-avatars\//i.test(url);
+}
+
+function isSelectedProductStorageUrl(url: string, productId?: string | null) {
+  if (!productId) return false;
+  const encoded = encodeURIComponent(productId);
+  return (
+    url.includes(`/storage/v1/object/sign/ms-products/`) && (url.includes(`/${productId}/`) || url.includes(`%2F${encoded}%2F`))
+  ) || (
+    url.includes(`/storage/v1/object/public/ms-products/`) && url.includes(`/${productId}/`)
+  );
+}
+
 async function signedStorageUrl(admin: any, bucket: string, path: string, ttl = 60 * 60 * 24): Promise<string | null> {
   const { data } = await admin.storage.from(bucket).createSignedUrl(path, ttl);
   return data?.signedUrl ?? null;
@@ -180,6 +196,44 @@ async function fetchAvatarImageUrl(admin: any, avatarId: string): Promise<string
   // headshots reliably pass Seedance's "real person" moderator on Atlas, and
   // this is the exact shape that worked before the recent rewrite.
   return `https://wsrv.nl/?url=${encodeURIComponent(raw)}&w=640&h=640&fit=cover&a=top&output=jpg`;
+}
+
+async function createAtlasPortraitAsset(imageUrl: string, avatarId?: string | null): Promise<string | null> {
+  if (!ATLAS_KEY || !imageUrl) return null;
+  const res = await fetch(`${ATLAS_ASSET_BASE}/sd/assets`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${ATLAS_KEY}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ url: imageUrl, name: `avatar-${String(avatarId ?? 'ref').slice(0, 48)}`, asset_type: 'Image' }),
+  });
+  const text = await res.text();
+  let parsed: any = {};
+  try { parsed = JSON.parse(text); } catch { /* keep text */ }
+  if (!res.ok) {
+    log('WARN', 'atlas asset create failed', { status: res.status, error: parsed?.message ?? parsed?.msg ?? text.slice(0, 240) });
+    return null;
+  }
+  const data = parsed?.data ?? parsed;
+  const id = data?.id;
+  const immediateAsset = data?.atlas_asset_id ?? data?.ark_asset_id;
+  if (immediateAsset && String(data?.status ?? '').toLowerCase() === 'active') return `asset://${immediateAsset}`;
+  if (!id) return immediateAsset ? `asset://${immediateAsset}` : null;
+  for (let i = 0; i < 24; i++) {
+    await new Promise((resolve) => setTimeout(resolve, 2500));
+    const poll = await fetch(`${ATLAS_ASSET_BASE}/sd/assets/${id}`, { headers: { Authorization: `Bearer ${ATLAS_KEY}` } });
+    const pollText = await poll.text();
+    let pollJson: any = {};
+    try { pollJson = JSON.parse(pollText); } catch { /* keep text */ }
+    const asset = pollJson?.data ?? pollJson;
+    const status = String(asset?.status ?? '').toLowerCase();
+    const assetId = asset?.atlas_asset_id ?? asset?.ark_asset_id ?? immediateAsset;
+    if (status === 'active' && assetId) return `asset://${assetId}`;
+    if (status === 'failed') {
+      log('WARN', 'atlas asset failed', { id, error: asset?.error_message ?? asset?.error_code ?? pollText.slice(0, 240) });
+      return null;
+    }
+  }
+  log('WARN', 'atlas asset timeout', { avatarId });
+  return null;
 }
 
 async function gatherAudioSourceUrls(admin: any, opts: { avatarId?: string | null; format?: string | null }): Promise<string[]> {
@@ -233,6 +287,17 @@ async function buildReferenceBundle(admin: any, opts: {
 }): Promise<ReferenceBundle> {
   const productUrls = opts.productId ? await fetchProductImageUrls(admin, opts.productId, 7) : [];
   const avatarUrl = opts.avatarId ? await fetchAvatarImageUrl(admin, opts.avatarId) : null;
+  const atlasAvatarAsset = avatarUrl ? await createAtlasPortraitAsset(avatarUrl, opts.avatarId) : null;
+  const extraImageUrls = uniqueValidUrls(opts.extraImageUrls ?? [], 9).filter((url) => {
+    if (!opts.avatarId) return true;
+    // Never pass the original avatar upload as an extra reference. The working
+    // pipeline only sent the wsrv-cropped avatar headshot; the raw signed avatar
+    // URL trips Atlas/Seedance real-person moderation during polling.
+    if (url === avatarUrl) return false;
+    if (url.includes('wsrv.nl') && url.includes('ms-avatars')) return false;
+    if (isSelectedProductStorageUrl(url, opts.productId)) return false;
+    return !isAvatarStorageUrl(url);
+  });
 
   // Order matters for Seedance reference-to-video: product refs first, avatar
   // (already wsrv-cropped to a 640x640 headshot) last. Putting a raw full-body
@@ -241,12 +306,13 @@ async function buildReferenceBundle(admin: any, opts: {
   const orderedRefs = uniqueValidUrls([
     ...productUrls,
     ...(avatarUrl ? [avatarUrl] : []),
-    ...(opts.extraImageUrls ?? []),
+    ...extraImageUrls,
   ], 9);
 
   return {
     mode: orderedRefs.length > 0 ? 'reference-to-video' : 'text-to-video',
     referenceImages: orderedRefs,
+    atlasReferenceImages: orderedRefs.map((url) => (avatarUrl && url === avatarUrl && atlasAvatarAsset ? atlasAvatarAsset : url)),
     referenceAudios: uniqueValidUrls(opts.audioSourceUrls ?? [], 3),
     hasAvatar: !!opts.avatarId && !!avatarUrl,
     hasProduct: !!opts.productId && productUrls.length > 0,
@@ -258,7 +324,13 @@ function withReferenceMap(prompt: string, bundle: ReferenceBundle) {
   const lines: string[] = [];
   const productCount = bundle.hasProduct ? Math.max(1, bundle.referenceImages.length - (bundle.hasAvatar ? 1 : 0)) : 0;
   if (bundle.hasProduct && bundle.hasAvatar) {
-    lines.push(`Reference map: images 1${productCount > 1 ? `–${productCount}` : ''} are product references — preserve product shape, color, material, packaging, and visible details exactly. Image ${productCount + 1} is the creator/avatar identity — preserve facial likeness only; do not copy the uploaded photo composition, background, pose, lighting, or wardrobe.`);
+    const avatarIndex = bundle.referenceImages.findIndex((url) => url.includes('wsrv.nl') && url.includes('ms-avatars')) + 1;
+    const productIndexes = bundle.referenceImages
+      .map((url, idx) => ({ url, idx: idx + 1 }))
+      .filter(({ idx }) => idx !== avatarIndex)
+      .map(({ idx }) => idx)
+      .join(', ');
+    lines.push(`Reference map: images ${productIndexes || '1'} are product references — preserve product shape, color, material, packaging, and visible details exactly. Image ${avatarIndex || productCount + 1} is the creator/avatar identity — preserve facial likeness only; do not copy the uploaded photo composition, background, pose, lighting, or wardrobe.`);
   } else if (bundle.hasProduct) {
     lines.push('Reference map: all images are product references. Preserve product shape, color, material, packaging, and visible details exactly.');
   } else if (bundle.hasAvatar) {
@@ -283,7 +355,7 @@ async function atlasSubmit(opts: { prompt: string; bundle: ReferenceBundle; dura
     watermark: false,
   };
   if (opts.bundle.mode === 'reference-to-video') {
-    body.reference_images = opts.bundle.referenceImages;
+    body.reference_images = opts.bundle.atlasReferenceImages?.length ? opts.bundle.atlasReferenceImages : opts.bundle.referenceImages;
     body.reference_videos = [];
     body.return_last_frame = false;
     if (opts.bundle.referenceAudios.length) body.reference_audios = opts.bundle.referenceAudios;
