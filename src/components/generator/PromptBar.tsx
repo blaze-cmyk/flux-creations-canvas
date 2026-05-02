@@ -1,5 +1,5 @@
 import { useGeneratorStore, MODELS, QUALITIES, ASPECT_RATIOS } from '@/store/generatorStore';
-import { ImagePlus, Minus, Plus, Check, Search, Sparkles, Heart } from 'lucide-react';
+import { ImagePlus, Minus, Plus, Check, Search, Sparkles, Heart, X } from 'lucide-react';
 import { useRef, useState, useEffect, useCallback } from 'react';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { ReferenceImageStrip } from '@/components/generator/ReferenceImageStrip';
@@ -267,12 +267,27 @@ export function PromptBar() {
         </div>
       </div>
 
-      {/* Image preview dialog */}
-      <Dialog open={!!previewImg} onOpenChange={() => setPreviewImg(null)}>
-        <DialogContent className="max-w-2xl p-2 bg-popover border-border">
-          {previewImg && <img src={previewImg} alt="Preview" className="w-full h-auto rounded-lg object-contain max-h-[80vh]" />}
-        </DialogContent>
-      </Dialog>
+      {/* Image preview overlay */}
+      {previewImg && (
+        <div
+          className="fixed inset-0 z-[100] bg-black/85 backdrop-blur-sm flex items-center justify-center p-6 animate-in fade-in"
+          onClick={() => setPreviewImg(null)}
+        >
+          <img
+            src={previewImg}
+            alt="Preview"
+            className="max-h-[92vh] max-w-[92vw] object-contain"
+            onClick={(e) => e.stopPropagation()}
+          />
+          <button
+            onClick={() => setPreviewImg(null)}
+            aria-label="Close"
+            className="absolute top-5 right-5 grid place-items-center w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 text-white transition-colors"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+      )}
     </div>
   );
 }
