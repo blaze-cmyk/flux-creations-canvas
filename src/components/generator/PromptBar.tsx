@@ -1,5 +1,5 @@
 import { useGeneratorStore, MODELS, QUALITIES, ASPECT_RATIOS } from '@/store/generatorStore';
-import { ImagePlus, Minus, Plus, Check, Search, AtSign, Sparkles, Heart } from 'lucide-react';
+import { ImagePlus, Minus, Plus, Check, Search, Sparkles, Heart } from 'lucide-react';
 import { useRef, useState, useEffect, useCallback } from 'react';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { ReferenceImageStrip } from '@/components/generator/ReferenceImageStrip';
