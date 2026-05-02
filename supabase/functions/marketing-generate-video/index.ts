@@ -132,9 +132,11 @@ function isModerationError(err: string | undefined) {
   return !!err && /real person|may contain real|moderation|nsfw|content policy|safety/i.test(err);
 }
 
-function providerOrder(bundle: ReferenceBundle, forced?: Provider): Provider[] {
+function providerOrder(_bundle: ReferenceBundle, forced?: Provider): Provider[] {
   if (forced) return [forced];
-  const order: Provider[] = bundle.hasAvatar ? ['fal', 'atlascloud'] : ['atlascloud', 'fal'];
+  // Atlas first regardless of avatar — the wsrv-cropped headshot now passes
+  // moderation, and fal.ai is currently in balance-locked state.
+  const order: Provider[] = ['atlascloud', 'fal'];
   return order.filter((p) => (p === 'fal' ? !!FAL_KEY : !!ATLAS_KEY));
 }
 
