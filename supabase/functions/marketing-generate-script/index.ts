@@ -1028,25 +1028,18 @@ Deno.serve(async (req) => {
 
     // Build the LLM image attachment list first so we can describe @mentions
     // by their position in that list.
-    // ── UNBOXING: the user's first extra ref is the PACKAGING anchor — bump it
-    // to attachment slot #1 so the model sees the box before anything else. ──
+    // ── UNBOXING: keep product images first. Extra refs are taste/prop anchors
+    // unless explicitly named/mentioned as packaging. Putting an extra image in
+    // slot #1 made Seedance/script generation over-copy that image's composition.
     const isUnboxing = format === 'Unboxing';
     const imageUrlsForLLM: string[] = [];
-    if (isUnboxing && userExtraRefs.length > 0) {
-      imageUrlsForLLM.push(userExtraRefs[0]); // packaging anchor first
-      imageUrlsForLLM.push(...productImageUrls.slice(0, 3));
-    } else {
-      imageUrlsForLLM.push(...productImageUrls.slice(0, 3));
-    }
+    imageUrlsForLLM.push(...productImageUrls.slice(0, 3));
     if (avatarImageUrl) imageUrlsForLLM.push(avatarImageUrl);
     const extraStartIdx = imageUrlsForLLM.length; // 0-based index where extras begin
     const remainingSlots = Math.max(0, 8 - imageUrlsForLLM.length);
-    // For Unboxing we already used the first extra above — skip it here.
-    const extrasPool = isUnboxing && userExtraRefs.length > 0 ? userExtraRefs.slice(1) : userExtraRefs;
-    const extraForLLM = extrasPool.slice(0, remainingSlots);
+    const extraForLLM = userExtraRefs.slice(0, remainingSlots);
     imageUrlsForLLM.push(...extraForLLM);
     extraForLLM.forEach((u) => allRefUrls.push(u));
-    if (isUnboxing && userExtraRefs.length > 0) allRefUrls.unshift(userExtraRefs[0]);
 
     const extraRefBlock = extraForLLM.length
       ? `\nUSER_EXTRA_REFERENCE_IMAGES (in order, exposed to the user as @mentions):\n` +
