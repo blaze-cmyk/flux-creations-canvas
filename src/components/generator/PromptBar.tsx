@@ -15,55 +15,103 @@ export function PromptBar() {
   } = useGeneratorStore();
 
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const editorRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [modelOpen, setModelOpen] = useState(false);
   const [aspectOpen, setAspectOpen] = useState(false);
   const [qualityOpen, setQualityOpen] = useState(false);
   const [modelSearch, setModelSearch] = useState('');
   const [dragging, setDragging] = useState(false);
-  
+
   const [previewImg, setPreviewImg] = useState<string | null>(null);
 
   // @-mention autocomplete
   const [mentionOpen, setMentionOpen] = useState(false);
   const [mentionQuery, setMentionQuery] = useState('');
-  const [mentionAnchor, setMentionAnchor] = useState<number>(0);
-  const [mentionLength, setMentionLength] = useState<number>(0);
-
-  // Selected reference chips (indices into referenceImages)
-  const [mentionedIdx, setMentionedIdx] = useState<number[]>([]);
-
-  // Keep mentionedIdx valid if refs are removed/reordered
-  useEffect(() => {
-    setMentionedIdx((prev) => prev.filter((i) => i < referenceImages.length));
-  }, [referenceImages.length]);
-
-  const refNames = referenceImages.map((_, i) => `Image ${i + 1}`);
-
-  const addMentionChip = (idx: number) => {
-    setMentionedIdx((prev) => (prev.includes(idx) ? prev : [...prev, idx]));
-    // Strip the partial "@xyz" the user was typing
-    const before = prompt.slice(0, mentionAnchor);
-    const after = prompt.slice(mentionAnchor + mentionLength + 1); // +1 for '@'
-    setPrompt(`${before}${after.replace(/^\s+/, '')}`);
-    setMentionOpen(false);
-    setTimeout(() => textareaRef.current?.focus(), 0);
-  };
-
-  const removeMentionChip = (idx: number) => {
-    setMentionedIdx((prev) => prev.filter((i) => i !== idx));
-  };
+  const mentionRangeRef = useRef<Range | null>(null);
 
   const selectedModel = MODELS.find((m) => m.id === model);
 
-  // Auto-resize textarea
+  // Render the prompt string into the contentEditable, parsing "@Image N" into chips.
+  const renderToEditor = useCallback((text: string) => {
+    const el = editorRef.current;
+    if (!el) return;
+    el.innerHTML = '';
+    const regex = /@Image (\d+)/g;
+    let last = 0;
+    let m: RegExpExecArray | null;
+    while ((m = regex.exec(text))) {
+      if (m.index > last) el.appendChild(document.createTextNode(text.slice(last, m.index)));
+      const idx = parseInt(m[1], 10) - 1;
+      const chip = buildChip(idx, referenceImages[idx]);
+      el.appendChild(chip);
+      last = m.index + m[0].length;
+    }
+    if (last < text.length) el.appendChild(document.createTextNode(text.slice(last)));
+  }, [referenceImages]);
+
+  // Initial mount + when references change (so chip thumbnails update)
   useEffect(() => {
-    const ta = textareaRef.current;
-    if (!ta) return;
-    ta.style.height = 'auto';
-    ta.style.height = Math.min(ta.scrollHeight, 220) + 'px';
-  }, [prompt]);
+    renderToEditor(prompt);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [referenceImages.length]);
+
+  useEffect(() => {
+    // First mount only
+    renderToEditor(prompt);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const placeCaretAtEnd = () => {
+    const el = editorRef.current;
+    if (!el) return;
+    el.focus();
+    const range = document.createRange();
+    range.selectNodeContents(el);
+    range.collapse(false);
+    const sel = window.getSelection();
+    sel?.removeAllRanges();
+    sel?.addRange(range);
+  };
+
+  const insertMention = (idx: number) => {
+    const el = editorRef.current;
+    if (!el) return;
+    el.focus();
+    const sel = window.getSelection();
+    let range = mentionRangeRef.current;
+    // If we have a stored range covering the "@query", delete it
+    if (range) {
+      range.deleteContents();
+    } else if (sel && sel.rangeCount > 0) {
+      range = sel.getRangeAt(0);
+    } else {
+      placeCaretAtEnd();
+      range = window.getSelection()?.getRangeAt(0) ?? null;
+    }
+    if (!range) return;
+    const chip = buildChip(idx, referenceImages[idx]);
+    const space = document.createTextNode('\u00A0');
+    range.insertNode(space);
+    range.insertNode(chip);
+    // Move caret after the inserted space
+    const newRange = document.createRange();
+    newRange.setStartAfter(space);
+    newRange.collapse(true);
+    sel?.removeAllRanges();
+    sel?.addRange(newRange);
+    mentionRangeRef.current = null;
+    setMentionOpen(false);
+    syncPromptFromEditor();
+  };
+
+  const syncPromptFromEditor = () => {
+    const el = editorRef.current;
+    if (!el) return;
+    // Convert DOM to plain text — chips already contain "@Image N" as textContent
+    const text = (el.innerText || '').replace(/\u00A0/g, ' ');
+    setPrompt(text);
+  };
 
   const handleFiles = useCallback((files: FileList | File[]) => {
     const arr = Array.from(files).filter(f => f.type.startsWith('image/'));
