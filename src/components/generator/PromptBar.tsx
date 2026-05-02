@@ -263,11 +263,6 @@ export function PromptBar() {
             </button>
           </div>
 
-          {/* @ mention */}
-          <button className="ms-chip-glass grid place-items-center w-9 h-9 rounded-full text-foreground transition-all">
-            <AtSign className="w-3.5 h-3.5" />
-          </button>
-
           <div className="flex-1" />
         </div>
       </div>
