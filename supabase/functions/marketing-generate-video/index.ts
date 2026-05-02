@@ -232,9 +232,13 @@ async function buildReferenceBundle(admin: any, opts: {
   const productUrls = opts.productId ? await fetchProductImageUrls(admin, opts.productId, 7) : [];
   const avatarUrl = opts.avatarId ? await fetchAvatarImageUrl(admin, opts.avatarId) : null;
 
+  // Order matters for Seedance reference-to-video: product refs first, avatar
+  // (already wsrv-cropped to a 640x640 headshot) last. Putting a raw full-body
+  // avatar photo first is what Atlas's "may contain real person" moderator
+  // rejects. Keep extras after the avatar.
   const orderedRefs = uniqueValidUrls([
-    ...(avatarUrl ? [avatarUrl] : []),
     ...productUrls,
+    ...(avatarUrl ? [avatarUrl] : []),
     ...(opts.extraImageUrls ?? []),
   ], 9);
 
@@ -242,8 +246,8 @@ async function buildReferenceBundle(admin: any, opts: {
     mode: orderedRefs.length > 0 ? 'reference-to-video' : 'text-to-video',
     referenceImages: orderedRefs,
     referenceAudios: uniqueValidUrls(opts.audioSourceUrls ?? [], 3),
-    hasAvatar: !!opts.avatarId,
-    hasProduct: !!opts.productId,
+    hasAvatar: !!opts.avatarId && !!avatarUrl,
+    hasProduct: !!opts.productId && productUrls.length > 0,
   };
 }
 
