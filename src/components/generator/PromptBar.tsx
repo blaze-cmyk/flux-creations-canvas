@@ -95,30 +95,32 @@ export function PromptBar() {
           </div>
         )}
 
+        {referenceImages.length > 0 && (
+          <ReferenceImageStrip
+            images={referenceImages}
+            onAdd={() => fileInputRef.current?.click()}
+            onPreview={setPreviewImg}
+            onRemove={removeReferenceImage}
+            onReorder={reorderReferenceImages}
+          />
+        )}
+
         <div className="flex items-stretch gap-2">
-          {/* Left + button (upload reference) */}
-          <button
-            onClick={() => fileInputRef.current?.click()}
-            className="grid place-items-center w-9 h-9 self-start mt-1 rounded-lg ms-chip-glass text-foreground shrink-0"
-            aria-label="Add reference"
-          >
-            <Plus className="w-4 h-4" strokeWidth={1.5} />
-          </button>
+          {/* Left + button (upload reference) — only when no refs yet */}
+          {referenceImages.length === 0 && (
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              className="grid place-items-center w-9 h-9 self-start mt-1 rounded-lg ms-chip-glass text-foreground shrink-0"
+              aria-label="Add reference"
+            >
+              <Plus className="w-4 h-4" strokeWidth={1.5} />
+            </button>
+          )}
 
           <input ref={fileInputRef} type="file" accept="image/*" multiple className="hidden" onChange={handleFileUpload} />
 
           {/* Prompt area */}
           <div className="flex-1 min-w-0 flex flex-col gap-1.5 py-1 pr-1">
-            {referenceImages.length > 0 && (
-              <ReferenceImageStrip
-                images={referenceImages}
-                onAdd={() => fileInputRef.current?.click()}
-                onPreview={setPreviewImg}
-                onRemove={removeReferenceImage}
-                onReorder={reorderReferenceImages}
-              />
-            )}
-
             <textarea
               ref={textareaRef}
               value={prompt}
@@ -135,8 +137,8 @@ export function PromptBar() {
                 }
               }}
               rows={2}
-              placeholder="Describe the scene you imagine…"
-              className="w-full bg-transparent border-0 text-sm leading-[1.6] text-foreground placeholder:text-muted-foreground/70 focus:outline-none resize-none ms-prompt-scroll min-h-[56px] max-h-[220px] overflow-y-auto"
+              placeholder="Describe the scene you imagine"
+              className="w-full bg-transparent border-0 text-sm leading-[1.6] text-foreground placeholder:text-muted-foreground/70 focus:outline-none resize-none ms-prompt-scroll min-h-[44px] max-h-[220px] overflow-y-auto"
             />
           </div>
 
@@ -144,11 +146,11 @@ export function PromptBar() {
           <button
             onClick={handleSubmit}
             disabled={!prompt.trim()}
-            className="ms-cta self-start mt-1 flex items-center justify-center gap-1.5 h-[56px] px-6 rounded-2xl text-white text-[12px] font-extrabold tracking-wider disabled:opacity-50 disabled:cursor-not-allowed"
+            className="ms-cta self-stretch flex items-center justify-center gap-2 min-h-[88px] px-7 rounded-2xl text-white text-[15px] font-bold disabled:opacity-50 disabled:cursor-not-allowed shrink-0"
           >
-            GENERATE
-            <Sparkles className="w-3.5 h-3.5" />
-            <span className="text-[12px] font-bold opacity-95">{quantity}</span>
+            Generate
+            <Sparkles className="w-4 h-4" />
+            <span className="text-[15px] font-bold opacity-95">{quantity}</span>
           </button>
         </div>
 
