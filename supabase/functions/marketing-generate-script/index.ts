@@ -542,6 +542,31 @@ function isWeak(
     }
     // 7. Product fidelity — at least one concrete detail referenced.
     // (the global details check below also runs)
+    // 8. AVATAR-VOICE TASTE GATE — only fires when the chosen camera language uses an on-camera speaking avatar.
+    //    Detects haul/scarcity/try-on/quiet-handheld/vlog modes via the camera-language tag in the head.
+    const avatarVoiceModeRx = /\b(HAUL TRY-ON|SCARCITY DROP|FULL-SET REVEAL|VLOG SELFIE|JUMP-CUT HAUL|QUIET HANDHELD)\b/;
+    if (avatarVoiceModeRx.test(head)) {
+      // 8a. Named micro-actions — ≥2 hits from the influencer-haul vocabulary (the difference between real UGC and AI slop).
+      const MICRO_ACTIONS = /\b(nail[- ]tap|taps? (?:her |his )?(?:long )?(?:acrylic )?nails?|hair[- ]?fluff|fluffs? (?:her|his) hair|pulls? (?:her|his) hair (?:out from |from )?under(?:neath)? the (?:collar|hood|hoodie)|hugging[- ]self|hugs? (?:her|him)self|crosses? both arms|hood[- ]pull|pulls? the hood (?:up |over )|sleeve[- ]tug|tugs? (?:the |her |his )?sleeves?|pulls? (?:the |her |his )?sleeves? outward|index[- ]finger[- ]tap|taps? the (?:embossed |chest )?logo|points? (?:both |two )?index fingers? (?:down |at |into the lens)|chopping (?:hand )?gestures?|downward chop|360°? ?spin|playful (?:little )?spin|ta[- ]?da|throws? (?:both )?arms? out|leans? (?:in|forward) (?:to|toward) the (?:lens|camera)|hard cut|HARD CUT|rapid open[- ]palm|claps? (?:once |her hands? )?(?:on|together))\b/gi;
+      const microHits = (finalPrompt.match(MICRO_ACTIONS) || []).length;
+      if (microHits < 2) {
+        return { weak: true, reason: `unboxing avatar-voice mode needs ≥2 named micro-actions (nail-tap, hair-fluff, hugging-self, hood-pull, sleeve-tug, finger-tap-on-logo, chopping gestures, spin, ta-da, hard-cut) — got ${microHits}` };
+      }
+      // 8b. Spoken-line discipline — every quoted line ≤12 words (Comfrt-style conversational pacing).
+      //     Allow up to ONE longer line as a "rant" exception, but flag if 2+ are over.
+      const quoted = finalPrompt.match(/"([^"\n]{1,400})"/g) || [];
+      const longLines = quoted.filter((q) => {
+        const wc = q.replace(/^"|"$/g, '').trim().split(/\s+/).filter(Boolean).length;
+        return wc > 12;
+      });
+      if (quoted.length >= 2 && longLines.length >= 2) {
+        return { weak: true, reason: `unboxing avatar-voice mode: ${longLines.length} quoted lines exceed 12 words — keep dialogue conversational and short` };
+      }
+      // 8c. Em-dash / ellipsis pacing — real influencer speech has self-corrections and breath beats.
+      if (quoted.length >= 3 && !/[—…]/.test(finalPrompt)) {
+        return { weak: true, reason: 'unboxing avatar-voice mode missing em-dash or ellipsis pacing breaks (real speech has breath / self-corrections)' };
+      }
+    }
   } else {
     if (!/(switches to the back camera|back camera|close-up|macro|props the phone|jump cut|overhead|POV|sets the phone down|detail shot)/i.test(finalPrompt)) return { weak: true, reason: 'too static' };
   }
