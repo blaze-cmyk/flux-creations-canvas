@@ -542,29 +542,39 @@ function isWeak(
     }
     // 7. Product fidelity — at least one concrete detail referenced.
     // (the global details check below also runs)
-    // 8. AVATAR-VOICE TASTE GATE — only fires when the chosen camera language uses an on-camera speaking avatar.
-    //    Detects haul/scarcity/try-on/quiet-handheld/vlog modes via the camera-language tag in the head.
-    const avatarVoiceModeRx = /\b(HAUL TRY-ON|SCARCITY DROP|FULL-SET REVEAL|VLOG SELFIE|JUMP-CUT HAUL|QUIET HANDHELD)\b/;
-    if (avatarVoiceModeRx.test(head)) {
+    // 8. AVATAR-VOICE TASTE GATE — only fires for HIGH-ENERGY haul/scarcity/full-set/jump-cut/vlog modes.
+    //    QUIET HANDHELD is intentionally excluded: it's the ash-grey-tee whisper family — no nail-taps,
+    //    no 360° spins, no chopping gestures. Forcing those onto quiet luxury IS the AI slop we're killing.
+    const hauLEnergyRx = /\b(HAUL TRY-ON|SCARCITY DROP|FULL-SET REVEAL|JUMP-CUT HAUL)\b/;
+    if (hauLEnergyRx.test(head)) {
       // 8a. Named micro-actions — ≥2 hits from the influencer-haul vocabulary (the difference between real UGC and AI slop).
       const MICRO_ACTIONS = /\b(nail[- ]tap|taps? (?:her |his )?(?:long )?(?:acrylic )?nails?|hair[- ]?fluff|fluffs? (?:her|his) hair|pulls? (?:her|his) hair (?:out from |from )?under(?:neath)? the (?:collar|hood|hoodie)|hugging[- ]self|hugs? (?:her|him)self|crosses? both arms|hood[- ]pull|pulls? the hood (?:up |over )|sleeve[- ]tug|tugs? (?:the |her |his )?sleeves?|pulls? (?:the |her |his )?sleeves? outward|index[- ]finger[- ]tap|taps? the (?:embossed |chest )?logo|points? (?:both |two )?index fingers? (?:down |at |into the lens)|chopping (?:hand )?gestures?|downward chop|360°? ?spin|playful (?:little )?spin|ta[- ]?da|throws? (?:both )?arms? out|leans? (?:in|forward) (?:to|toward) the (?:lens|camera)|hard cut|HARD CUT|rapid open[- ]palm|claps? (?:once |her hands? )?(?:on|together))\b/gi;
       const microHits = (finalPrompt.match(MICRO_ACTIONS) || []).length;
       if (microHits < 2) {
-        return { weak: true, reason: `unboxing avatar-voice mode needs ≥2 named micro-actions (nail-tap, hair-fluff, hugging-self, hood-pull, sleeve-tug, finger-tap-on-logo, chopping gestures, spin, ta-da, hard-cut) — got ${microHits}` };
+        return { weak: true, reason: `unboxing haul-energy mode needs ≥2 named micro-actions (nail-tap, hair-fluff, hugging-self, hood-pull, sleeve-tug, finger-tap-on-logo, chopping gestures, spin, ta-da, hard-cut) — got ${microHits}` };
       }
       // 8b. Spoken-line discipline — every quoted line ≤12 words (Comfrt-style conversational pacing).
-      //     Allow up to ONE longer line as a "rant" exception, but flag if 2+ are over.
       const quoted = finalPrompt.match(/"([^"\n]{1,400})"/g) || [];
       const longLines = quoted.filter((q) => {
         const wc = q.replace(/^"|"$/g, '').trim().split(/\s+/).filter(Boolean).length;
         return wc > 12;
       });
       if (quoted.length >= 2 && longLines.length >= 2) {
-        return { weak: true, reason: `unboxing avatar-voice mode: ${longLines.length} quoted lines exceed 12 words — keep dialogue conversational and short` };
+        return { weak: true, reason: `unboxing haul-energy mode: ${longLines.length} quoted lines exceed 12 words — keep dialogue conversational and short` };
       }
-      // 8c. Em-dash / ellipsis pacing — real influencer speech has self-corrections and breath beats.
+      // 8c. Em-dash / ellipsis pacing.
       if (quoted.length >= 3 && !/[—…]/.test(finalPrompt)) {
-        return { weak: true, reason: 'unboxing avatar-voice mode missing em-dash or ellipsis pacing breaks (real speech has breath / self-corrections)' };
+        return { weak: true, reason: 'unboxing haul-energy mode missing em-dash or ellipsis pacing breaks (real speech has breath / self-corrections)' };
+      }
+    }
+    // 8d. QUIET-WHISPER GATE — fires for QUIET HANDHELD / VLOG SELFIE / EDITORIAL PAN.
+    //     These need the OPPOSITE: short whispered lines, ≤14 words, no chopping/spin/ta-da.
+    const quietWhisperRx = /\b(QUIET HANDHELD|VLOG SELFIE|EDITORIAL PAN)\b/;
+    if (quietWhisperRx.test(head)) {
+      const FORBIDDEN_HAUL_GESTURES = /\b(360°? ?spin|ta[- ]?da|chopping (?:hand )?gestures?|downward chop|throws? (?:both )?arms? out|rapid open[- ]palm|claps? (?:once |her hands? )?(?:on|together))\b/i;
+      const hauLeak = finalPrompt.match(FORBIDDEN_HAUL_GESTURES);
+      if (hauLeak) {
+        return { weak: true, reason: `quiet-whisper mode contains haul-energy gesture "${hauLeak[0]}" — these belong only in HAUL TRY-ON / SCARCITY DROP / FULL-SET REVEAL` };
       }
     }
   } else {
