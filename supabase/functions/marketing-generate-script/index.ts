@@ -254,6 +254,9 @@ Use this palette as a starting point. INVENT MORE if the product deserves someth
 
 For each of your 3+ options name ONE reason it FITS this product and ONE reason it MIGHT NOT. Pick the winner. Commit fully. Write the script in THAT camera language. The opening line of your final paragraph MUST explicitly name the chosen camera language so the structural gate can verify you committed (e.g. "TOP-DOWN ASMR — 10-second vertical 9:16…", "THEATRICAL REVEAL — A 15-second…", "HAUL TRY-ON — A 60-second vertical 9:16 UGC haul…", "SCARCITY DROP — A 22-second…", or your own invented tag in the same SHOUTY-CAPS — em-dash form).
 
+STEP 2B — DIRECT THE CINEMATOGRAPHY, NOT JUST THE DIALOGUE.
+Before writing, silently choose a real SCENE LANGUAGE that fits the product: cozy desk by window, white silk flat-lay, quiet oak table, lived-in bedroom, aesthetic gym, studio workbench, car-seat street drop, picnic blanket, cafe table, concrete gallery plinth, etc. Cinematography is the main taste signal. The final prompt MUST name the surface, motivated light source, lens/camera feel, hand/avatar blocking, frame composition, background life, and color harmony. Never write generic "cinematic", "aesthetic", "clean setup", or "beautiful background" unless you have named the actual room/surface/light/props that make it cinematic. The reference prompts are good because the scenery feels real: wooden desk + sage sleeves, white silk + red box, gym lighting + tired breath, ash-grey tee + oak table. Match that level.
+
 STEP 3 — DECIDE WHO UNBOXES IT.
 - AVATAR PROVIDED → cast them. Their persona drives the dialogue voice (= CREATOR_PERSONA). Outfit, hands, posture must visually fit the chosen camera language and product palette.
 - NO AVATAR → invent the hands/persona that visually FITS the product (sage sweater sleeves for cozy collectibles, bare wrist with one thin gold ring for fine jewelry, oversized hoodie sleeves for streetwear, a man's plain ash-grey crew tee + leather watch for quiet-luxury small goods). Match nail color and sleeve color to the product palette.
@@ -279,7 +282,7 @@ DIALOGUE — driven by camera language, NEVER by template:
 - All spoken lines in double quotes, attributed to the speaker by action
 - The dialogue serves the reveal — never narrates "okay so I just got this box" ad-style
 
-AVATAR-VOICE TASTE (when the chosen camera language uses an on-camera avatar speaking — HAUL TRY-ON, SCARCITY DROP, FULL-SET REVEAL, VLOG SELFIE, JUMP-CUT HAUL, QUIET HANDHELD): the script MUST stage AT LEAST 2 named authentic micro-actions from this vocabulary, written as physical stage directions in the beats: nail-tap on the unopened polymailer/box (ASMR cue at the hook), hair-fluff or hair-pull-out-from-under-collar after putting the piece on, hugging-self into the fabric to demo roominess/comfort, hood-pull-overhead in one swift motion, sleeve-tug-outward to show extra fabric, index-finger-tap on the embossed logo to draw the eye, both-index-fingers-down at the chest naming the color, downward-chop-gesture on the scarcity word, both-fingers-pointing-into-lens on the CTA, 360°-spin to show the back, ta-da open-palms close, leans-into-lens-then-hard-cut. These are the difference between a real influencer haul and AI slop. Mirror the Comfrt-style references: hook (frantic energy, packaging-as-anticipation, nail-tap, opens with a real reaction line), hard-cut to try-on, tactile demos that physically prove the product claim ("hugging-self" proves "wrapped in a blanket"), optional scarcity CTA close. Optional sizing tip when product is wearable ("I'm 5'2, wearing a small").
+AVATAR-VOICE TASTE is family-specific, never universal. HIGH-ENERGY fashion/avatar families (HAUL TRY-ON, SCARCITY DROP, FULL-SET REVEAL, JUMP-CUT HAUL) MUST stage at least 2 named authentic micro-actions from this vocabulary: nail-tap on the unopened polymailer/box, hair-fluff or hair-pull-out-from-under-collar after putting the piece on, hugging-self into the fabric, hood-pull-overhead, sleeve-tug-outward, index-finger-tap on the embossed logo, both-index-fingers-down at the chest naming the color, downward-chop-gesture on the scarcity word, both-fingers-pointing-into-lens on the CTA, 360°-spin, ta-da open-palms close, leans-into-lens-then-hard-cut. QUIET avatar families (QUIET HANDHELD, EDITORIAL PAN, VLOG SELFIE when not fashion) must NOT use haul gestures; they use restrained physical blocking instead: fingertip tracing embossing, lid lifted with both hands, tissue folded back, product turned toward window light, thumb across a finished edge, small breath, quiet half-smile. Silent ASMR families use no avatar-voice gate at all.
 
 PRODUCT FIDELITY: the script MUST mention at least 4 concrete details from the product images verbatim (exact colors named, materials, hardware pieces, printed text exactly as on the product, distinctive features). NEVER invent details that aren't visible.
 
@@ -532,7 +535,14 @@ function isWeak(
     const SOUND_VOCAB = /\b(cardboard|tissue|foam|sticker peel|ribbon|hollow|magnetic|seam|crinkle|whisper|click|pop|thunk|rustle|chain shimmer|leather creak|glass clink|plastic shrink)\b/gi;
     const soundHits = (finalPrompt.match(SOUND_VOCAB) || []).length;
     if (soundHits < 2) return { weak: true, reason: `unboxing needs ≥2 specific sound-vocabulary hits (got ${soundHits})` };
-    // 6. Packaging-as-hero — ≥1 packaging noun must appear before the first time-anchor beat.
+    // 6. Cinematography specificity — the scene must feel DIRECTED, not generic AI "cinematic" slop.
+    const SCENE_TEXTURE = /\b(wooden desk|oak table|white silk|satin|window daylight|natural daylight|diffused daylight|gym lighting|front camera|overhead|top-down|handheld|iPhone|macro|35mm|50mm|shallow depth|camera-left|side window|golden-hour|practical light|sweater sleeves|ring|watch|table surface|flatlay|plinth|workbench|bedroom|kitchen|cafe|park bench|picnic blanket|car seat|studio|concrete|linen|velvet|leather|ribbon trails?|foam insert|tissue paper|polymailer|box centered)\b/gi;
+    const sceneHits = (finalPrompt.match(SCENE_TEXTURE) || []).length;
+    if (sceneHits < 3) return { weak: true, reason: `unboxing cinematography needs ≥3 concrete scene/light/surface details (got ${sceneHits})` };
+    const genericCineRx = /\b(generic cinematic|cinematic background|aesthetic background|clean setup|beautiful setup|premium background|minimal setup)\b/i;
+    const genericCineHit = finalPrompt.match(genericCineRx);
+    if (genericCineHit) return { weak: true, reason: `unboxing contains generic cinematography slop: "${genericCineHit[0]}"` };
+    // 7. Packaging-as-hero — ≥1 packaging noun must appear before the first time-anchor beat.
     const firstBeatIdx = finalPrompt.search(/\b\d{1,2}(?:\.\d)?\s*[–-]\s*\d{1,2}(?:\.\d)?\s*s/i);
     if (firstBeatIdx > 0) {
       const preamble = finalPrompt.slice(0, firstBeatIdx);
@@ -540,9 +550,9 @@ function isWeak(
         return { weak: true, reason: 'unboxing missing packaging description before first beat (packaging-as-hero rule)' };
       }
     }
-    // 7. Product fidelity — at least one concrete detail referenced.
+    // 8. Product fidelity — at least one concrete detail referenced.
     // (the global details check below also runs)
-    // 8. AVATAR-VOICE TASTE GATE — only fires for HIGH-ENERGY haul/scarcity/full-set/jump-cut/vlog modes.
+    // 9. AVATAR-VOICE TASTE GATE — only fires for HIGH-ENERGY haul/scarcity/full-set/jump-cut modes.
     //    QUIET HANDHELD is intentionally excluded: it's the ash-grey-tee whisper family — no nail-taps,
     //    no 360° spins, no chopping gestures. Forcing those onto quiet luxury IS the AI slop we're killing.
     const hauLEnergyRx = /\b(HAUL TRY-ON|SCARCITY DROP|FULL-SET REVEAL|JUMP-CUT HAUL)\b/;
@@ -978,7 +988,8 @@ Deno.serve(async (req) => {
       'TOP-DOWN ASMR', 'THEATRICAL REVEAL', 'VLOG SELFIE', 'QUIET HANDHELD',
       'EDITORIAL PAN', 'JUMP-CUT HAUL', 'STREET DOC', 'TABLETOP CINEMATIC',
       'POV FIRST-PERSON', 'MACRO TACTILE', 'OVERHEAD STILL-LIFE', 'OUTDOOR DAYLIGHT',
-      'HAUL TRY-ON', 'SCARCITY DROP', 'FULL-SET REVEAL',
+      'BEDROOM WINDOW UGC', 'WORKBENCH MACRO', 'CAFE TABLE REVEAL', 'CAR-SEAT STREET DROP',
+      'GOLDEN-HOUR FLATLAY', 'GALLERY PLINTH REVEAL', 'HAUL TRY-ON', 'SCARCITY DROP', 'FULL-SET REVEAL',
     ];
     const productBlob = `${productMeta?.name || ''} ${productMeta?.description || ''}`.toLowerCase();
     const taxonomyHints: string[] = [];
@@ -1009,20 +1020,20 @@ Deno.serve(async (req) => {
     if (isCollectible || isJewelry) {
       weightedPalette = [
         'TOP-DOWN ASMR', 'THEATRICAL REVEAL', 'MACRO TACTILE', 'OVERHEAD STILL-LIFE',
-        'TABLETOP CINEMATIC', 'POV FIRST-PERSON', 'QUIET HANDHELD', 'EDITORIAL PAN',
+        'GOLDEN-HOUR FLATLAY', 'TABLETOP CINEMATIC', 'POV FIRST-PERSON', 'QUIET HANDHELD',
       ];
     } else if (isQuietLux || isBeauty || isTech) {
       weightedPalette = [
-        'QUIET HANDHELD', 'TABLETOP CINEMATIC', 'EDITORIAL PAN', 'TOP-DOWN ASMR',
-        'MACRO TACTILE', 'POV FIRST-PERSON', 'OVERHEAD STILL-LIFE', 'STREET DOC',
+        'QUIET HANDHELD', 'TABLETOP CINEMATIC', 'EDITORIAL PAN', 'WORKBENCH MACRO',
+        'CAFE TABLE REVEAL', 'GALLERY PLINTH REVEAL', 'MACRO TACTILE', 'STREET DOC',
       ];
     } else if (isFashion) {
       // Fashion is the ONE category where haul/try-on energy is on-brand.
       // Still seed a quiet option first so Claude can pick silent ASMR if the
       // packaging/product personality calls for it (e.g. quiet-luxury fashion).
       weightedPalette = [
-        'HAUL TRY-ON', 'SCARCITY DROP', 'FULL-SET REVEAL', 'VLOG SELFIE',
-        'JUMP-CUT HAUL', 'QUIET HANDHELD', 'EDITORIAL PAN', 'OUTDOOR DAYLIGHT',
+        'BEDROOM WINDOW UGC', 'HAUL TRY-ON', 'SCARCITY DROP', 'FULL-SET REVEAL',
+        'VLOG SELFIE', 'JUMP-CUT HAUL', 'QUIET HANDHELD', 'CAR-SEAT STREET DROP',
       ];
     } else if (isUsedNotOpened) {
       weightedPalette = [
@@ -1041,6 +1052,7 @@ Deno.serve(async (req) => {
       ? `\nUNBOXING CREATIVE BRIEF — DO STEPS 1–4 SILENTLY, OUTPUT ONLY THE FINAL PARAGRAPH.\n` +
         `STEP 1 — name in one phrase what THIS product IS. ${taxonomyHints.length ? `Lightweight taxonomy hint: ${taxonomyHints.join(' / ')}.` : 'No taxonomy hint — read the images.'}\n` +
         `STEP 2 — propose 3+ camera-language options that could honor THIS specific product+avatar combo. PRIMARY palette for this product (ordered by fit, but you are NOT capped — invent a hybrid or a brand-new tag if it serves the product better): ${shuffledTop.join(' · ')}. For each option name ONE reason it FITS and ONE reason it MIGHT NOT. Pick the winner.\n` +
+        `CINEMATOGRAPHY IS THE MAIN THING: before writing, choose a real scene language and make it visible in the prompt — surface, motivated light, lens/camera feel, frame composition, background life, hand/avatar blocking, color harmony. Good examples: light wooden desk + sage sweater sleeves for a toy; white silk + warm diffused daylight for jewelry; ash-grey tee + oak table + window light for quiet luxury; iPhone front camera + modern aesthetic gym + tired breath for equipment; lived-in bedroom window UGC only when fashion needs it. Bad examples: generic cinematic, aesthetic background, clean setup, random voiceover in a blank room.\n` +
         `IMPORTANT — match the product's personality. Collectibles, jewelry, quiet-luxury small goods, ceramics, fragrances, stationery → almost always SILENT or quiet-whisper families (TOP-DOWN ASMR, THEATRICAL REVEAL, MACRO TACTILE, QUIET HANDHELD, TABLETOP CINEMATIC). Fashion drops, multi-piece sets, sneaker drops, streetwear, lingerie haul → high-energy avatar families (HAUL TRY-ON, SCARCITY DROP, FULL-SET REVEAL). Used-not-opened gear (gym bike, blender, camera) → VLOG SELFIE / STREET DOC, the product is unboxed by being USED. NEVER force haul-energy onto a quiet collectible. NEVER force silent ASMR onto a fashion drop the user clearly wants try-on energy for.\n` +
         `STEP 3 — commit to that camera language. The opening line of your final paragraph MUST start with the camera-language tag in caps, an em-dash, then the duration ("TOP-DOWN ASMR — 10-second vertical 9:16…"). The structural gate verifies this.\n` +
         `STEP 4 — write the script in the exact shape of the REFERENCE LIBRARY: one-line camera/style header → setting+packaging+product paragraph (≥30% of words on the unopened packaging) → ${beatCount} timestamped beats with windows ${beatWindows.join(', ')}, each beat = action + named sound + sensory verb → closing style line.\n` +
