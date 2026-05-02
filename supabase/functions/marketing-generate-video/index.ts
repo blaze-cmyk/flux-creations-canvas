@@ -308,6 +308,7 @@ async function pollAtlas(requestId: string): Promise<{
   status: 'running' | 'done' | 'failed';
   videoUrl?: string | null;
   error?: string;
+  failureCode?: 'real_person' | 'nsfw' | 'other';
 }> {
   const res = await fetch(`https://api.atlascloud.ai/api/v1/model/prediction/${requestId}`, {
     headers: { Authorization: `Bearer ${ATLAS_KEY}` },
@@ -317,10 +318,14 @@ async function pollAtlas(requestId: string): Promise<{
   if (status === 'completed' || status === 'succeeded') {
     const out = json?.data?.outputs?.[0];
     const videoUrl = typeof out === 'string' ? out : out?.url ?? null;
-    return videoUrl ? { status: 'done', videoUrl } : { status: 'failed', error: 'No video in outputs' };
+    return videoUrl ? { status: 'done', videoUrl } : { status: 'failed', error: 'No video in outputs', failureCode: 'other' };
   }
   if (status === 'failed') {
-    return { status: 'failed', error: json?.data?.error || 'AtlasCloud reported failure' };
+    const errMsg = String(json?.data?.error || json?.message || 'AtlasCloud reported failure');
+    let failureCode: 'real_person' | 'nsfw' | 'other' = 'other';
+    if (/real person|likeness|celebrity/i.test(errMsg)) failureCode = 'real_person';
+    else if (/nsfw|unsafe|policy/i.test(errMsg)) failureCode = 'nsfw';
+    return { status: 'failed', error: errMsg, failureCode };
   }
   return { status: 'running' };
 }
