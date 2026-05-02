@@ -20,24 +20,20 @@ export function ImageGrid() {
 
   if (images.length === 0) {
     return (
-      <div className="flex items-center justify-center h-full text-muted-foreground text-sm">
+      <div className="flex items-center justify-center min-h-[60vh] text-muted-foreground text-sm">
         <div className="text-center space-y-2">
-          <p className="text-lg">Start creating</p>
-          <p className="text-xs text-muted-foreground/60">Type a prompt below and click Generate</p>
+          <p className="text-lg text-foreground font-semibold">No generations yet</p>
+          <p className="text-xs text-muted-foreground/70">Describe what you want below to get started.</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="h-full overflow-y-auto p-3">
-      <div className="grid grid-cols-[repeat(auto-fill,minmax(220px,1fr))] gap-2">
-        {images.map((img) => (
-          <div key={img.id} className="break-inside-avoid mb-2">
-            <ImageCard image={img} />
-          </div>
-        ))}
-      </div>
+    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5 gap-2">
+      {images.map((img) => (
+        <ImageCard key={img.id} image={img} />
+      ))}
     </div>
   );
 }
@@ -100,10 +96,11 @@ function ImageCard({ image }: {
   // Generating state
   if (image.status === 'generating') {
     return (
-      <div className={`relative ${aspectClass} rounded-xl overflow-hidden bg-card border border-border flex items-center justify-center`}>
-        <div className="flex flex-col items-center gap-2">
-          <Loader2 className="w-6 h-6 text-primary animate-spin" />
-          <span className="text-xs text-muted-foreground">Generating...</span>
+      <div className={`relative ${aspectClass} rounded-xl overflow-hidden bg-ms-surface-2 ring-1 ring-ms-border flex items-center justify-center`}>
+        <div className="absolute inset-0 ms-shimmer opacity-40" />
+        <div className="relative flex flex-col items-center gap-2">
+          <Loader2 className="w-6 h-6 text-foreground animate-spin" />
+          <span className="text-[11px] uppercase tracking-wider text-muted-foreground">Generating…</span>
         </div>
       </div>
     );
@@ -112,7 +109,7 @@ function ImageCard({ image }: {
   // Failed / NSFW state
   if (image.status === 'failed' || image.status === 'nsfw') {
     return (
-      <div className={`relative ${aspectClass} rounded-xl overflow-hidden bg-card border border-border flex flex-col items-center justify-center gap-3 p-3`}>
+      <div className={`relative ${aspectClass} rounded-xl overflow-hidden bg-ms-surface-2 ring-1 ring-ms-border flex flex-col items-center justify-center gap-3 p-3`}>
         <div className="flex items-center gap-1.5">
           {image.status === 'failed' ? (
             <span className="flex items-center gap-1 bg-destructive/80 text-destructive-foreground text-[10px] px-2 py-0.5 rounded-full font-medium">
@@ -151,7 +148,7 @@ function ImageCard({ image }: {
 
   return (
     <div
-      className={`group relative ${containerClass} rounded-xl overflow-hidden bg-card border border-border hover:border-foreground/20 transition-colors cursor-pointer`}
+      className={`group relative ${containerClass} rounded-xl overflow-hidden bg-ms-surface-2 ring-1 ring-ms-border hover:ring-foreground/30 transition-all cursor-pointer`}
       style={style}
       onClick={() => setSelectedImageId(image.id)}
     >
