@@ -137,8 +137,7 @@ export function PromptBar() {
             <button
               onClick={handleSubmit}
               disabled={!prompt.trim()}
-              className="shrink-0 flex items-center gap-1.5 font-semibold text-sm px-5 py-2.5 rounded-xl transition-opacity disabled:opacity-40 disabled:cursor-not-allowed bg-[#ff2e77]"
-              style={{ color: 'hsl(var(--primary-foreground))' }}
+              className="ms-cta shrink-0 flex items-center gap-1.5 font-semibold text-sm text-white px-5 py-2.5 rounded-xl transition-opacity disabled:opacity-40 disabled:cursor-not-allowed"
             >
               Generate
               <span className="text-xs opacity-70">✦ {quantity}</span>
