@@ -109,8 +109,8 @@ export function VideoPromptBar() {
             <button
               onClick={handleSubmit}
               disabled={!prompt.trim() && mode === 'text-to-video'}
-              className="shrink-0 flex items-center gap-1.5 font-semibold text-sm px-5 py-2.5 rounded-xl transition-opacity disabled:opacity-40 disabled:cursor-not-allowed"
-              style={{ backgroundColor: 'hsl(var(--primary))', color: 'hsl(var(--primary-foreground))' }}
+              className="shrink-0 flex items-center gap-1.5 font-semibold text-sm px-5 py-2.5 rounded-xl transition-opacity disabled:opacity-40 disabled:cursor-not-allowed bg-[#ff2e77]"
+              style={{ color: 'hsl(var(--primary-foreground))' }}
             >
               <Play className="w-3.5 h-3.5" />
               Generate
