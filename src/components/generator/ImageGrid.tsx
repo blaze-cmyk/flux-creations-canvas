@@ -1,7 +1,7 @@
 import { useGeneratorStore } from '@/store/generatorStore';
-import { useLayoutStore, ZOOM_COLUMNS } from '@/store/layoutStore';
+import { useLayoutStore, ZOOM_TILE_WIDTHS } from '@/store/layoutStore';
 import { AlertCircle, Eye, RefreshCw, Trash2, Loader2, Download, Link2, Heart, MoreHorizontal, Maximize2 } from 'lucide-react';
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useLayoutEffect, useMemo } from 'react';
 
 // Build a resized variant of a Supabase Storage public URL using the
 // `/render/image/` transform endpoint. Falls back to original on non-Supabase URLs.
@@ -16,9 +16,56 @@ function thumbUrl(url: string | undefined, width = 480, quality = 70): string | 
   return url;
 }
 
+function parseRatio(ar: string): number {
+  const [w, h] = ar.split(':').map(Number);
+  if (!w || !h) return 3 / 4;
+  return w / h;
+}
+
 export function ImageGrid() {
   const { images } = useGeneratorStore();
   const zoom = useLayoutStore((s) => s.zoom);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [containerWidth, setContainerWidth] = useState(0);
+
+  useLayoutEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver(([entry]) => {
+      setContainerWidth(entry.contentRect.width);
+    });
+    ro.observe(el);
+    setContainerWidth(el.clientWidth);
+    return () => ro.disconnect();
+  }, []);
+
+  const gap = 8;
+  const targetWidth = ZOOM_TILE_WIDTHS[zoom];
+  const columnCount = Math.max(1, Math.min(8, Math.round(containerWidth / targetWidth) || 1));
+  const colWidth = containerWidth > 0
+    ? (containerWidth - gap * (columnCount - 1)) / columnCount
+    : 0;
+
+  // Order is preserved (newest first as supplied by store). We assign each
+  // item to the currently shortest column so latest generations always land
+  // on the top row instead of all stacking in the leftmost column.
+  const layout = useMemo(() => {
+    if (!colWidth) return { items: [] as Array<{ id: string; left: number; top: number; height: number }>, totalHeight: 0 };
+    const heights = new Array(columnCount).fill(0) as number[];
+    const items = images.map((img) => {
+      const ratio = parseRatio(img.aspectRatio);
+      const h = colWidth / ratio;
+      // pick shortest column
+      let col = 0;
+      for (let i = 1; i < columnCount; i++) if (heights[i] < heights[col]) col = i;
+      const top = heights[col];
+      const left = col * (colWidth + gap);
+      heights[col] = top + h + gap;
+      return { id: img.id, left, top, height: h };
+    });
+    const totalHeight = Math.max(0, ...heights) - gap;
+    return { items, totalHeight };
+  }, [images, colWidth, columnCount]);
 
   if (images.length === 0) {
     return (
@@ -32,12 +79,19 @@ export function ImageGrid() {
   }
 
   return (
-    <div className={`${ZOOM_COLUMNS[zoom]} gap-2 [column-fill:_balance]`}>
-      {images.map((img) => (
-        <div key={img.id} className="mb-2 break-inside-avoid">
-          <ImageCard image={img} />
-        </div>
-      ))}
+    <div ref={containerRef} className="relative w-full" style={{ height: layout.totalHeight }}>
+      {layout.items.map((pos, i) => {
+        const img = images[i];
+        return (
+          <div
+            key={img.id}
+            className="absolute"
+            style={{ left: pos.left, top: pos.top, width: colWidth, height: pos.height }}
+          >
+            <ImageCard image={img} />
+          </div>
+        );
+      })}
     </div>
   );
 }
