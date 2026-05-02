@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { Menu, X, Bell, Gem, User } from 'lucide-react';
 import logoWhite from '@/assets/korsola-logo-white.png';
 import logoPink from '@/assets/korsola-logo-pink.png';
+import { useLayoutStore } from '@/store/layoutStore';
 
 // TODO: replace with real auth state
 const isLoggedIn = false;
@@ -72,6 +73,7 @@ export function GlobalHeader() {
 
         {/* Right: auth / actions */}
         <div className="flex items-center gap-2">
+          {location.pathname.startsWith('/image') && <LayoutZoomSlider />}
           {!isLoggedIn ? (
             <>
               <button className="hidden sm:flex items-center gap-1.5 px-4 h-10 rounded-2xl text-sm font-semibold text-foreground hover:bg-muted/50 relative transition-colors">
