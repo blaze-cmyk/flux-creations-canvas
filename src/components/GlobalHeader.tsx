@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { Menu, X, Bell, Gem, User } from 'lucide-react';
 import logoWhite from '@/assets/korsola-logo-white.png';
 import logoPink from '@/assets/korsola-logo-pink.png';
+import { useLayoutStore } from '@/store/layoutStore';
 
 // TODO: replace with real auth state
 const isLoggedIn = false;
@@ -72,6 +73,7 @@ export function GlobalHeader() {
 
         {/* Right: auth / actions */}
         <div className="flex items-center gap-2">
+          {location.pathname.startsWith('/image') && <LayoutZoomSlider />}
           {!isLoggedIn ? (
             <>
               <button className="hidden sm:flex items-center gap-1.5 px-4 h-10 rounded-2xl text-sm font-semibold text-foreground hover:bg-muted/50 relative transition-colors">
@@ -152,3 +154,29 @@ export function GlobalHeader() {
     </header>
   );
 }
+
+function LayoutZoomSlider() {
+  const zoom = useLayoutStore((s) => s.zoom);
+  const setZoom = useLayoutStore((s) => s.setZoom);
+  const max = 4;
+  const pct = (zoom / max) * 100;
+  return (
+    <div
+      className="hidden md:flex items-center h-10 px-3 rounded-2xl bg-muted/40 hover:bg-muted/60 transition-colors"
+      title="Adjust grid size"
+    >
+      <input
+        type="range"
+        min={0}
+        max={max}
+        step={1}
+        value={zoom}
+        onChange={(e) => setZoom(parseInt(e.target.value, 10))}
+        aria-label="Grid size"
+        className="ms-zoom-slider w-28 cursor-pointer"
+        style={{ background: `linear-gradient(to right, hsl(var(--primary)) 0%, hsl(var(--primary)) ${pct}%, hsl(0 0% 100% / 0.12) ${pct}%, hsl(0 0% 100% / 0.12) 100%)` }}
+      />
+    </div>
+  );
+}
+
