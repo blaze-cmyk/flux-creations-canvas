@@ -18,6 +18,7 @@ export function PromptBar() {
   const containerRef = useRef<HTMLDivElement>(null);
   const [modelOpen, setModelOpen] = useState(false);
   const [aspectOpen, setAspectOpen] = useState(false);
+  const [qualityOpen, setQualityOpen] = useState(false);
   const [modelSearch, setModelSearch] = useState('');
   const [dragging, setDragging] = useState(false);
   const [freeGens, setFreeGens] = useState(false);
@@ -214,7 +215,7 @@ export function PromptBar() {
           </Popover>
 
           {/* Quality */}
-          <Popover>
+          <Popover open={qualityOpen} onOpenChange={setQualityOpen}>
             <PopoverTrigger asChild>
               <button className="ms-chip-glass flex items-center gap-1.5 px-3.5 h-9 rounded-full text-xs text-foreground transition-all">
                 <Heart className="w-3.5 h-3.5 text-muted-foreground" />
@@ -231,7 +232,7 @@ export function PromptBar() {
               {QUALITIES.map((q) => (
                 <button
                   key={q}
-                  onClick={() => setQuality(q)}
+                  onClick={() => { setQuality(q); setQualityOpen(false); }}
                   className={`w-full flex items-center justify-between px-2.5 py-2 rounded-lg text-sm transition-colors ${
                     quality === q ? 'bg-white/10 text-white' : 'text-white/85 hover:bg-white/5'
                   }`}
