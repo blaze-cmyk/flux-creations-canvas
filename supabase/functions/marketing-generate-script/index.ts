@@ -247,8 +247,12 @@ Use this palette as a starting point. INVENT MORE if the product deserves someth
   • MACRO TACTILE        — extreme close-ups of fingertip on texture, no wide shots ever
   • OVERHEAD STILL-LIFE  — the unboxing as a slow flat-lay rearrangement, almost food-styling
   • OUTDOOR DAYLIGHT     — opening on a picnic blanket, beach towel, park bench — natural setting
+  • HAUL TRY-ON          — bedroom selfie energy, frantic-hype hook → packaging tear → hard-cut try-on demo → scarcity CTA, dialogue-led, ≤12-word lines, named tactile micro-actions (nail-tap on bag, hair-fluff out of collar, hugging-self in fabric, hood-pull, sleeve-tug, 360° spin, ta-da)
+  • SCARCITY DROP        — short avatar selfie, 15–25s, restock/just-launched energy, one product, urgency CTA close ("if you see your size, run"), 1 packaging beat + 1 try-on beat + 1 scarcity beat
+  • FULL-SET REVEAL      — avatar unboxes a multi-piece set (hoodie + pants, top + bottom, full kit) on a bed or table, names each piece individually, sizing tip in the close ("I'm 5'2 in a small")
+  • Or invent something new entirely — a hybrid (silent ASMR open → hard cut to avatar try-on → scarcity CTA), an unconventional setting, an inversion. The palette is a launchpad, never a cage.
 
-For each of your 3+ options name ONE reason it FITS this product and ONE reason it MIGHT NOT. Pick the winner. Commit fully. Write the script in THAT camera language. The opening line of your final paragraph MUST explicitly name the chosen camera language so the structural gate can verify you committed (e.g. "TOP-DOWN ASMR — 10-second vertical 9:16…", "THEATRICAL REVEAL — A 15-second…", "VLOG SELFIE — Style: UGC, …", "EDITORIAL PAN — A 12-second…").
+For each of your 3+ options name ONE reason it FITS this product and ONE reason it MIGHT NOT. Pick the winner. Commit fully. Write the script in THAT camera language. The opening line of your final paragraph MUST explicitly name the chosen camera language so the structural gate can verify you committed (e.g. "TOP-DOWN ASMR — 10-second vertical 9:16…", "THEATRICAL REVEAL — A 15-second…", "HAUL TRY-ON — A 60-second vertical 9:16 UGC haul…", "SCARCITY DROP — A 22-second…", or your own invented tag in the same SHOUTY-CAPS — em-dash form).
 
 STEP 3 — DECIDE WHO UNBOXES IT.
 - AVATAR PROVIDED → cast them. Their persona drives the dialogue voice (= CREATOR_PERSONA). Outfit, hands, posture must visually fit the chosen camera language and product palette.
