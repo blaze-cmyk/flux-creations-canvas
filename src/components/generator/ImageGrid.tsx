@@ -154,7 +154,7 @@ function ImageCard({ image }: {
   // Generating state
   if (image.status === 'generating') {
     return (
-      <div className={`relative ${aspectClass} rounded-xl overflow-hidden bg-ms-surface-2 ring-1 ring-ms-border flex items-center justify-center`}>
+      <div className="relative w-full h-full rounded-xl overflow-hidden bg-ms-surface-2 ring-1 ring-ms-border flex items-center justify-center">
         <div className="absolute inset-0 ms-shimmer opacity-40" />
         <div className="relative flex flex-col items-center gap-2">
           <Loader2 className="w-6 h-6 text-foreground animate-spin" />
@@ -167,7 +167,7 @@ function ImageCard({ image }: {
   // Failed / NSFW state
   if (image.status === 'failed' || image.status === 'nsfw') {
     return (
-      <div className={`relative ${aspectClass} rounded-xl overflow-hidden bg-ms-surface-2 ring-1 ring-ms-border flex flex-col items-center justify-center gap-3 p-3`}>
+      <div className="relative w-full h-full rounded-xl overflow-hidden bg-ms-surface-2 ring-1 ring-ms-border flex flex-col items-center justify-center gap-3 p-3">
         <div className="flex items-center gap-1.5">
           {image.status === 'failed' ? (
             <span className="flex items-center gap-1 bg-destructive/80 text-destructive-foreground text-[10px] px-2 py-0.5 rounded-full font-medium">
