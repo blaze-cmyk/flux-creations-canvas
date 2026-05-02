@@ -601,7 +601,11 @@ function isWeak(
 // We use the public wsrv.nl image proxy to convert any format to PNG on the fly.
 const ANTHROPIC_OK = new Set(['image/jpeg', 'image/png', 'image/gif', 'image/webp']);
 
+// Anthropic hard-caps base64 images at 5 MB. We always route through wsrv.nl with
+// a width cap + JPEG quality so payloads stay small AND we transcode AVIF/HEIC to
+// a supported format. Falls back to direct fetch only if proxy fails.
 async function fetchImageAsBase64(url: string): Promise<{ data: string; mediaType: string } | null> {
+  const MAX_BYTES = 4_500_000; // safety margin under Anthropic's 5MB limit
   const tryFetch = async (u: string) => {
     const r = await fetch(u);
     if (!r.ok) return null;
@@ -610,16 +614,22 @@ async function fetchImageAsBase64(url: string): Promise<{ data: string; mediaTyp
     let binary = '';
     const chunk = 0x8000;
     for (let i = 0; i < buf.length; i += chunk) binary += String.fromCharCode(...buf.subarray(i, i + chunk));
-    return { data: btoa(binary), mediaType };
+    return { data: btoa(binary), mediaType, bytes: buf.length };
   };
+  const proxy = (w: number, q: number) =>
+    `https://wsrv.nl/?url=${encodeURIComponent(url)}&output=jpg&w=${w}&q=${q}&we`;
   try {
+    // Always go through proxy first — guarantees size + format.
+    for (const [w, q] of [[1600, 85], [1280, 80], [1024, 75], [768, 70]] as const) {
+      const r = await tryFetch(proxy(w, q));
+      if (r && r.bytes <= MAX_BYTES) return { data: r.data, mediaType: 'image/jpeg' };
+    }
+    // Last resort: direct fetch (only safe if natively small + supported).
     const direct = await tryFetch(url);
-    if (direct && ANTHROPIC_OK.has(direct.mediaType)) return direct;
-    // Transcode via wsrv.nl (free image proxy, supports AVIF/HEIC → PNG).
-    const proxied = `https://wsrv.nl/?url=${encodeURIComponent(url)}&output=png`;
-    const png = await tryFetch(proxied);
-    if (png) return { data: png.data, mediaType: 'image/png' };
-    return direct; // last resort
+    if (direct && ANTHROPIC_OK.has(direct.mediaType) && direct.bytes <= MAX_BYTES) {
+      return { data: direct.data, mediaType: direct.mediaType };
+    }
+    return null;
   } catch (e) {
     console.warn('image fetch failed', e);
     return null;
