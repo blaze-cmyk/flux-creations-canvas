@@ -185,7 +185,7 @@ export function PromptBar() {
               setPrompt(prompt.replace(new RegExp(`@${removedName}\\b`, 'g'), '').replace(/\s{2,}/g, ' ').trim());
             }}
             onReorder={reorderReferenceImages}
-            onChipClick={(idx) => addMentionChip(idx)}
+            onChipClick={(idx) => insertMention(idx)}
           />
         )}
 
@@ -205,67 +205,78 @@ export function PromptBar() {
 
           {/* Prompt area */}
           <div className="flex-1 min-w-0 flex flex-col gap-1.5 py-1 pr-1">
-            {/* Selected reference chips */}
-            {mentionedIdx.length > 0 && (
-              <div className="flex items-center gap-1.5 flex-wrap">
-                {mentionedIdx.map((idx) => (
-                  <span
-                    key={idx}
-                    className="inline-flex items-center gap-1.5 pl-1 pr-2 py-1 rounded-full bg-white/[0.06] border border-white/10 text-[12px] font-medium text-foreground/90"
-                  >
-                    {referenceImages[idx] && (
-                      <img src={referenceImages[idx]} alt="" className="w-4 h-4 rounded-full object-cover" />
-                    )}
-                    @Image {idx + 1}
-                    <button
-                      type="button"
-                      onClick={() => removeMentionChip(idx)}
-                      className="ml-0.5 grid place-items-center w-4 h-4 rounded-full hover:bg-white/10 text-muted-foreground hover:text-foreground"
-                      aria-label="Remove"
-                    >
-                      <X className="w-2.5 h-2.5" />
-                    </button>
-                  </span>
-                ))}
-              </div>
-            )}
             <div className="relative">
-            <textarea
-              ref={textareaRef}
-              value={prompt}
-              onChange={(e) => {
-                const val = e.target.value;
-                setPrompt(val);
-                const caret = e.currentTarget.selectionStart ?? val.length;
-                const upto = val.slice(0, caret);
-                const m = upto.match(/(?:^|\s)@([A-Za-z0-9 ]{0,20})$/);
-                if (m && referenceImages.length > 0) {
-                  setMentionOpen(true);
-                  setMentionQuery(m[1] || '');
-                  setMentionAnchor(caret - (m[1]?.length ?? 0) - 1);
-                  setMentionLength((m[1] ?? '').length);
-                } else {
-                  setMentionOpen(false);
-                }
-              }}
-              onPaste={handlePaste}
-              onKeyDown={(e) => {
-                if (mentionOpen && (e.key === 'Escape' || e.key === 'ArrowLeft' || e.key === 'ArrowRight')) {
-                  setMentionOpen(false);
-                }
-                if (e.key === 'Enter' && !e.shiftKey && (e.metaKey || e.ctrlKey)) {
+              <div
+                ref={editorRef}
+                contentEditable
+                suppressContentEditableWarning
+                role="textbox"
+                aria-multiline="true"
+                data-placeholder={referenceImages.length > 0 ? 'Describe the scene… type @ to reference an image' : 'Describe the scene you imagine'}
+                onInput={(e) => {
+                  syncPromptFromEditor();
+                  // detect "@query" before caret
+                  const sel = window.getSelection();
+                  if (!sel || sel.rangeCount === 0 || referenceImages.length === 0) {
+                    setMentionOpen(false);
+                    return;
+                  }
+                  const r = sel.getRangeAt(0).cloneRange();
+                  // walk back from caret to find '@' on the same text node
+                  const node = r.startContainer;
+                  if (node.nodeType !== Node.TEXT_NODE) {
+                    setMentionOpen(false);
+                    return;
+                  }
+                  const text = (node.textContent || '').slice(0, r.startOffset);
+                  const m = text.match(/(?:^|\s)@([A-Za-z0-9 ]{0,20})$/);
+                  if (m) {
+                    const atIndex = r.startOffset - (m[1]?.length ?? 0) - 1;
+                    const range = document.createRange();
+                    range.setStart(node, atIndex);
+                    range.setEnd(node, r.startOffset);
+                    mentionRangeRef.current = range;
+                    setMentionQuery(m[1] || '');
+                    setMentionOpen(true);
+                  } else {
+                    setMentionOpen(false);
+                  }
+                }}
+                onPaste={(e) => {
+                  // Try image paste first
+                  const items = e.clipboardData?.items;
+                  if (items) {
+                    const imgs: File[] = [];
+                    for (let i = 0; i < items.length; i++) {
+                      if (items[i].type.startsWith('image/')) {
+                        const f = items[i].getAsFile();
+                        if (f) imgs.push(f);
+                      }
+                    }
+                    if (imgs.length > 0) {
+                      e.preventDefault();
+                      handleFiles(imgs);
+                      return;
+                    }
+                  }
+                  // Plain text paste (avoid HTML pollution)
                   e.preventDefault();
-                  handleSubmit();
-                }
-                if (e.key === 'Enter' && !e.shiftKey && !e.metaKey && !e.ctrlKey) {
-                  e.preventDefault();
-                  handleSubmit();
-                }
-              }}
-              rows={2}
-              placeholder={referenceImages.length > 0 ? 'Describe the scene… type @ to reference an image' : 'Describe the scene you imagine'}
-              className="w-full bg-transparent border-0 text-sm leading-[1.6] text-foreground placeholder:text-muted-foreground/70 focus:outline-none resize-none ms-prompt-scroll min-h-[44px] max-h-[220px] overflow-y-auto"
-            />
+                  const text = e.clipboardData.getData('text/plain');
+                  document.execCommand('insertText', false, text);
+                  syncPromptFromEditor();
+                }}
+                onKeyDown={(e) => {
+                  if (mentionOpen && e.key === 'Escape') {
+                    setMentionOpen(false);
+                    return;
+                  }
+                  if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    handleSubmit();
+                  }
+                }}
+                className="ms-prompt-editor w-full bg-transparent border-0 text-sm leading-[1.6] text-foreground focus:outline-none ms-prompt-scroll min-h-[44px] max-h-[220px] overflow-y-auto whitespace-pre-wrap break-words"
+              />
 
             {mentionOpen && (
               <div className="absolute left-0 bottom-full mb-2 z-30 w-56 rounded-xl ms-glass shadow-2xl overflow-hidden">
@@ -273,25 +284,23 @@ export function PromptBar() {
                   Reference an image
                 </div>
                 <div className="max-h-56 overflow-y-auto">
-                  {refNames
-                    .map((name, idx) => ({ name, idx }))
-                    .filter((r) => !mentionedIdx.includes(r.idx))
+                  {referenceImages
+                    .map((url, idx) => ({ url, idx, name: `Image ${idx + 1}` }))
                     .filter((r) => r.name.toLowerCase().includes(mentionQuery.toLowerCase()))
                     .map((r) => (
                       <button
                         key={r.idx}
                         type="button"
-                        onClick={() => addMentionChip(r.idx)}
+                        onMouseDown={(e) => { e.preventDefault(); insertMention(r.idx); }}
                         className="w-full flex items-center gap-2 px-2.5 py-2 hover:bg-white/5 text-left"
                       >
-                        <img src={referenceImages[r.idx]} alt="" className="w-7 h-7 rounded-md object-cover" />
+                        <img src={r.url} alt="" className="w-7 h-7 rounded-md object-cover" />
                         <span className="text-sm text-foreground">@{r.name}</span>
                       </button>
                     ))}
-                  {refNames
-                    .map((name, idx) => ({ name, idx }))
-                    .filter((r) => !mentionedIdx.includes(r.idx))
-                    .filter((r) => r.name.toLowerCase().includes(mentionQuery.toLowerCase()))
+                  {referenceImages
+                    .map((_, idx) => `Image ${idx + 1}`)
+                    .filter((n) => n.toLowerCase().includes(mentionQuery.toLowerCase()))
                     .length === 0 && (
                     <div className="px-3 py-2 text-xs text-muted-foreground">No matches</div>
                   )}
