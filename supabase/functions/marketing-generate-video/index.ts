@@ -16,6 +16,7 @@ const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 
 const ATLAS_BASE = 'https://api.atlascloud.ai/api/v1/model';
+const ATLAS_ASSET_BASE = 'https://console.atlascloud.ai/api/v1';
 const FAL_QUEUE = 'https://queue.fal.run';
 const SEEDANCE_REF = 'bytedance/seedance-2.0/reference-to-video';
 const SEEDANCE_TEXT = 'bytedance/seedance-2.0/text-to-video';
@@ -26,6 +27,7 @@ type VideoMode = 'text-to-video' | 'reference-to-video';
 type ReferenceBundle = {
   mode: VideoMode;
   referenceImages: string[];
+  atlasReferenceImages?: string[];
   referenceAudios: string[];
   hasAvatar: boolean;
   hasProduct: boolean;
