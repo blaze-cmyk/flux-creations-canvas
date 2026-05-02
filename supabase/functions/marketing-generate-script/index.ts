@@ -307,15 +307,17 @@ STEP 2 — PROPOSE 3+ CAMERA-LANGUAGE OPTIONS that could honor THIS product, the
 Use this palette as a starting point. INVENT MORE if the product deserves something the palette doesn't cover — never feel capped at this list:
   • TOP-DOWN ASMR        — cozy, hands-only, sound-first, no dialogue, sleeves match product palette
   • THEATRICAL REVEAL    — slow paper-stage reveal, single hero piece, near-silent, packaging IS the spectacle
-  • VLOG SELFIE          — iPhone front cam, real energy, dialogue-driven, product unboxed by being USED
-  • QUIET HANDHELD       — avatar + box on a table, impressed whisper, intimate, packaging stays in frame
-  • EDITORIAL PAN        — slow lateral push past the product, fashion-shoot lighting, magazine energy
+  • VLOG SELFIE          — iPhone front cam in a creator's real home/gym/car, real energy, dialogue-driven, product unboxed by being USED
+  • QUIET HANDHELD       — avatar + box on a home table/bed/vanity, impressed whisper, intimate, packaging stays in frame
+  • BEDROOM WINDOW UGC   — creator-at-home package open on bed/floor/desk, window daylight, lived-in background, dialogue optional
+  • BATHROOM VANITY UGC  — beauty/fragrance/skincare opened on a real bathroom counter, towels/sink/window/practical light visible
+  • KITCHEN COUNTER UGC  — product opened on a real kitchen counter, mugs/fruit/mail in background, handheld phone energy
+  • COUCH COFFEE-TABLE UGC — parcel opened on a sofa/coffee table/rug, TV remote/book/blanket background life
   • JUMP-CUT HAUL        — fast handheld cuts, multiple pieces, hype energy, real bedroom mess
-  • STREET DOC           — handheld in a real-world location (cafe, studio, car), ambient sound, casual reveal
-  • TABLETOP CINEMATIC   — 35mm shallow DOF, gallery-clean, museum-vitrine vibe
+  • STREET DOC           — handheld in a real-world non-studio location (car seat, cafe table, stoop, gym locker), ambient sound, casual reveal
   • POV FIRST-PERSON     — chest-mounted feel, the viewer's own hands open it, breath audible
   • MACRO TACTILE        — extreme close-ups of fingertip on texture, no wide shots ever
-  • OVERHEAD STILL-LIFE  — the unboxing as a slow flat-lay rearrangement, almost food-styling
+  • OVERHEAD STILL-LIFE  — the unboxing as a slow home flat-lay rearrangement on desk/duvet/vanity, never a studio packshot
   • OUTDOOR DAYLIGHT     — opening on a picnic blanket, beach towel, park bench — natural setting
   • HAUL TRY-ON          — bedroom selfie energy, frantic-hype hook → packaging tear → hard-cut try-on demo → scarcity CTA, dialogue-led, ≤12-word lines, named tactile micro-actions (nail-tap on bag, hair-fluff out of collar, hugging-self in fabric, hood-pull, sleeve-tug, 360° spin, ta-da)
   • SCARCITY DROP        — short avatar selfie, 15–25s, restock/just-launched energy, one product, urgency CTA close ("if you see your size, run"), 1 packaging beat + 1 try-on beat + 1 scarcity beat
@@ -324,8 +326,8 @@ Use this palette as a starting point. INVENT MORE if the product deserves someth
 
 For each of your 3+ options name ONE reason it FITS this product and ONE reason it MIGHT NOT. Pick the winner. Commit fully. Write the script in THAT camera language. The opening line of your final paragraph MUST explicitly name the chosen camera language so the structural gate can verify you committed (e.g. "TOP-DOWN ASMR — 10-second vertical 9:16…", "THEATRICAL REVEAL — A 15-second…", "HAUL TRY-ON — A 60-second vertical 9:16 UGC haul…", "SCARCITY DROP — A 22-second…", or your own invented tag in the same SHOUTY-CAPS — em-dash form).
 
-STEP 2B — DIRECT THE CINEMATOGRAPHY, NOT JUST THE DIALOGUE.
-Before writing, silently choose a real SCENE LANGUAGE that fits the product: cozy desk by window, white silk flat-lay, quiet oak table, lived-in bedroom, aesthetic gym, studio workbench, car-seat street drop, picnic blanket, cafe table, concrete gallery plinth, etc. Cinematography is the main taste signal. The final prompt MUST name the surface, motivated light source, lens/camera feel, hand/avatar blocking, frame composition, background life, and color harmony. Never write generic "cinematic", "aesthetic", "clean setup", or "beautiful background" unless you have named the actual room/surface/light/props that make it cinematic. The reference prompts are good because the scenery feels real: wooden desk + sage sleeves, white silk + red box, gym lighting + tired breath, ash-grey tee + oak table. Match that level.
+STEP 2B — DIRECT CREATOR-AT-HOME UGC CINEMATOGRAPHY, NOT STUDIO PRODUCT FILM.
+Before writing, silently choose a real CREATOR HOME SCENE LANGUAGE that fits the product: unmade duvet by a bedroom window, desk next to a laptop and cold coffee, bathroom vanity with towel/sink/practical bulb, kitchen counter with mail/mug/fruit bowl, couch + coffee table + throw blanket, closet floor with shoeboxes, car-seat street drop, picnic blanket, cafe table, gym locker bench. Cinematography is the main taste signal. The final prompt MUST name the room/location, surface, motivated light source, phone/lens feel, hand/avatar blocking, frame composition, background life, and color harmony. It MUST include at least one imperfect human/home detail (wrinkled sheet, half-open drawer, charger cable, coffee mug, towel, keys, book, remote, mail, laundry chair, messy but tasteful shelf). Never write generic "cinematic", "aesthetic", "clean setup", "beautiful background", "studio", "gallery", "plinth", "museum", "softbox", or "product film" unless USER_DIRECTION explicitly asks for that. The reference prompts are good because the scenery feels lived-in and real: wooden desk + sage sleeves, white silk on a home dresser, gym lighting + tired breath, ash-grey tee + oak table by a window. Match that level.
 
 STEP 3 — DECIDE WHO UNBOXES IT.
 - AVATAR PROVIDED → cast them. Their persona drives the dialogue voice (= CREATOR_PERSONA). Outfit, hands, posture must visually fit the chosen camera language and product palette.
@@ -389,6 +391,7 @@ PHRASES (banned everywhere, including silently in voiceover):
 
 DEFAULT-LOOK BANS (kill the AI-slop reflex):
 - Generic "aesthetic background", "minimalist white setup", "clean white background" without naming the actual surface, light source, and 2+ named props
+- Studio / product-render cinematography: photo studio, studio lighting, softbox setup, gallery plinth, museum vitrine, cyclorama, seamless backdrop, packshot table, product film, floating hero product
 - Ring lights, floating logos, on-screen text, captions, subtitles, smartphones-in-frame as cameras
 - Top-down-as-default for products that are not collectibles/jewelry/cozy small goods
 - Jump-cut-haul-as-default for single-hero items
