@@ -30,7 +30,7 @@ export function PromptBar() {
   const [mentionQuery, setMentionQuery] = useState('');
   const [mentionAnchor, setMentionAnchor] = useState<number>(0);
 
-  const refNames = referenceImages.map((_, i) => `Image ${i + 1}`);
+  const refNames = referenceImages.map((_, i) => `${i + 1}`);
 
   const insertMention = (name: string) => {
     setPrompt(
