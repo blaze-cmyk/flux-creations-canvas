@@ -66,20 +66,46 @@ const QUALITY_MAP: Record<string, string> = { "1K": "1K", "2K": "2K", "4K": "4K"
 
 function bytesToBase64(bytes: Uint8Array): string {
   let binary = "";
-  for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
+  const chunk = 0x8000;
+  for (let i = 0; i < bytes.length; i += chunk) {
+    binary += String.fromCharCode(...bytes.subarray(i, i + chunk));
+  }
   return btoa(binary);
+}
+
+// Hard cap so we never blow the worker's memory budget when we base64 it.
+// 3.5 MB raw bytes ≈ ~4.7 MB base64 string.
+const MAX_REF_BYTES = 3.5 * 1024 * 1024;
+
+async function fetchViaWsrv(src: string, width: number, quality: number): Promise<{ bytes: Uint8Array; mimeType: string } | null> {
+  try {
+    const proxied = `https://wsrv.nl/?url=${encodeURIComponent(src)}&w=${width}&output=jpg&q=${quality}&we`;
+    const resp = await fetch(proxied);
+    if (!resp.ok) return null;
+    const buf = await resp.arrayBuffer();
+    return { bytes: new Uint8Array(buf), mimeType: "image/jpeg" };
+  } catch {
+    return null;
+  }
 }
 
 async function fetchImageAsDataUri(src: string): Promise<string | null> {
   try {
-    if (src.startsWith("data:")) return src;
-    if (src.startsWith("http://") || src.startsWith("https://")) {
-      const resp = await fetch(src);
-      if (!resp.ok) return null;
-      const buf = await resp.arrayBuffer();
-      const bytes = new Uint8Array(buf);
-      const mimeType = resp.headers.get("content-type") || "image/jpeg";
-      return `data:${mimeType};base64,${bytesToBase64(bytes)}`;
+    if (src.startsWith("data:")) {
+      // Trust caller-provided data URIs but reject if absurdly large
+      const approxBytes = (src.length * 3) / 4;
+      if (approxBytes > MAX_REF_BYTES * 2) return null;
+      return src;
+    }
+    if (!src.startsWith("http://") && !src.startsWith("https://")) return null;
+
+    // Cascade: try larger first, fall back to smaller if still over budget
+    for (const [w, q] of [[1280, 82], [1024, 78], [768, 72]] as const) {
+      const got = await fetchViaWsrv(src, w, q);
+      if (!got) continue;
+      if (got.bytes.byteLength <= MAX_REF_BYTES) {
+        return `data:${got.mimeType};base64,${bytesToBase64(got.bytes)}`;
+      }
     }
     return null;
   } catch {
