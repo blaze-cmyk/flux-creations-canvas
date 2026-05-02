@@ -34,6 +34,7 @@ export function ReferenceImageStrip({
   onPreview,
   onRemove,
   onReorder,
+  onChipClick,
 }: ReferenceImageStripProps) {
   const sortableImages = useMemo<SortableReferenceImage[]>(() => {
     const seen = new Map<string, number>();
