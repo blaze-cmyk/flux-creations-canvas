@@ -647,6 +647,9 @@ function isWeak(
     const genericCineRx = /\b(generic cinematic|cinematic background|aesthetic background|clean setup|beautiful setup|premium background|minimal setup)\b/i;
     const genericCineHit = finalPrompt.match(genericCineRx);
     if (genericCineHit) return { weak: true, reason: `unboxing contains generic cinematography slop: "${genericCineHit[0]}"` };
+    const renderSlopRx = /\b(product render|catalog (?:shot|photo)|packshot|studio render|3d render|floating product|same reference (?:image|photo)|recreate(?:s|d)? the reference|matching the reference (?:image|photo)|static product (?:shot|image)|product sits alone)\b/i;
+    const renderHit = finalPrompt.match(renderSlopRx);
+    if (renderHit) return { weak: true, reason: `unboxing treats references like a render target: "${renderHit[0]}"` };
     // 7. Packaging-as-hero — ≥1 packaging noun must appear before the first time-anchor beat.
     const firstBeatIdx = finalPrompt.search(/\b\d{1,2}(?:\.\d)?\s*[–-]\s*\d{1,2}(?:\.\d)?\s*s/i);
     if (firstBeatIdx > 0) {
