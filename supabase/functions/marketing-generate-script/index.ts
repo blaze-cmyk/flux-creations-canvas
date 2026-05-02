@@ -609,7 +609,7 @@ function isWeak(
   } else if (format === 'Unboxing') {
     // ── Unboxing taste gates — slop catcher, NEVER a concept gate ──
     // 1. STRUCTURED SHAPE — must contain a VIDEO line with a camera-language tag, ≥1 "Scene N — … (window):" label, and the literal "NO MUSIC, ONLY SFX" line.
-    const cameraLangRx = /\b(TOP-DOWN ASMR|THEATRICAL REVEAL|VLOG SELFIE|QUIET HANDHELD|EDITORIAL PAN|JUMP-CUT HAUL|STREET DOC|TABLETOP CINEMATIC|POV FIRST-PERSON|MACRO TACTILE|OVERHEAD STILL-LIFE|OUTDOOR DAYLIGHT|HAUL TRY-ON|SCARCITY DROP|FULL-SET REVEAL|BEDROOM WINDOW UGC|CAFE TABLE REVEAL|WORKBENCH MACRO|GOLDEN-HOUR FLATLAY|GALLERY PLINTH REVEAL|CAR-SEAT STREET DROP)\b/;
+    const cameraLangRx = /\b(TOP-DOWN ASMR|THEATRICAL REVEAL|VLOG SELFIE|QUIET HANDHELD|JUMP-CUT HAUL|STREET DOC|POV FIRST-PERSON|MACRO TACTILE|OVERHEAD STILL-LIFE|OUTDOOR DAYLIGHT|HAUL TRY-ON|SCARCITY DROP|FULL-SET REVEAL|BEDROOM WINDOW UGC|BATHROOM VANITY UGC|KITCHEN COUNTER UGC|COUCH COFFEE-TABLE UGC|CLOSET FLOOR UGC|CAFE TABLE REVEAL|CAR-SEAT STREET DROP)\b/;
     // The VIDEO line declares the chosen camera language. Pull it out and verify.
     const videoLineMatch = finalPrompt.match(/(^|\n)[^\n]*\bVIDEO\s+—[^\n]*/);
     const videoLine = videoLineMatch ? videoLineMatch[0] : '';
@@ -632,7 +632,7 @@ function isWeak(
     const slopHit = finalPrompt.match(unboxingSlopRx);
     if (slopHit) return { weak: true, reason: `unboxing contains banned ad-slop phrase: "${slopHit[0]}"` };
     // 3. Default-look slop — bans the lazy fallbacks.
-    const lookSlopRx = /(ring light|aesthetic background(?! of)|background music|lo-?fi (beat|track)|royalty[- ]free music|on[- ]screen text|subtitle overlay|captions overlay)/i;
+    const lookSlopRx = /(ring light|aesthetic background(?! of)|background music|lo-?fi (beat|track)|royalty[- ]free music|on[- ]screen text|subtitle overlay|captions overlay|photo studio|studio lighting|softbox|cyclorama|seamless backdrop|gallery plinth|museum vitrine|packshot|product film|floating hero product)/i;
     const lookHit = finalPrompt.match(lookSlopRx);
     if (lookHit) return { weak: true, reason: `unboxing contains banned default-look phrase: "${lookHit[0]}"` };
     // 4. Sensory verb density — ≥6 hits from real unboxing vocabulary.
@@ -644,12 +644,14 @@ function isWeak(
     const soundHits = (finalPrompt.match(SOUND_VOCAB) || []).length;
     if (soundHits < 2) return { weak: true, reason: `unboxing needs ≥2 specific sound-vocabulary hits (got ${soundHits})` };
     // 6. Cinematography specificity — the scene must feel DIRECTED, not generic AI "cinematic" slop.
-    const SCENE_TEXTURE = /\b(wooden desk|oak table|white silk|satin|window daylight|natural daylight|diffused daylight|gym lighting|front camera|overhead|top-down|handheld|iPhone|macro|35mm|50mm|shallow depth|camera-left|side window|golden-hour|practical light|sweater sleeves|ring|watch|table surface|flatlay|plinth|workbench|bedroom|kitchen|cafe|park bench|picnic blanket|car seat|studio|concrete|linen|velvet|leather|ribbon trails?|foam insert|tissue paper|polymailer|box centered)\b/gi;
+    const SCENE_TEXTURE = /\b(wooden desk|oak table|white silk|satin|window daylight|natural daylight|diffused daylight|bathroom vanity|kitchen counter|coffee table|couch|sofa|rug|closet floor|gym lighting|front camera|overhead|top-down|handheld|iPhone|macro|35mm|50mm|shallow depth|camera-left|side window|golden-hour|practical light|sweater sleeves|ring|watch|table surface|flatlay|bedroom|kitchen|cafe|park bench|picnic blanket|car seat|concrete|linen|velvet|leather|ribbon trails?|foam insert|tissue paper|polymailer|box centered|unmade duvet|wrinkled sheet|coffee mug|charger cable|keys|remote|mail|towel|half-open drawer|laundry chair)\b/gi;
     const sceneHits = (finalPrompt.match(SCENE_TEXTURE) || []).length;
     if (sceneHits < 3) return { weak: true, reason: `unboxing cinematography needs ≥3 concrete scene/light/surface details (got ${sceneHits})` };
     const genericCineRx = /\b(generic cinematic|cinematic background|aesthetic background|clean setup|beautiful setup|premium background|minimal setup)\b/i;
     const genericCineHit = finalPrompt.match(genericCineRx);
     if (genericCineHit) return { weak: true, reason: `unboxing contains generic cinematography slop: "${genericCineHit[0]}"` };
+    const homeUgcRx = /\b(bedroom|unmade duvet|wrinkled sheet|desk|bathroom vanity|kitchen counter|coffee table|couch|sofa|rug|closet floor|car seat|cafe table|gym locker|window daylight|side window|phone|iPhone|handheld|front camera|charger cable|coffee mug|keys|remote|mail|towel|half-open drawer|laundry chair|shelf|blanket)\b/i;
+    if (!homeUgcRx.test(finalPrompt)) return { weak: true, reason: 'unboxing missing creator-at-home UGC environment details' };
     const renderSlopRx = /\b(product render|catalog (?:shot|photo)|packshot|studio render|3d render|floating product|same reference (?:image|photo)|recreate(?:s|d)? the reference|matching the reference (?:image|photo)|static product (?:shot|image)|product sits alone)\b/i;
     const renderHit = finalPrompt.match(renderSlopRx);
     if (renderHit) return { weak: true, reason: `unboxing treats references like a render target: "${renderHit[0]}"` };
