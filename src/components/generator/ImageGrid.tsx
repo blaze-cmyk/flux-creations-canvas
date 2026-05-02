@@ -30,9 +30,11 @@ export function ImageGrid() {
   }
 
   return (
-    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5 gap-2">
+    <div className="columns-2 sm:columns-3 md:columns-4 xl:columns-5 2xl:columns-6 gap-2 [column-fill:_balance]">
       {images.map((img) => (
-        <ImageCard key={img.id} image={img} />
+        <div key={img.id} className="mb-2 break-inside-avoid">
+          <ImageCard image={img} />
+        </div>
       ))}
     </div>
   );
@@ -142,14 +144,12 @@ function ImageCard({ image }: {
     );
   }
 
-  // Use natural image aspect if loaded, otherwise fall back to aspectRatio setting
-  const style = naturalAspect ? { aspectRatio: naturalAspect } : undefined;
-  const containerClass = naturalAspect ? '' : aspectClass;
+  // Use natural aspect once loaded; before load show a neutral placeholder ratio
+  const placeholderAspect = naturalAspect ? undefined : aspectClass;
 
   return (
     <div
-      className={`group relative ${containerClass} rounded-xl overflow-hidden bg-ms-surface-2 ring-1 ring-ms-border hover:ring-foreground/30 transition-all cursor-pointer`}
-      style={style}
+      className={`group relative ${placeholderAspect ?? ''} rounded-xl overflow-hidden bg-ms-surface-2 ring-1 ring-ms-border hover:ring-foreground/30 transition-all cursor-pointer`}
       onClick={() => setSelectedImageId(image.id)}
     >
       {/* Loading skeleton */}
@@ -161,7 +161,7 @@ function ImageCard({ image }: {
         srcSet={image.imageUrl ? `${thumbUrl(image.imageUrl, 480, 70)} 1x, ${thumbUrl(image.imageUrl, 960, 72)} 2x` : undefined}
         sizes="(max-width: 640px) 50vw, 220px"
         alt=""
-        className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-300 ${loaded ? 'opacity-100' : 'opacity-0'}`}
+        className={`w-full h-auto block transition-opacity duration-300 ${loaded ? 'opacity-100' : 'opacity-0'}`}
         loading="lazy"
         decoding="async"
         draggable={false}
