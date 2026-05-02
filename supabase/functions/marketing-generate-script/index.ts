@@ -768,19 +768,29 @@ Deno.serve(async (req) => {
         `- If USER_DIRECTION mentions @Image N (or any of the names above), treat that as a literal pointer to the matching reference image.\n`
       : '';
 
-    // ---------- Per-request Podcast studio preset roll (kills "always dim black foam" slop) ----------
-    const PODCAST_PRESETS = [
-      '(1) WARM SUNSET LOFT — golden-hour loft with industrial window, exposed brick, plants, tan suede couch, brass lamp',
-      '(2) DAYLIT SCANDI STUDIO — bright airy room, sheer linen daylight, white oak floor, olive tree, beige bouclé chairs',
-      '(3) NEON GAMER POD — dark room, magenta+cyan RGB glow, vinyl-record back wall, purple neon sign, gaming chairs, slight haze',
-      '(4) COZY COFFEE SHOP CORNER — after-hours specialty coffee shop, edison pendants, chalkboard menu blur, mismatched mustard + olive armchairs',
-      '(5) MINIMAL WHITE CYC — seamless white cyclorama, softbox key + cool blue rim, matte-grey Eames chairs, concrete plinth — editorial',
-      '(7) ROOFTOP MAGIC HOUR — outdoor dusk rooftop, blurred city skyline, warm string bulbs, rattan lounge chairs, teal-to-peach sky',
-      '(8) RETRO 70s WOOD-PANEL DEN — full walnut paneling, mustard shag rug, Chesterfield, vintage globe, amber 2700K floor lamp, film grain',
+    // ---------- Per-request Podcast studio variety nudge (kills "always dim black foam" slop) ----------
+    // Claude invents a fresh studio per generation, matched to product/persona/topic.
+    // The taste references below are inspiration only — NOT a checklist.
+    const TASTE_REFERENCES = [
+      'warm sunset loft with industrial window + exposed brick',
+      'bright daylit scandi room with sheer linen + olive tree',
+      'neon gamer pod with RGB glow + vinyl wall + slight haze',
+      'after-hours specialty coffee shop with edison pendants',
+      'minimal white cyclorama, editorial softbox + cool rim',
+      'rooftop magic-hour set with blurred city skyline + string bulbs',
+      'retro 70s walnut-paneled den with mustard shag + amber lamp',
+      'neo-tokyo night studio with rain-on-glass projection + teal practicals',
+      'desert airstream interior with warm wood + window light',
+      'art-deco hotel lounge with green velvet + brass sconces',
+      'industrial concrete loft with single skylight beam',
+      'beach-house sunroom with rattan + linen + ocean haze',
     ];
-    const rolledPreset = PODCAST_PRESETS[Math.floor(Math.random() * PODCAST_PRESETS.length)];
+    const shuffled = [...TASTE_REFERENCES].sort(() => Math.random() - 0.5).slice(0, 3);
     const podcastPresetBlock = format === 'Podcast'
-      ? `\nROLLED_STUDIO_PRESET (use THIS preset for this generation — do NOT default to the dim-foam classic den unless USER_DIRECTION explicitly demands it):\n${rolledPreset}\nDescribe this preset in rich sensory detail in the final paragraph (specific lights with color temperatures, named props, wall texture, floor, atmosphere). The RØDE boom mic is still mandatory in every shot tag, even on the rooftop / coffee-shop / cyc sets.\n`
+      ? `\nSTUDIO CREATIVE BRIEF — invent a brand-new podcast studio for THIS clip that fits the product, persona, and topic. Do NOT copy a template. The dim-black-foam classic den is BANNED unless USER_DIRECTION explicitly asks for it.\n` +
+        `Taste references for vibe range only (do NOT literally reproduce — invent something new in the same family, or somewhere unexpected entirely): ${shuffled.join(' · ')}.\n` +
+        `Your invented set MUST specify: wall material/texture, floor, 2+ named props, 2+ practical light sources with color temperatures (e.g. tungsten 3200K, daylight 5600K, neon RGB, edison amber 2200K, softbox 5000K, golden-hour 2200K), seating, table, and overall color palette. The RØDE boom mic on a visible articulating arm is mandatory in every shot tag, even on outdoor / unconventional sets.\n` +
+        `Variety rule: surprise the viewer. Do not reuse the same studio you would obviously default to.\n`
       : '';
 
     const userTextBlock =
