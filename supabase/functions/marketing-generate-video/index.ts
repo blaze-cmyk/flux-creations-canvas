@@ -355,7 +355,7 @@ async function atlasSubmit(opts: { prompt: string; bundle: ReferenceBundle; dura
     watermark: false,
   };
   if (opts.bundle.mode === 'reference-to-video') {
-    body.reference_images = opts.bundle.referenceImages;
+    body.reference_images = opts.bundle.atlasReferenceImages?.length ? opts.bundle.atlasReferenceImages : opts.bundle.referenceImages;
     body.reference_videos = [];
     body.return_last_frame = false;
     if (opts.bundle.referenceAudios.length) body.reference_audios = opts.bundle.referenceAudios;
