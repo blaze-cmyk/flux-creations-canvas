@@ -27,19 +27,21 @@ export function GlobalHeader() {
       <div className="h-14 px-4 md:px-6 flex items-center justify-between gap-4">
         {/* Left: logo + nav */}
         <div className="flex items-center gap-6 min-w-0">
-          <Link to="/home" className="group relative shrink-0 flex items-center" aria-label="Korsola home">
-            <img
-              src={logoWhite}
-              alt="Korsola"
-              className="w-8 h-8 object-contain transition-opacity duration-200 group-hover:opacity-0"
-            />
-            <img
-              src={logoPink}
-              alt=""
-              aria-hidden
-              className="w-8 h-8 object-contain absolute inset-0 opacity-0 transition-opacity duration-200 group-hover:opacity-100"
-            />
-            <span className="ml-2 hidden sm:block text-[13px] font-extrabold tracking-[0.14em] text-foreground">
+          <Link to="/home" className="group shrink-0 flex items-center gap-2" aria-label="Korsola home">
+            <span className="relative w-8 h-8 rounded-[8px] overflow-hidden bg-white block">
+              <img
+                src={logoWhite}
+                alt="Korsola"
+                className="absolute inset-0 w-full h-full object-contain transition-opacity duration-200 group-hover:opacity-0"
+              />
+              <img
+                src={logoPink}
+                alt=""
+                aria-hidden
+                className="absolute inset-0 w-full h-full object-cover opacity-0 transition-opacity duration-200 group-hover:opacity-100"
+              />
+            </span>
+            <span className="hidden sm:block text-[13px] font-extrabold tracking-[0.14em] text-foreground">
               KORSOLA
             </span>
           </Link>
