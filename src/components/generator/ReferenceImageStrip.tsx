@@ -83,6 +83,7 @@ export function ReferenceImageStrip({
               index={image.index}
               onPreview={() => onPreview(image.src)}
               onRemove={() => onRemove(image.index)}
+              onChipClick={onChipClick ? () => onChipClick(image.index) : undefined}
             />
           ))}
 
