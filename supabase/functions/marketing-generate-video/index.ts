@@ -63,7 +63,7 @@ function looksLikeUnboxing(format: unknown, prompt: unknown) {
 // Seedance silently drops the audio refs and invents a generic high-pitched
 // voice. Bumping the cache key forces a regen of the old 10.9s clip.
 async function ensurePodcastSecondVoiceUrl(
-  admin: ReturnType<typeof createClient>,
+  admin: any,
 ): Promise<string | null> {
   const ELEVENLABS_API_KEY = Deno.env.get('ELEVENLABS_API_KEY');
   if (!ELEVENLABS_API_KEY) return null;
