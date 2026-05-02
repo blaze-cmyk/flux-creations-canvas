@@ -104,7 +104,7 @@ export default function MarketingStudioProject() {
       const { data, error } = await supabase
         .from('ms_generations')
         .select(
-          'id, status, stage, video_url, thumb_url, error, fal_request_id, prompt, format, surface, aspect, resolution, duration_seconds, product_id, avatar_id, created_at, keyframe_url',
+          'id, status, stage, video_url, thumb_url, error, fal_request_id, prompt, format, surface, aspect, resolution, duration_seconds, product_id, avatar_id, created_at, updated_at, keyframe_url',
         )
         .eq('project_id', project.id)
         .order('created_at', { ascending: false })
@@ -120,6 +120,10 @@ export default function MarketingStudioProject() {
             thumbUrl: row.thumb_url ?? (row as any).keyframe_url ?? undefined,
             error: row.error ?? undefined,
             falRequestId: row.fal_request_id ?? undefined,
+            submittedAt:
+              row.status === 'queued' || row.status === 'queued_pending_persist' || row.status === 'running'
+                ? new Date((row as any).updated_at ?? row.created_at as any).getTime()
+                : undefined,
           });
         } else {
           addGeneration(project.id, {
@@ -135,7 +139,7 @@ export default function MarketingStudioProject() {
             productId: (row as any).product_id ?? undefined,
             avatarId: (row as any).avatar_id ?? undefined,
             createdAt: new Date(row.created_at as any).getTime(),
-            submittedAt: new Date(row.created_at as any).getTime(),
+            submittedAt: new Date(((row as any).updated_at ?? row.created_at) as any).getTime(),
             status: row.status as MSGeneration['status'],
             stage: (row as any).stage as MSGeneration['stage'],
             falRequestId: row.fal_request_id ?? undefined,
