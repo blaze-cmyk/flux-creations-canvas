@@ -97,14 +97,18 @@
   border-color: hsl(0 0% 100% / 0.12);
 }
 .ms-chip-glass {
-  background: hsl(0 0% 100% / 0.04);
+  background:
+    linear-gradient(180deg, hsl(0 0% 100% / 0.03) 0%, hsl(0 0% 100% / 0.01) 100%),
+    hsl(0 0% 8% / 0.78);
   backdrop-filter: blur(14px) saturate(140%);
   -webkit-backdrop-filter: blur(14px) saturate(140%);
   border: 1px solid hsl(0 0% 100% / 0.07);
-  box-shadow: inset 0 1px 0 hsl(0 0% 100% / 0.06);
+  box-shadow: inset 0 1px 0 hsl(0 0% 100% / 0.05);
 }
 .ms-chip-glass:hover {
-  background: hsl(0 0% 100% / 0.07);
+  background:
+    linear-gradient(180deg, hsl(0 0% 100% / 0.05) 0%, hsl(0 0% 100% / 0.02) 100%),
+    hsl(0 0% 11% / 0.82);
   border-color: hsl(0 0% 100% / 0.12);
 }
 .ms-scroll::-webkit-scrollbar { width: 8px; height: 8px; }
