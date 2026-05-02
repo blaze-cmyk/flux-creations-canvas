@@ -164,7 +164,7 @@ export function PromptBar() {
             <PopoverContent
               align="start"
               sideOffset={10}
-              className="w-72 p-0 rounded-2xl border border-white/10 bg-[hsl(0_0%_8%)]/95 backdrop-blur-xl shadow-[0_24px_60px_-20px_rgba(0,0,0,0.7)] overflow-hidden"
+              className="w-72 p-0 rounded-2xl border border-white/10 bg-[hsl(0_0%_3%)]/97 backdrop-blur-xl shadow-[0_24px_60px_-20px_rgba(0,0,0,0.85)] overflow-hidden"
             >
               <ModelDropdownContent
                 model={model}
