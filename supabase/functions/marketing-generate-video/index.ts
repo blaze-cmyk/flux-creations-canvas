@@ -48,6 +48,10 @@ function clampDuration(d: unknown) {
   return Math.max(4, Math.min(15, n));
 }
 
+function looksLikeUnboxing(format: unknown, prompt: unknown) {
+  return String(format || '').toLowerCase() === 'unboxing' || /\bunboxing\b|NO MUSIC,\s*ONLY SFX|VIDEO\s+—\s*(TOP-DOWN ASMR|THEATRICAL REVEAL|QUIET HANDHELD|HAUL TRY-ON|VLOG SELFIE)/i.test(String(prompt || ''));
+}
+
 // Lazily generate (and cache) a SHORT smooth-warm female reference voice clip
 // for the "second speaker" in Podcast Mode A. Uses Jessica
 // (cgSgspJ2msm6clMCkdW9) — the closest match to the smooth, warm Jade-like
@@ -653,13 +657,15 @@ Deno.serve(async (req) => {
     const resolutionN = normalizeRes(resolution);
     const ratio = aspectToRatio(aspect);
 
-    // Re-sign stored private assets and send the composed keyframe first, then raw
-    // product/avatar refs so Seedance keeps identity and product fidelity.
+    // Re-sign stored private assets. For Unboxing, do NOT send a composed keyframe
+    // first: reference-to-video over-follows that still and turns the clip into a
+    // rendered product photo instead of a fresh UGC unboxing scene.
+    const skipKeyframeForUnboxing = looksLikeUnboxing(format, prompt);
     const finalImageUrls = await gatherFreshReferenceUrls(admin, {
       productId,
       avatarId,
-      keyframeUrl: keyframe_url,
-      fallbackUrls: keyframe_url ? [keyframe_url, ...image_urls] : image_urls,
+      keyframeUrl: skipKeyframeForUnboxing ? undefined : keyframe_url,
+      fallbackUrls: skipKeyframeForUnboxing ? image_urls : (keyframe_url ? [keyframe_url, ...image_urls] : image_urls),
       maxProductImages: 1,
     });
 
