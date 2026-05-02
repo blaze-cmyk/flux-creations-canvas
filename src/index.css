@@ -122,6 +122,23 @@
 .ms-prompt-scroll { scrollbar-width: thin; scrollbar-color: hsl(0 0% 100% / 0.14) transparent; }
 .ms-prompt-editor:empty:before { content: attr(data-placeholder); color: hsl(var(--muted-foreground) / 0.7); pointer-events: none; }
 
+.ms-zoom-slider { -webkit-appearance: none; appearance: none; height: 4px; border-radius: 9999px; outline: none; }
+.ms-zoom-slider::-webkit-slider-thumb {
+  -webkit-appearance: none; appearance: none;
+  width: 16px; height: 16px; border-radius: 9999px;
+  background: hsl(var(--primary));
+  border: 2px solid hsl(var(--background));
+  box-shadow: 0 0 0 1px hsl(var(--primary) / 0.4), 0 2px 6px hsl(0 0% 0% / 0.4);
+  cursor: pointer;
+}
+.ms-zoom-slider::-moz-range-thumb {
+  width: 16px; height: 16px; border-radius: 9999px;
+  background: hsl(var(--primary));
+  border: 2px solid hsl(var(--background));
+  box-shadow: 0 0 0 1px hsl(var(--primary) / 0.4), 0 2px 6px hsl(0 0% 0% / 0.4);
+  cursor: pointer;
+}
+
 .ms-shimmer {
   background: linear-gradient(110deg, hsl(0 0% 100% / 0) 30%, hsl(0 0% 100% / 0.08) 50%, hsl(0 0% 100% / 0) 70%);
   background-size: 200% 100%;
