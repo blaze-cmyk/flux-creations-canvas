@@ -2,6 +2,19 @@ import { useGeneratorStore } from '@/store/generatorStore';
 import { AlertCircle, Eye, RefreshCw, Trash2, Loader2, Download, Link2, Heart, MoreHorizontal, Maximize2 } from 'lucide-react';
 import { useState, useRef, useEffect } from 'react';
 
+// Build a resized variant of a Supabase Storage public URL using the
+// `/render/image/` transform endpoint. Falls back to original on non-Supabase URLs.
+function thumbUrl(url: string | undefined, width = 480, quality = 70): string | undefined {
+  if (!url) return url;
+  try {
+    if (url.includes('/storage/v1/object/public/')) {
+      return url.replace('/storage/v1/object/public/', '/storage/v1/render/image/public/')
+        + (url.includes('?') ? '&' : '?') + `width=${width}&quality=${quality}&resize=contain`;
+    }
+  } catch {}
+  return url;
+}
+
 export function ImageGrid() {
   const { images } = useGeneratorStore();
 
