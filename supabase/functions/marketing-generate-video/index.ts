@@ -402,10 +402,9 @@ async function pollFal(requestId: string, endpoint = 'bytedance/seedance-2.0/ref
 
 // ---------------- Provider chain ----------------
 // Input-aware routing rules:
-//   - avatarId present  → AtlasCloud only (fal Seedance blocks real-person refs).
-//                          If Atlas fails, retry once on fal WITHOUT the avatar ref.
-//   - reference images, no avatar → AtlasCloud → fal (full refs).
-//   - product only / text-only    → AtlasCloud → fal.
+//   - keep avatar + product references together; do not strip avatar refs.
+//   - reference images → AtlasCloud → fal (full refs).
+//   - text-only        → AtlasCloud → fal.
 function buildChain(opts: { productId?: string | null; avatarId?: string | null; image_urls: string[] }): Provider[] {
   const chain: Provider[] = [];
   if (ATLAS_KEY) chain.push('atlascloud');
