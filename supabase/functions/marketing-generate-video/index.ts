@@ -170,9 +170,14 @@ async function fetchAvatarImageUrl(admin: any, avatarId: string): Promise<string
     .eq('id', avatarId)
     .maybeSingle();
   if (!avatar) return null;
-  if (isValidHttpUrl((avatar as any).public_url)) return String((avatar as any).public_url);
-  if ((avatar as any).storage_path) return await signedStorageUrl(admin, 'ms-avatars', (avatar as any).storage_path);
-  return null;
+  let raw: string | null = null;
+  if (isValidHttpUrl((avatar as any).public_url)) raw = String((avatar as any).public_url);
+  else if ((avatar as any).storage_path) raw = await signedStorageUrl(admin, 'ms-avatars', (avatar as any).storage_path);
+  if (!raw) return null;
+  // Route avatar through wsrv.nl: 640x640 face-crop JPG. Smaller, tighter
+  // headshots reliably pass Seedance's "real person" moderator on Atlas, and
+  // this is the exact shape that worked before the recent rewrite.
+  return `https://wsrv.nl/?url=${encodeURIComponent(raw)}&w=640&h=640&fit=cover&a=top&output=jpg`;
 }
 
 async function gatherAudioSourceUrls(admin: any, opts: { avatarId?: string | null; format?: string | null }): Promise<string[]> {
