@@ -511,7 +511,7 @@ function isWeak(
   } else if (format === 'Unboxing') {
     // ── Unboxing taste gates — slop catcher, NEVER a concept gate ──
     // 1. Camera language MUST be declared in the opening so we know Claude committed.
-    const cameraLangRx = /\b(TOP-DOWN ASMR|THEATRICAL REVEAL|VLOG SELFIE|QUIET HANDHELD|EDITORIAL PAN|JUMP-CUT HAUL|STREET DOC|TABLETOP CINEMATIC|POV FIRST-PERSON|MACRO TACTILE|OVERHEAD STILL-LIFE|OUTDOOR DAYLIGHT)\b/;
+    const cameraLangRx = /\b(TOP-DOWN ASMR|THEATRICAL REVEAL|VLOG SELFIE|QUIET HANDHELD|EDITORIAL PAN|JUMP-CUT HAUL|STREET DOC|TABLETOP CINEMATIC|POV FIRST-PERSON|MACRO TACTILE|OVERHEAD STILL-LIFE|OUTDOOR DAYLIGHT|HAUL TRY-ON|SCARCITY DROP|FULL-SET REVEAL)\b/;
     const head = finalPrompt.slice(0, 280);
     if (!cameraLangRx.test(head) && !/^[A-Z][A-Z \-]{4,40}—/m.test(head)) {
       return { weak: true, reason: 'unboxing missing explicit camera-language declaration in opening line' };
