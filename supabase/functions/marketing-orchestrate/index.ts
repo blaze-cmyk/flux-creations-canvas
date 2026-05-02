@@ -452,12 +452,9 @@ Deno.serve(async (req) => {
           })
           .eq('id', generationId);
 
-        // Keyframe step is intentionally SKIPPED for avatar jobs.
-        // Atlas Cloud Seedance image-to-video moderates the first-frame image
-        // and rejects anything containing a real person — which is exactly what
-        // an avatar+product keyframe is. We route avatar jobs through
-        // reference-to-video instead (handled inside marketing-generate-video).
-        const keyframeUrl: string | null = null;
+        // No generated keyframe step: product/avatar images are passed as direct
+        // provider references so the creative pipeline stays intact without
+        // inserting a composed first-frame image.
 
         // 4e) Submit to the video function (still synchronous from its own POV
         // but we're already in the background).
@@ -465,7 +462,6 @@ Deno.serve(async (req) => {
           reuseGenerationId: generationId,
           prompt: finalPrompt,
           image_urls: refs,
-          keyframe_url: keyframeUrl,
           aspect: ratio,
           duration_seconds: duration_seconds_final,
           resolution,
