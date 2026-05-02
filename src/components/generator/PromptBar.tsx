@@ -232,7 +232,7 @@ export function PromptBar() {
               {QUALITIES.map((q) => (
                 <button
                   key={q}
-                  onClick={() => setQuality(q)}
+                  onClick={() => { setQuality(q); setQualityOpen(false); }}
                   className={`w-full flex items-center justify-between px-2.5 py-2 rounded-lg text-sm transition-colors ${
                     quality === q ? 'bg-white/10 text-white' : 'text-white/85 hover:bg-white/5'
                   }`}
