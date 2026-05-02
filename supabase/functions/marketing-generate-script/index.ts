@@ -768,6 +768,21 @@ Deno.serve(async (req) => {
         `- If USER_DIRECTION mentions @Image N (or any of the names above), treat that as a literal pointer to the matching reference image.\n`
       : '';
 
+    // ---------- Per-request Podcast studio preset roll (kills "always dim black foam" slop) ----------
+    const PODCAST_PRESETS = [
+      '(1) WARM SUNSET LOFT — golden-hour loft with industrial window, exposed brick, plants, tan suede couch, brass lamp',
+      '(2) DAYLIT SCANDI STUDIO — bright airy room, sheer linen daylight, white oak floor, olive tree, beige bouclé chairs',
+      '(3) NEON GAMER POD — dark room, magenta+cyan RGB glow, vinyl-record back wall, purple neon sign, gaming chairs, slight haze',
+      '(4) COZY COFFEE SHOP CORNER — after-hours specialty coffee shop, edison pendants, chalkboard menu blur, mismatched mustard + olive armchairs',
+      '(5) MINIMAL WHITE CYC — seamless white cyclorama, softbox key + cool blue rim, matte-grey Eames chairs, concrete plinth — editorial',
+      '(7) ROOFTOP MAGIC HOUR — outdoor dusk rooftop, blurred city skyline, warm string bulbs, rattan lounge chairs, teal-to-peach sky',
+      '(8) RETRO 70s WOOD-PANEL DEN — full walnut paneling, mustard shag rug, Chesterfield, vintage globe, amber 2700K floor lamp, film grain',
+    ];
+    const rolledPreset = PODCAST_PRESETS[Math.floor(Math.random() * PODCAST_PRESETS.length)];
+    const podcastPresetBlock = format === 'Podcast'
+      ? `\nROLLED_STUDIO_PRESET (use THIS preset for this generation — do NOT default to the dim-foam classic den unless USER_DIRECTION explicitly demands it):\n${rolledPreset}\nDescribe this preset in rich sensory detail in the final paragraph (specific lights with color temperatures, named props, wall texture, floor, atmosphere). The RØDE boom mic is still mandatory in every shot tag, even on the rooftop / coffee-shop / cyc sets.\n`
+      : '';
+
     const userTextBlock =
       // Duration spec FIRST so it dominates everything that follows.
       `${durationSpec}\n` +
@@ -780,6 +795,7 @@ Deno.serve(async (req) => {
       `${visionFactsCtx}\n` +
       `${avatarCtx}\n\n` +
       `${extraRefBlock}` +
+      `${podcastPresetBlock}` +
       `${directionBlock}\n` +
       `Look at the attached reference images carefully. Product images are for exact visible product details. Avatar image is for facial identity only; do not use its background, clothes, pose, lighting, or framing as the scene. ` +
       `Extract real visible product details (colors, textures, hardware, printed text, distinctive features) into concrete_product_details — do not invent. ` +
