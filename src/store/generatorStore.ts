@@ -43,15 +43,20 @@ type GeneratorState = {
 };
 
 export const MODELS = [
-  { id: 'nano-banana-pro', name: 'Nano Banana Pro', desc: "Google's flagship generation model", featured: true },
-  { id: 'nano-banana-2', name: 'Nano Banana 2', desc: 'Pro quality at Flash speed', featured: true, badge: 'NEW' as const },
-  { id: 'seedream-4', name: 'Seedream 4.0', desc: "ByteDance's next-gen 4K image model", featured: true },
-  { id: 'seedream-5-lite', name: 'Seedream 5.0 Lite', desc: 'Intelligent visual reasoning', featured: true },
-  { id: 'grok-imagine', name: 'Grok Imagine', desc: "xAI's highly aesthetic image generation", featured: true },
-  { id: 'kling', name: 'Kling Image V3', desc: 'Latest Kling image model with face control', featured: true },
-  { id: 'flux', name: 'Flux 2 Pro', desc: 'State-of-the-art Flux generation & editing', featured: true },
-  { id: 'wan', name: 'Wan 2.2', desc: 'Photorealistic high-resolution generation', featured: true },
+  { id: 'nano-banana-pro', name: 'Nano Banana Pro', desc: "Google's flagship generation model", featured: true, maxRefs: 14 },
+  { id: 'nano-banana-2', name: 'Nano Banana 2', desc: 'Pro quality at Flash speed', featured: true, badge: 'NEW' as const, maxRefs: 14 },
+  { id: 'seedream-4', name: 'Seedream 4.0', desc: "ByteDance's next-gen 4K image model", featured: true, maxRefs: 10 },
+  { id: 'seedream-5-lite', name: 'Seedream 5.0 Lite', desc: 'Intelligent visual reasoning', featured: true, maxRefs: 10 },
+  { id: 'grok-imagine', name: 'Grok Imagine', desc: "xAI's highly aesthetic image generation", featured: true, maxRefs: 0 },
+  { id: 'kling', name: 'Kling Image V3', desc: 'Latest Kling image model with face control', featured: true, maxRefs: 1 },
+  { id: 'flux', name: 'Flux 2 Pro', desc: 'State-of-the-art Flux generation & editing', featured: true, maxRefs: 10 },
+  { id: 'wan', name: 'Wan 2.2', desc: 'Photorealistic high-resolution generation', featured: true, maxRefs: 0 },
 ];
+
+export function getModelMaxRefs(modelId: string): number {
+  return MODELS.find((m) => m.id === modelId)?.maxRefs ?? 5;
+}
+
 
 export const ASPECT_RATIOS = [
   'Auto', '1:1', '3:4', '4:3', '2:3', '3:2', '9:16', '16:9', '5:4', '4:5', '21:9',
@@ -202,10 +207,10 @@ export const useGeneratorStore = create<GeneratorState>()((set, get) => ({
   setPrompt: (prompt) => { set({ prompt }); localStorage.setItem('gen-last-prompt', prompt); },
   addReferenceImage: (img) => {
     const refs = get().referenceImages;
-    if (refs.length < 5) {
+    const max = getModelMaxRefs(get().model);
+    if (refs.length < max) {
       const next = [...refs, img];
       set({ referenceImages: next });
-      // If it's base64, upload to storage then swap with URL
       if (img.startsWith('data:')) {
         uploadReferenceImage(img).then((url) => {
           if (url !== img) {
@@ -231,7 +236,14 @@ export const useGeneratorStore = create<GeneratorState>()((set, get) => ({
     set({ referenceImages: imgs });
     persistReferenceImages(imgs);
   },
-  setModel: (model) => { set({ model }); localStorage.setItem('gen-last-model', model); },
+  setModel: (model) => {
+    const max = getModelMaxRefs(model);
+    const refs = get().referenceImages;
+    const trimmed = refs.length > max ? refs.slice(0, max) : refs;
+    set({ model, referenceImages: trimmed });
+    if (trimmed !== refs) persistReferenceImages(trimmed);
+    localStorage.setItem('gen-last-model', model);
+  },
   setQuality: (quality) => { set({ quality }); localStorage.setItem('gen-last-quality', quality); },
   setAspectRatio: (aspectRatio) => { set({ aspectRatio }); localStorage.setItem('gen-last-ar', aspectRatio); },
   setQuantity: (qty) => set({ quantity: Math.max(1, Math.min(4, qty)) }),
@@ -400,7 +412,8 @@ export const useGeneratorStore = create<GeneratorState>()((set, get) => ({
 
   useAsReference: (imageUrl) => {
     const refs = get().referenceImages;
-    if (refs.length < 5) {
+    const max = getModelMaxRefs(get().model);
+    if (refs.length < max) {
       set({ referenceImages: [...refs, imageUrl], selectedImageId: null });
     }
   },

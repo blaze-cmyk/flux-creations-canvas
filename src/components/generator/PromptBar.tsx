@@ -1,4 +1,4 @@
-import { useGeneratorStore, MODELS, QUALITIES, ASPECT_RATIOS } from '@/store/generatorStore';
+import { useGeneratorStore, MODELS, QUALITIES, ASPECT_RATIOS, getModelMaxRefs } from '@/store/generatorStore';
 import { ImagePlus, Minus, Plus, Check, Search, Sparkles, Heart, X } from 'lucide-react';
 import { useRef, useState, useEffect, useCallback } from 'react';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
@@ -47,6 +47,7 @@ export function PromptBar() {
   const mentionRangeRef = useRef<Range | null>(null);
 
   const selectedModel = MODELS.find((m) => m.id === model);
+  const maxRefs = getModelMaxRefs(model);
 
   // Render the prompt string into the contentEditable, parsing "@Image N" into chips.
   const renderToEditor = useCallback((text: string) => {
@@ -130,13 +131,14 @@ export function PromptBar() {
   };
 
   const handleFiles = useCallback((files: FileList | File[]) => {
+    if (maxRefs === 0) return;
     const arr = Array.from(files).filter(f => f.type.startsWith('image/'));
-    arr.slice(0, 5 - referenceImages.length).forEach((file) => {
+    arr.slice(0, maxRefs - referenceImages.length).forEach((file) => {
       const reader = new FileReader();
       reader.onload = () => addReferenceImage(reader.result as string);
       reader.readAsDataURL(file);
     });
-  }, [referenceImages.length, addReferenceImage]);
+  }, [referenceImages.length, addReferenceImage, maxRefs]);
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) handleFiles(e.target.files);
@@ -193,6 +195,7 @@ export function PromptBar() {
         {referenceImages.length > 0 && (
           <ReferenceImageStrip
             images={referenceImages}
+            maxImages={maxRefs}
             onAdd={() => fileInputRef.current?.click()}
             onPreview={setPreviewImg}
             onRemove={(idx) => {
@@ -206,12 +209,13 @@ export function PromptBar() {
         )}
 
         <div className="flex items-center gap-2">
-          {/* Left + button (upload reference) — only when no refs yet */}
-          {referenceImages.length === 0 && (
+          {/* Left + button (upload reference) — only when no refs yet and model supports refs */}
+          {referenceImages.length === 0 && maxRefs > 0 && (
             <button
               onClick={() => fileInputRef.current?.click()}
               className="grid place-items-center w-9 h-9 self-start mt-1 rounded-lg ms-chip-glass text-foreground shrink-0"
               aria-label="Add reference"
+              title={`Up to ${maxRefs} reference image${maxRefs === 1 ? '' : 's'}`}
             >
               <Plus className="w-4 h-4" strokeWidth={1.5} />
             </button>
