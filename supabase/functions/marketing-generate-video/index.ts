@@ -737,7 +737,7 @@ Deno.serve(async (req) => {
     }
     log('INFO', 'submit: row persisted', { jobId: row.id, mode: bundle.mode });
 
-    const submission = await submitToAtlas({
+    const submission = await submitWithModerationFallback({
       prompt,
       bundle,
       duration,
