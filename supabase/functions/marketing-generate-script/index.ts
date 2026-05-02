@@ -535,7 +535,14 @@ function isWeak(
     const SOUND_VOCAB = /\b(cardboard|tissue|foam|sticker peel|ribbon|hollow|magnetic|seam|crinkle|whisper|click|pop|thunk|rustle|chain shimmer|leather creak|glass clink|plastic shrink)\b/gi;
     const soundHits = (finalPrompt.match(SOUND_VOCAB) || []).length;
     if (soundHits < 2) return { weak: true, reason: `unboxing needs ≥2 specific sound-vocabulary hits (got ${soundHits})` };
-    // 6. Packaging-as-hero — ≥1 packaging noun must appear before the first time-anchor beat.
+    // 6. Cinematography specificity — the scene must feel DIRECTED, not generic AI "cinematic" slop.
+    const SCENE_TEXTURE = /\b(wooden desk|oak table|white silk|satin|window daylight|natural daylight|diffused daylight|gym lighting|front camera|overhead|top-down|handheld|iPhone|macro|35mm|50mm|shallow depth|camera-left|side window|golden-hour|practical light|sweater sleeves|ring|watch|table surface|flatlay|plinth|workbench|bedroom|kitchen|cafe|park bench|picnic blanket|car seat|studio|concrete|linen|velvet|leather|ribbon trails?|foam insert|tissue paper|polymailer|box centered)\b/gi;
+    const sceneHits = (finalPrompt.match(SCENE_TEXTURE) || []).length;
+    if (sceneHits < 3) return { weak: true, reason: `unboxing cinematography needs ≥3 concrete scene/light/surface details (got ${sceneHits})` };
+    const genericCineRx = /\b(generic cinematic|cinematic background|aesthetic background|clean setup|beautiful setup|premium background|minimal setup)\b/i;
+    const genericCineHit = finalPrompt.match(genericCineRx);
+    if (genericCineHit) return { weak: true, reason: `unboxing contains generic cinematography slop: "${genericCineHit[0]}"` };
+    // 7. Packaging-as-hero — ≥1 packaging noun must appear before the first time-anchor beat.
     const firstBeatIdx = finalPrompt.search(/\b\d{1,2}(?:\.\d)?\s*[–-]\s*\d{1,2}(?:\.\d)?\s*s/i);
     if (firstBeatIdx > 0) {
       const preamble = finalPrompt.slice(0, firstBeatIdx);
@@ -543,9 +550,9 @@ function isWeak(
         return { weak: true, reason: 'unboxing missing packaging description before first beat (packaging-as-hero rule)' };
       }
     }
-    // 7. Product fidelity — at least one concrete detail referenced.
+    // 8. Product fidelity — at least one concrete detail referenced.
     // (the global details check below also runs)
-    // 8. AVATAR-VOICE TASTE GATE — only fires for HIGH-ENERGY haul/scarcity/full-set/jump-cut/vlog modes.
+    // 9. AVATAR-VOICE TASTE GATE — only fires for HIGH-ENERGY haul/scarcity/full-set/jump-cut modes.
     //    QUIET HANDHELD is intentionally excluded: it's the ash-grey-tee whisper family — no nail-taps,
     //    no 360° spins, no chopping gestures. Forcing those onto quiet luxury IS the AI slop we're killing.
     const hauLEnergyRx = /\b(HAUL TRY-ON|SCARCITY DROP|FULL-SET REVEAL|JUMP-CUT HAUL)\b/;
