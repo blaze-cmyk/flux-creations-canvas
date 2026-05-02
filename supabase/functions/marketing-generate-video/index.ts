@@ -1,20 +1,7 @@
-// Marketing Studio video generation — AtlasCloud Seedance 2.0 (sole provider).
-//
-// Implements the three Atlas Seedance endpoints exactly per docs:
-//   • bytedance/seedance-2.0/text-to-video        (prompt only)
-//   • bytedance/seedance-2.0/image-to-video       (prompt + image first-frame, optional last_image)
-//   • bytedance/seedance-2.0/reference-to-video   (prompt + reference_images[1-9], optional reference_audios[1-3])
-//
-// Routing decision per Studio inputs:
-//   • avatar present (with or without product) → keyframe (avatar+product composed) → IMAGE-TO-VIDEO
-//   • product only, no avatar                  → REFERENCE-TO-VIDEO with product photos
-//   • text only                                → TEXT-TO-VIDEO
-//
-// Atlas docs:
-//   POST   https://api.atlascloud.ai/api/v1/model/generateVideo      → { data: { id } }
-//   GET    https://api.atlascloud.ai/api/v1/model/prediction/{id}    → { data: { status, outputs: [url], error } }
-//   POST   https://api.atlascloud.ai/api/v1/model/uploadMedia        → multipart/form-data, returns { data: { download_url } }
-
+// Marketing Studio video generation — clean AtlasCloud + fal Seedance pipeline.
+// Keeps the creative/script pipeline intact, but uses provider-native Seedance
+// reference-to-video with direct product/avatar references. No generated keyframe
+// or Nano Banana step is used here.
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0';
 
 const corsHeaders = {
@@ -24,19 +11,51 @@ const corsHeaders = {
 };
 
 const ATLAS_KEY = Deno.env.get('ATLASCLOUD_API_KEY') ?? '';
+const FAL_KEY = Deno.env.get('FAL_KEY') ?? '';
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+
 const ATLAS_BASE = 'https://api.atlascloud.ai/api/v1/model';
+const FAL_QUEUE = 'https://queue.fal.run';
+const SEEDANCE_REF = 'bytedance/seedance-2.0/reference-to-video';
+const SEEDANCE_TEXT = 'bytedance/seedance-2.0/text-to-video';
 
-type AtlasMode = 'text-to-video' | 'image-to-video' | 'reference-to-video';
+type Provider = 'atlascloud' | 'fal';
+type VideoMode = 'text-to-video' | 'reference-to-video';
 
-const MIN_TIMEOUT_MS = 8 * 60 * 1000;
-const MAX_TIMEOUT_MS = 15 * 60 * 1000;
+type ReferenceBundle = {
+  mode: VideoMode;
+  referenceImages: string[];
+  referenceAudios: string[];
+  hasAvatar: boolean;
+  hasProduct: boolean;
+};
 
-// ──────────────────────────── helpers ────────────────────────────
+type SubmitOutcome = {
+  ok: boolean;
+  provider?: Provider;
+  endpoint?: string;
+  requestId?: string;
+  usedFallback?: boolean;
+  error?: string;
+  raw?: unknown;
+};
+
+type PollOutcome = {
+  status: 'processing' | 'done' | 'failed';
+  videoUrl?: string;
+  error?: string;
+};
 
 function log(level: 'INFO' | 'WARN' | 'ERROR', msg: string, ctx: Record<string, unknown> = {}) {
   console.log(JSON.stringify({ level, msg, ...ctx, ts: new Date().toISOString() }));
+}
+
+function json(data: unknown, status = 200) {
+  return new Response(JSON.stringify(data), {
+    status,
+    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+  });
 }
 
 function isValidHttpUrl(value: unknown): value is string {
@@ -49,33 +68,78 @@ function isValidHttpUrl(value: unknown): value is string {
   }
 }
 
+function uniqueValidUrls(values: unknown[], max = 99): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const raw of values) {
+    if (!isValidHttpUrl(raw)) continue;
+    const url = String(raw).trim();
+    if (seen.has(url)) continue;
+    seen.add(url);
+    out.push(url);
+    if (out.length >= max) break;
+  }
+  return out;
+}
+
 function clampDuration(d: unknown): number {
-  // Atlas: integer 4-15, or -1 for auto.
   const n = Number(d);
   if (!Number.isFinite(n)) return 8;
   if (n === -1) return -1;
   return Math.max(4, Math.min(15, Math.round(n)));
 }
 
-function normalizeResolution(r: unknown): string {
-  // Atlas: 480p | 720p | 1080p | 1080p-SR | 1440p-SR
+function normalizeAtlasResolution(r: unknown): string {
   const allowed = new Set(['480p', '720p', '1080p', '1080p-SR', '1440p-SR']);
   const v = String(r ?? '720p');
   return allowed.has(v) ? v : '720p';
 }
 
-function normalizeRatio(a: unknown): string {
-  // Atlas: 16:9 | 4:3 | 1:1 | 3:4 | 9:16 | 21:9 | adaptive
+function normalizeFalResolution(r: unknown): string {
+  return String(r ?? '').toLowerCase() === '480p' ? '480p' : '720p';
+}
+
+function normalizeAtlasRatio(a: unknown): string {
   const allowed = new Set(['16:9', '4:3', '1:1', '3:4', '9:16', '21:9', 'adaptive']);
   const v = String(a ?? 'adaptive');
-  if (!v || v === 'Auto') return 'adaptive';
+  if (!v || v === 'Auto' || v === 'auto') return 'adaptive';
   return allowed.has(v) ? v : 'adaptive';
+}
+
+function normalizeFalAspect(a: unknown): string {
+  const allowed = new Set(['21:9', '16:9', '4:3', '1:1', '3:4', '9:16', 'auto']);
+  const v = String(a ?? 'auto');
+  if (!v || v === 'Auto' || v === 'adaptive') return 'auto';
+  return allowed.has(v) ? v : 'auto';
+}
+
+function falDuration(d: number): string {
+  return d === -1 ? 'auto' : String(Math.max(4, Math.min(15, d)));
 }
 
 function timeoutForDuration(d: unknown): number {
   const dur = clampDuration(d);
   const seconds = dur === -1 ? 10 : dur;
-  return Math.max(MIN_TIMEOUT_MS, Math.min(MAX_TIMEOUT_MS, (6 * 60 + seconds * 30) * 1000));
+  return Math.max(8 * 60 * 1000, Math.min(15 * 60 * 1000, (6 * 60 + seconds * 30) * 1000));
+}
+
+function isBalanceError(status: number, body: string) {
+  if (status === 401 || status === 402) return true;
+  return /balance|exhausted|locked|insufficient|top.?up/i.test(body);
+}
+
+function isModerationError(err: string | undefined) {
+  return !!err && /real person|may contain real|moderation|nsfw|content policy|safety/i.test(err);
+}
+
+function providerOrder(bundle: ReferenceBundle, forced?: Provider): Provider[] {
+  if (forced) return [forced];
+  const order: Provider[] = bundle.hasAvatar ? ['fal', 'atlascloud'] : ['atlascloud', 'fal'];
+  return order.filter((p) => (p === 'fal' ? !!FAL_KEY : !!ATLAS_KEY));
+}
+
+function providerLabel(p: Provider) {
+  return p === 'atlascloud' ? 'AtlasCloud' : 'fal.ai';
 }
 
 async function signedStorageUrl(admin: any, bucket: string, path: string, ttl = 60 * 60 * 24): Promise<string | null> {
@@ -83,278 +147,45 @@ async function signedStorageUrl(admin: any, bucket: string, path: string, ttl = 
   return data?.signedUrl ?? null;
 }
 
-// ──────────────────────────── Atlas API client ────────────────────────────
-
-interface AtlasUploadResult {
-  ok: boolean;
-  url?: string;
-  error?: string;
-}
-
-/**
- * Upload an image or audio file to Atlas storage and get back a CDN URL.
- * Per docs: POST /api/v1/model/uploadMedia, multipart/form-data, returns { data: { download_url } }
- */
-async function atlasUpload(sourceUrl: string, kind: 'image' | 'audio', index = 0): Promise<AtlasUploadResult> {
-  try {
-    const src = await fetch(sourceUrl);
-    if (!src.ok) return { ok: false, error: `source ${kind} not downloadable (${src.status})` };
-    const blob = await src.blob();
-    const contentType = blob.type || (kind === 'audio' ? 'audio/mpeg' : 'image/jpeg');
-    const ext = (contentType.split('/')[1] || (kind === 'audio' ? 'mp3' : 'jpg')).split(';')[0];
-
-    const form = new FormData();
-    form.append('file', blob, `${kind}-${index + 1}.${ext}`);
-
-    const res = await fetch(`${ATLAS_BASE}/uploadMedia`, {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${ATLAS_KEY}` },
-      body: form,
-    });
-    const json = await res.json().catch(() => ({}));
-    const downloadUrl = json?.data?.download_url ?? json?.data?.url ?? json?.url;
-    if (!res.ok || !isValidHttpUrl(downloadUrl)) {
-      return { ok: false, error: json?.msg || json?.message || `upload http ${res.status}` };
-    }
-    return { ok: true, url: String(downloadUrl) };
-  } catch (e) {
-    return { ok: false, error: e instanceof Error ? e.message : 'upload threw' };
-  }
-}
-
-interface AtlasSubmitResult {
-  ok: boolean;
-  predictionId?: string;
-  error?: string;
-  raw: unknown;
-}
-
-/**
- * Submit a Seedance generation. Caller is responsible for choosing the right
- * `model` and supplying the body fields per docs:
- *   • text-to-video       → { model, prompt, duration, resolution, ratio, generate_audio, watermark }
- *   • image-to-video      → above + { image: <url|base64|asset://>, last_image? }
- *   • reference-to-video  → above + { reference_images: string[], reference_audios?: string[] }
- */
-async function atlasGenerateVideo(body: Record<string, unknown>): Promise<AtlasSubmitResult> {
-  const res = await fetch(`${ATLAS_BASE}/generateVideo`, {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${ATLAS_KEY}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
-  });
-  const json = await res.json().catch(() => ({}));
-  const predictionId = json?.data?.id ?? json?.id;
-  if (!res.ok || !predictionId) {
-    const code = json?.code ?? res.status;
-    const msg = json?.message ?? json?.msg ?? json?.data?.error ?? `http ${res.status}`;
-    return { ok: false, error: `Atlas ${code}: ${msg}`, raw: json };
-  }
-  return { ok: true, predictionId: String(predictionId), raw: json };
-}
-
-interface AtlasPollResult {
-  status: 'processing' | 'done' | 'failed';
-  videoUrl?: string;
-  error?: string;
-}
-
-/**
- * Poll a Seedance prediction. Per docs status ∈ processing | completed | succeeded | failed | timeout.
- * On success, video URL is at data.outputs[0] (string) or data.outputs[0].url (object form for safety).
- */
-async function atlasPollPrediction(predictionId: string): Promise<AtlasPollResult> {
-  const res = await fetch(`${ATLAS_BASE}/prediction/${predictionId}`, {
-    headers: { Authorization: `Bearer ${ATLAS_KEY}` },
-  });
-  const json = await res.json().catch(() => ({}));
-  const data = json?.data ?? json;
-  const status = String(data?.status ?? '').toLowerCase();
-
-  if (status === 'completed' || status === 'succeeded') {
-    const out = data?.outputs?.[0];
-    const videoUrl = typeof out === 'string' ? out : out?.url ?? null;
-    if (videoUrl) return { status: 'done', videoUrl: String(videoUrl) };
-    return { status: 'failed', error: 'Atlas completed without a video URL' };
-  }
-  if (status === 'failed' || status === 'timeout') {
-    return { status: 'failed', error: data?.error || json?.message || `Atlas reported ${status}` };
-  }
-  return { status: 'processing' };
-}
-
-// ──────────────────────────── reference gathering ────────────────────────────
-
-interface ReferenceBundle {
-  mode: AtlasMode;
-  // image-to-video: a single first-frame URL (Atlas-hosted)
-  firstFrame?: string;
-  // reference-to-video: 1..9 reference image URLs (Atlas-hosted)
-  referenceImages?: string[];
-  // reference-to-video: 0..3 reference audio URLs (Atlas-hosted)
-  referenceAudios?: string[];
-}
-
-// Collect product photo signed URLs (originals from storage).
-async function fetchProductImageUrls(admin: any, productId: string, max = 6): Promise<string[]> {
-  const out: string[] = [];
+async function fetchProductImageUrls(admin: any, productId: string, max = 7): Promise<string[]> {
+  const urls: string[] = [];
   const { data: imgs } = await admin
     .from('ms_product_images')
     .select('storage_path, is_primary')
     .eq('product_id', productId)
     .order('is_primary', { ascending: false })
     .limit(max);
+
   for (const img of imgs ?? []) {
     const signed = await signedStorageUrl(admin, 'ms-products', (img as any).storage_path);
-    if (signed) out.push(signed);
+    if (signed) urls.push(signed);
   }
-  return out;
+  return urls;
 }
 
 async function fetchAvatarImageUrl(admin: any, avatarId: string): Promise<string | null> {
-  const { data: a } = await admin
+  const { data: avatar } = await admin
     .from('ms_avatars')
     .select('public_url, storage_path')
     .eq('id', avatarId)
     .maybeSingle();
-  if (!a) return null;
-  if ((a as any).public_url && isValidHttpUrl((a as any).public_url)) return String((a as any).public_url);
-  if ((a as any).storage_path) {
-    const signed = await signedStorageUrl(admin, 'ms-avatars', (a as any).storage_path);
-    if (signed) return signed;
-  }
+  if (!avatar) return null;
+  if (isValidHttpUrl((avatar as any).public_url)) return String((avatar as any).public_url);
+  if ((avatar as any).storage_path) return await signedStorageUrl(admin, 'ms-avatars', (avatar as any).storage_path);
   return null;
 }
-
-// Upload a list of source URLs to Atlas, return only successful Atlas-hosted URLs.
-async function uploadAllToAtlas(sourceUrls: string[], kind: 'image' | 'audio'): Promise<string[]> {
-  const out: string[] = [];
-  for (const url of sourceUrls) {
-    if (!isValidHttpUrl(url)) continue;
-    const r = await atlasUpload(url, kind, out.length);
-    if (r.ok && r.url) out.push(r.url);
-    else log('WARN', `atlas upload failed (${kind})`, { err: r.error });
-  }
-  return out;
-}
-
-/**
- * Build the Atlas Seedance request bundle.
- *
- * IMPORTANT routing rules — these reflect what Atlas Cloud Seedance 2.0 actually
- * accepts (per docs at /docs/models/video):
- *
- *   • image-to-video  → expects a SINGLE first-frame `image`. Atlas runs strict
- *                       moderation on this image and will reject anything that
- *                       "may contain real person". So we ONLY use this endpoint
- *                       when we have a non-human keyframe (e.g. product-only
- *                       composed keyframe). NEVER for avatar + product — that
- *                       gets reliably rejected.
- *
- *   • reference-to-video → up to 9 `reference_images` + optional `reference_audios`.
- *                          This is the correct endpoint for avatar/person inputs;
- *                          it composes a fresh scene using the references for
- *                          identity/style/product anchoring. This is what every
- *                          format with an avatar should use.
- *
- *   • text-to-video → no image inputs at all.
- */
-async function buildReferenceBundle(admin: any, opts: {
-  productId?: string | null;
-  avatarId?: string | null;
-  keyframePath?: string | null;
-  keyframeUrl?: string | null;
-  format?: string | null;
-  audioSourceUrls: string[];
-  extraImageUrls: string[];
-  preferReferenceMode?: boolean;
-}): Promise<ReferenceBundle> {
-  const hasAvatar = !!opts.avatarId;
-  const hasProduct = !!opts.productId;
-
-  // ──── Resolve raw source URLs ────
-  const productSrcs: string[] = hasProduct ? await fetchProductImageUrls(admin, opts.productId!, 6) : [];
-  const avatarSrc: string | null = hasAvatar ? await fetchAvatarImageUrl(admin, opts.avatarId!) : null;
-  const extras: string[] = (opts.extraImageUrls ?? []).filter(isValidHttpUrl);
-
-  // ──── Avatar jobs → reference-to-video ALWAYS ────
-  // Order matters for Seedance: the prompt references "image 1", "image 2", etc.
-  // We put the avatar first (identity anchor) then product photos (so script can
-  // say "the person in image 1 holds the product in image 2…") then extras.
-  if (hasAvatar) {
-    const refSources: string[] = [];
-    if (avatarSrc) refSources.push(avatarSrc);
-    refSources.push(...productSrcs);
-    refSources.push(...extras);
-
-    const refImages = await uploadAllToAtlas(refSources.slice(0, 9), 'image');
-    if (refImages.length > 0) {
-      const audioRefs = await uploadAllToAtlas(opts.audioSourceUrls.slice(0, 3), 'audio');
-      return {
-        mode: 'reference-to-video',
-        referenceImages: refImages,
-        referenceAudios: audioRefs.length ? audioRefs : undefined,
-      };
-    }
-    // If avatar uploads failed entirely, fall through to text-to-video.
-    log('WARN', 'avatar present but no references uploaded — falling back to text-to-video');
-    return { mode: 'text-to-video' };
-  }
-
-  // ──── Product-only jobs → reference-to-video with product photos + extras ────
-  if (hasProduct) {
-    const refSources = [...productSrcs, ...extras];
-    const refImages = await uploadAllToAtlas(refSources.slice(0, 9), 'image');
-    if (refImages.length > 0) {
-      return { mode: 'reference-to-video', referenceImages: refImages };
-    }
-  }
-
-  // ──── No product, no avatar, but extras → reference-to-video using extras ────
-  if (extras.length > 0) {
-    const refImages = await uploadAllToAtlas(extras.slice(0, 9), 'image');
-    if (refImages.length > 0) {
-      return { mode: 'reference-to-video', referenceImages: refImages };
-    }
-  }
-
-  // ──── Optional non-human keyframe path (only when explicitly safe) ────
-  // We currently do NOT route through image-to-video for avatar jobs because
-  // Atlas blocks human first frames. Kept here for future product-only keyframes.
-  const hasKeyframe = !!opts.keyframePath || isValidHttpUrl(opts.keyframeUrl);
-  if (!hasAvatar && hasKeyframe) {
-    let keyframeUrl: string | null = null;
-    if (opts.keyframePath) keyframeUrl = await signedStorageUrl(admin, 'ms-products', opts.keyframePath);
-    if (!keyframeUrl && isValidHttpUrl(opts.keyframeUrl)) keyframeUrl = String(opts.keyframeUrl);
-    if (keyframeUrl) {
-      const uploaded = await atlasUpload(keyframeUrl, 'image', 0);
-      if (uploaded.ok && uploaded.url) {
-        return { mode: 'image-to-video', firstFrame: uploaded.url };
-      }
-    }
-  }
-
-  // ──── Text-to-video ────
-  return { mode: 'text-to-video' };
-}
-
-function isModerationRealPersonError(err: string | undefined): boolean {
-  if (!err) return false;
-  return /real person|may contain real|moderation|nsfw|content policy/i.test(err);
-}
-
-// ──────────────────────────── orchestrator helpers ────────────────────────────
 
 async function gatherAudioSourceUrls(admin: any, opts: { avatarId?: string | null; format?: string | null }): Promise<string[]> {
   const out: string[] = [];
   if (opts.avatarId) {
     const { data: av } = await admin.from('ms_avatars').select('voice_sample_url').eq('id', opts.avatarId).maybeSingle();
-    if (isValidHttpUrl(av?.voice_sample_url)) out.push(String(av?.voice_sample_url).trim());
+    if (isValidHttpUrl(av?.voice_sample_url)) out.push(String(av.voice_sample_url).trim());
   }
   if (String(opts.format ?? '').toLowerCase() === 'podcast') {
     const second = await ensurePodcastSecondVoiceUrl(admin);
     if (second && !out.includes(second)) out.push(second);
   }
-  return out;
+  return out.slice(0, 3);
 }
 
 async function ensurePodcastSecondVoiceUrl(admin: any): Promise<string | null> {
@@ -367,125 +198,268 @@ async function ensurePodcastSecondVoiceUrl(admin: any): Promise<string | null> {
   try {
     const head = await fetch(publicUrl, { method: 'HEAD' });
     if (head.ok) return publicUrl;
-  } catch { /* generate */ }
+  } catch { /* generate below */ }
   try {
-    const tts = await fetch(
-      `https://api.elevenlabs.io/v1/text-to-speech/cgSgspJ2msm6clMCkdW9?output_format=mp3_44100_128`,
-      {
-        method: 'POST',
-        headers: { 'xi-api-key': ELEVENLABS_API_KEY, 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          text: "Yeah, no, I get that. That's actually so true.",
-          model_id: 'eleven_multilingual_v2',
-          voice_settings: { stability: 0.55, similarity_boost: 0.85, style: 0.2, use_speaker_boost: true, speed: 1.0 },
-        }),
-      },
-    );
+    const tts = await fetch('https://api.elevenlabs.io/v1/text-to-speech/cgSgspJ2msm6clMCkdW9?output_format=mp3_44100_128', {
+      method: 'POST',
+      headers: { 'xi-api-key': ELEVENLABS_API_KEY, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        text: "Yeah, no, I get that. That's actually so true.",
+        model_id: 'eleven_multilingual_v2',
+        voice_settings: { stability: 0.55, similarity_boost: 0.85, style: 0.2, use_speaker_boost: true, speed: 1.0 },
+      }),
+    });
     if (!tts.ok) return null;
     const audio = new Uint8Array(await tts.arrayBuffer());
-    const { error: upErr } = await admin.storage
-      .from('video-inputs')
-      .upload(path, audio, { contentType: 'audio/mpeg', upsert: true });
-    if (upErr) return null;
-    return publicUrl;
+    const { error } = await admin.storage.from('video-inputs').upload(path, audio, { contentType: 'audio/mpeg', upsert: true });
+    return error ? null : publicUrl;
   } catch {
     return null;
   }
 }
 
-// ──────────────────────────── submit + retry pipeline ────────────────────────────
+async function buildReferenceBundle(admin: any, opts: {
+  productId?: string | null;
+  avatarId?: string | null;
+  extraImageUrls: string[];
+  audioSourceUrls: string[];
+}): Promise<ReferenceBundle> {
+  const productUrls = opts.productId ? await fetchProductImageUrls(admin, opts.productId, 7) : [];
+  const avatarUrl = opts.avatarId ? await fetchAvatarImageUrl(admin, opts.avatarId) : null;
 
-interface SubmitOutcome {
-  ok: boolean;
-  predictionId?: string;
-  endpoint?: AtlasMode;
-  error?: string;
-  raw?: unknown;
+  const orderedRefs = uniqueValidUrls([
+    ...(avatarUrl ? [avatarUrl] : []),
+    ...productUrls,
+    ...(opts.extraImageUrls ?? []),
+  ], 9);
+
+  return {
+    mode: orderedRefs.length > 0 ? 'reference-to-video' : 'text-to-video',
+    referenceImages: orderedRefs,
+    referenceAudios: uniqueValidUrls(opts.audioSourceUrls ?? [], 3),
+    hasAvatar: !!opts.avatarId,
+    hasProduct: !!opts.productId,
+  };
 }
 
-async function submitToAtlas(opts: {
-  prompt: string;
-  bundle: ReferenceBundle;
-  duration: number;
-  resolution: string;
-  ratio: string;
-  generateAudio: boolean;
-}): Promise<SubmitOutcome> {
-  const model = `bytedance/seedance-2.0/${opts.bundle.mode}`;
+function withReferenceMap(prompt: string, bundle: ReferenceBundle) {
+  if (bundle.mode !== 'reference-to-video' || bundle.referenceImages.length === 0) return prompt;
+  const lines: string[] = [];
+  if (bundle.hasAvatar) {
+    lines.push('Reference map: image 1 is the creator/avatar identity. Preserve facial likeness only; do not copy the uploaded photo composition, background, pose, lighting, or wardrobe.');
+    if (bundle.hasProduct) lines.push('Product references start at image 2. Preserve the product shape, color, material, packaging, and visible details exactly.');
+  } else if (bundle.hasProduct) {
+    lines.push('Reference map: images 1 onward are product references. Preserve product shape, color, material, packaging, and visible details exactly.');
+  } else {
+    lines.push('Reference map: use the provided images as visual anchors, not as a first frame to animate.');
+  }
+  lines.push('Generate a fresh scene from the script below; direct the subject and product naturally inside that new scene.');
+  return `${lines.join('\n')}\n\n${prompt}`;
+}
+
+async function atlasSubmit(opts: { prompt: string; bundle: ReferenceBundle; duration: number; resolution: string; ratio: string; generateAudio: boolean }): Promise<SubmitOutcome> {
+  if (!ATLAS_KEY) return { ok: false, provider: 'atlascloud', error: 'ATLASCLOUD_API_KEY not configured' };
+  const endpoint = opts.bundle.mode === 'reference-to-video' ? SEEDANCE_REF : SEEDANCE_TEXT;
   const body: Record<string, unknown> = {
-    model,
+    model: endpoint,
     prompt: opts.prompt,
     duration: opts.duration,
-    resolution: opts.resolution,
-    ratio: opts.ratio,
+    resolution: normalizeAtlasResolution(opts.resolution),
+    ratio: normalizeAtlasRatio(opts.ratio),
     generate_audio: opts.generateAudio,
     watermark: false,
   };
-
-  if (opts.bundle.mode === 'image-to-video' && opts.bundle.firstFrame) {
-    body.image = opts.bundle.firstFrame;
-  } else if (opts.bundle.mode === 'reference-to-video' && opts.bundle.referenceImages?.length) {
+  if (opts.bundle.mode === 'reference-to-video') {
     body.reference_images = opts.bundle.referenceImages;
-    if (opts.bundle.referenceAudios?.length) {
-      body.reference_audios = opts.bundle.referenceAudios;
-    }
+    body.reference_videos = [];
+    body.return_last_frame = false;
+    if (opts.bundle.referenceAudios.length) body.reference_audios = opts.bundle.referenceAudios;
   }
 
-  const result = await atlasGenerateVideo(body);
-  if (!result.ok) {
-    return { ok: false, endpoint: opts.bundle.mode, error: result.error, raw: result.raw };
+  const res = await fetch(`${ATLAS_BASE}/generateVideo`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${ATLAS_KEY}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  const text = await res.text();
+  let parsed: any = {};
+  try { parsed = JSON.parse(text); } catch { /* keep text */ }
+  const predictionId = parsed?.data?.id ?? parsed?.id;
+  if (!res.ok || !predictionId) {
+    const code = parsed?.code ?? res.status;
+    const msg = parsed?.message ?? parsed?.msg ?? parsed?.data?.error ?? text || `http ${res.status}`;
+    return { ok: false, provider: 'atlascloud', endpoint, error: `AtlasCloud ${code}: ${msg}`, raw: parsed || text };
   }
-  return { ok: true, predictionId: result.predictionId, endpoint: opts.bundle.mode, raw: result.raw };
+  return { ok: true, provider: 'atlascloud', endpoint, requestId: String(predictionId), raw: parsed };
 }
 
-/**
- * Submit + auto-retry once on Atlas moderation rejection ("real person" etc.).
- * If the first attempt was image-to-video and got moderated, retry as
- * reference-to-video using whatever references we have (or text-to-video
- * if none).
- */
-async function submitWithModerationFallback(opts: {
+async function falSubmit(opts: { prompt: string; bundle: ReferenceBundle; duration: number; resolution: string; ratio: string; generateAudio: boolean }): Promise<SubmitOutcome> {
+  if (!FAL_KEY) return { ok: false, provider: 'fal', error: 'FAL_KEY not configured' };
+  const endpoint = opts.bundle.mode === 'reference-to-video' ? SEEDANCE_REF : SEEDANCE_TEXT;
+  const body: Record<string, unknown> = {
+    prompt: opts.prompt,
+    resolution: normalizeFalResolution(opts.resolution),
+    duration: falDuration(opts.duration),
+    aspect_ratio: normalizeFalAspect(opts.ratio),
+    generate_audio: opts.generateAudio,
+  };
+  if (opts.bundle.mode === 'reference-to-video') {
+    body.image_urls = opts.bundle.referenceImages;
+    if (opts.bundle.referenceAudios.length) body.audio_urls = opts.bundle.referenceAudios;
+  }
+
+  const res = await fetch(`${FAL_QUEUE}/${endpoint}`, {
+    method: 'POST',
+    headers: { Authorization: `Key ${FAL_KEY}`, 'Content-Type': 'application/json', Accept: 'application/json' },
+    body: JSON.stringify(body),
+  });
+  const text = await res.text();
+  let parsed: any = {};
+  try { parsed = JSON.parse(text); } catch { /* keep text */ }
+  const immediateVideo = extractFalVideoUrl(parsed);
+  if (res.ok && immediateVideo) {
+    return { ok: true, provider: 'fal', endpoint, requestId: `immediate:${immediateVideo}`, raw: parsed };
+  }
+  const requestId = parsed?.request_id ?? parsed?.requestId;
+  if (!res.ok || !requestId) {
+    const msg = parsed?.detail ?? parsed?.message ?? parsed?.error ?? text || `http ${res.status}`;
+    const prefix = isBalanceError(res.status, text) ? 'fal.ai balance/auth' : 'fal.ai';
+    return { ok: false, provider: 'fal', endpoint, error: `${prefix}: ${msg}`, raw: parsed || text };
+  }
+  return { ok: true, provider: 'fal', endpoint, requestId: String(requestId), raw: parsed };
+}
+
+async function submitAcrossProviders(opts: {
   prompt: string;
   bundle: ReferenceBundle;
   duration: number;
   resolution: string;
   ratio: string;
   generateAudio: boolean;
+  forceProvider?: Provider;
 }): Promise<SubmitOutcome> {
-  const first = await submitToAtlas(opts);
-  if (first.ok) return first;
-  if (!isModerationRealPersonError(first.error)) return first;
+  const prompt = withReferenceMap(opts.prompt, opts.bundle);
+  const order = providerOrder(opts.bundle, opts.forceProvider);
+  if (order.length === 0) return { ok: false, error: 'No video provider configured. Need ATLASCLOUD_API_KEY or FAL_KEY.' };
 
-  log('WARN', 'atlas moderation rejection — retrying with reference-to-video', {
-    originalEndpoint: first.endpoint,
-    err: first.error,
-  });
-
-  const refImages =
-    opts.bundle.referenceImages && opts.bundle.referenceImages.length > 0
-      ? opts.bundle.referenceImages
-      : opts.bundle.firstFrame
-        ? [opts.bundle.firstFrame]
-        : [];
-
-  if (refImages.length === 0) {
-    const textOnly: ReferenceBundle = { mode: 'text-to-video' };
-    const second = await submitToAtlas({ ...opts, bundle: textOnly });
-    if (!second.ok) return { ...second, error: `${first.error} | retry text: ${second.error}` };
-    return second;
+  const errors: string[] = [];
+  for (let i = 0; i < order.length; i++) {
+    const provider = order[i];
+    const result = provider === 'atlascloud'
+      ? await atlasSubmit({ ...opts, prompt })
+      : await falSubmit({ ...opts, prompt });
+    if (result.ok) return { ...result, usedFallback: i > 0 };
+    errors.push(`${providerLabel(provider)}: ${result.error ?? 'submit failed'}`);
+    log('WARN', 'provider submit failed', { provider, error: result.error, moderation: isModerationError(result.error) });
   }
-
-  const refBundle: ReferenceBundle = {
-    mode: 'reference-to-video',
-    referenceImages: refImages.slice(0, 9),
-    referenceAudios: opts.bundle.referenceAudios,
-  };
-  const second = await submitToAtlas({ ...opts, bundle: refBundle });
-  if (!second.ok) return { ...second, error: `${first.error} | retry ref: ${second.error}` };
-  return second;
+  return { ok: false, error: errors.join(' | ') };
 }
 
-// ──────────────────────────── HTTP handler ────────────────────────────
+async function atlasPoll(requestId: string): Promise<PollOutcome> {
+  const res = await fetch(`${ATLAS_BASE}/prediction/${requestId}`, {
+    headers: { Authorization: `Bearer ${ATLAS_KEY}` },
+  });
+  const text = await res.text();
+  let parsed: any = {};
+  try { parsed = JSON.parse(text); } catch { /* keep text */ }
+  const data = parsed?.data ?? parsed;
+  if (!res.ok) {
+    return { status: 'failed', error: data?.error ?? parsed?.message ?? parsed?.msg ?? text || `AtlasCloud poll http ${res.status}` };
+  }
+  const status = String(data?.status ?? '').toLowerCase();
+  if (status === 'completed' || status === 'succeeded') {
+    const out = data?.outputs?.[0];
+    const videoUrl = typeof out === 'string' ? out : out?.url;
+    return videoUrl ? { status: 'done', videoUrl: String(videoUrl) } : { status: 'failed', error: 'AtlasCloud completed without a video URL' };
+  }
+  if (status === 'failed' || status === 'timeout') {
+    return { status: 'failed', error: data?.error ?? parsed?.message ?? `AtlasCloud reported ${status}` };
+  }
+  return { status: 'processing' };
+}
+
+function extractFalVideoUrl(payload: any): string | null {
+  const data = payload?.data ?? payload?.payload ?? payload;
+  const video = data?.video ?? data?.output?.video ?? data?.result?.video;
+  if (typeof video === 'string') return video;
+  if (isValidHttpUrl(video?.url)) return String(video.url);
+  if (Array.isArray(data?.videos) && data.videos[0]) {
+    const first = data.videos[0];
+    if (typeof first === 'string') return first;
+    if (isValidHttpUrl(first?.url)) return String(first.url);
+  }
+  return null;
+}
+
+async function falPoll(endpoint: string, requestId: string): Promise<PollOutcome> {
+  if (requestId.startsWith('immediate:')) return { status: 'done', videoUrl: requestId.slice('immediate:'.length) };
+  const headers = { Authorization: `Key ${FAL_KEY}`, Accept: 'application/json' };
+  const statusRes = await fetch(`${FAL_QUEUE}/${endpoint}/requests/${requestId}/status`, { headers });
+  const statusText = await statusRes.text();
+  let statusJson: any = {};
+  try { statusJson = JSON.parse(statusText); } catch { /* keep text */ }
+  if (statusRes.ok) {
+    const status = String(statusJson?.status ?? '').toUpperCase();
+    if (status === 'FAILED') {
+      return { status: 'failed', error: statusJson?.error ?? statusJson?.detail ?? 'fal.ai reported failure' };
+    }
+    if (status !== 'COMPLETED') return { status: 'processing' };
+  } else if (statusRes.status !== 202 && statusRes.status !== 404) {
+    return { status: 'failed', error: statusJson?.detail ?? statusJson?.message ?? statusText || `fal.ai status http ${statusRes.status}` };
+  }
+
+  const resultRes = await fetch(`${FAL_QUEUE}/${endpoint}/requests/${requestId}`, { headers });
+  if (resultRes.status === 202) return { status: 'processing' };
+  const resultText = await resultRes.text();
+  let resultJson: any = {};
+  try { resultJson = JSON.parse(resultText); } catch { /* keep text */ }
+  if (!resultRes.ok) {
+    const msg = resultJson?.detail ?? resultJson?.message ?? resultJson?.error ?? resultText || `fal.ai result http ${resultRes.status}`;
+    if (/in progress|not completed|still processing/i.test(msg)) return { status: 'processing' };
+    return { status: 'failed', error: msg };
+  }
+  const videoUrl = extractFalVideoUrl(resultJson);
+  return videoUrl ? { status: 'done', videoUrl } : { status: 'processing' };
+}
+
+async function submitFallbackFromRow(admin: any, row: any, provider: Provider): Promise<any | null> {
+  const existingRefs = Array.isArray(row.reference_paths) ? row.reference_paths : [];
+  const audioSourceUrls = await gatherAudioSourceUrls(admin, { avatarId: row.avatar_id, format: row.format });
+  const bundle = await buildReferenceBundle(admin, {
+    productId: row.product_id,
+    avatarId: row.avatar_id,
+    extraImageUrls: existingRefs,
+    audioSourceUrls,
+  });
+  const submission = await submitAcrossProviders({
+    prompt: row.prompt,
+    bundle,
+    duration: clampDuration(row.duration_seconds ?? 8),
+    resolution: row.resolution ?? '720p',
+    ratio: row.aspect ?? '9:16',
+    generateAudio: true,
+    forceProvider: provider,
+  });
+  if (!submission.ok) return null;
+  const { data: updated } = await admin
+    .from('ms_generations')
+    .update({
+      status: 'queued',
+      stage: 'videoing',
+      provider: submission.provider,
+      provider_endpoint: submission.endpoint,
+      fal_request_id: submission.requestId,
+      fallback_attempted: true,
+      error: null,
+      video_url: null,
+      reference_paths: bundle.referenceImages,
+    })
+    .eq('id', row.id)
+    .select()
+    .single();
+  log('INFO', 'poll fallback submitted', { jobId: row.id, provider: submission.provider, endpoint: submission.endpoint });
+  return updated;
+}
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response(null, { headers: corsHeaders });
@@ -493,140 +467,68 @@ Deno.serve(async (req) => {
     const admin = createClient(SUPABASE_URL, SERVICE_KEY);
     const body = await req.json();
 
-    // ──── POLL ────
     if (body.poll) {
       const { data: row } = await admin.from('ms_generations').select('*').eq('id', body.poll).maybeSingle();
-      if (!row) {
-        return new Response(JSON.stringify({ status: 'queued_pending_persist' }), {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        });
-      }
-      if (row.status === 'done' || row.status === 'failed') {
-        return new Response(JSON.stringify(row), {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        });
-      }
-      if (!row.fal_request_id) {
-        return new Response(JSON.stringify({ ...row, status: 'queued_pending_persist' }), {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        });
-      }
+      if (!row) return json({ status: 'queued_pending_persist' });
+      if (row.status === 'done') return json(row);
+      if (row.status === 'failed' && row.fallback_attempted) return json(row);
+      if (!row.fal_request_id || !row.provider_endpoint) return json({ ...row, status: 'queued_pending_persist' });
 
       const startedAt = Date.parse(row.updated_at || row.created_at || '') || Date.now();
       const timeoutMs = timeoutForDuration(row.duration_seconds);
       if (Date.now() - startedAt > timeoutMs) {
-        const msg = `Timed out after ${Math.round(timeoutMs / 60000)} minutes (Atlas prediction ${row.fal_request_id}).`;
-        const { data: updated } = await admin
-          .from('ms_generations')
-          .update({ status: 'failed', stage: 'failed', error: msg })
-          .eq('id', row.id)
-          .select()
-          .single();
-        return new Response(JSON.stringify(updated), {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        });
+        const fallbackProvider: Provider = row.provider === 'fal' ? 'atlascloud' : 'fal';
+        if (!row.fallback_attempted && (fallbackProvider === 'fal' ? FAL_KEY : ATLAS_KEY)) {
+          const fallback = await submitFallbackFromRow(admin, row, fallbackProvider);
+          if (fallback) return json(fallback);
+        }
+        const msg = `Timed out after ${Math.round(timeoutMs / 60000)} minutes while rendering. Retry will submit a fresh job.`;
+        const { data: updated } = await admin.from('ms_generations').update({ status: 'failed', stage: 'failed', error: msg }).eq('id', row.id).select().single();
+        return json(updated);
       }
 
-      const result = await atlasPollPrediction(row.fal_request_id);
-      if (result.status === 'done') {
-        const { data: updated } = await admin
-          .from('ms_generations')
-          .update({ status: 'done', stage: 'done', video_url: result.videoUrl, error: null })
-          .eq('id', row.id)
-          .select()
-          .single();
-        return new Response(JSON.stringify(updated), {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        });
+      const poll = row.provider === 'fal'
+        ? await falPoll(row.provider_endpoint, row.fal_request_id)
+        : await atlasPoll(row.fal_request_id);
+
+      if (poll.status === 'done') {
+        const { data: updated } = await admin.from('ms_generations').update({ status: 'done', stage: 'done', video_url: poll.videoUrl, error: null }).eq('id', row.id).select().single();
+        return json(updated);
       }
-      if (result.status === 'failed') {
-        const { data: updated } = await admin
-          .from('ms_generations')
-          .update({ status: 'failed', stage: 'failed', error: result.error ?? 'Atlas reported failure' })
-          .eq('id', row.id)
-          .select()
-          .single();
-        return new Response(JSON.stringify(updated), {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        });
+
+      if (poll.status === 'failed') {
+        const fallbackProvider: Provider = row.provider === 'fal' ? 'atlascloud' : 'fal';
+        const shouldFallback = !row.fallback_attempted && (fallbackProvider === 'fal' ? FAL_KEY : ATLAS_KEY);
+        if (shouldFallback) {
+          const fallback = await submitFallbackFromRow(admin, row, fallbackProvider);
+          if (fallback) return json(fallback);
+        }
+        const { data: updated } = await admin.from('ms_generations').update({ status: 'failed', stage: 'failed', error: poll.error ?? `${providerLabel(row.provider)} reported failure` }).eq('id', row.id).select().single();
+        return json(updated);
       }
-      if (row.status !== 'running') {
-        await admin.from('ms_generations').update({ status: 'running' }).eq('id', row.id);
-      }
-      return new Response(JSON.stringify({ ...row, status: 'running' }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
+
+      if (row.status !== 'running') await admin.from('ms_generations').update({ status: 'running' }).eq('id', row.id);
+      return json({ ...row, status: 'running' });
     }
 
-    // ──── RETRY ────
     if (body.retry) {
       const { data: row } = await admin.from('ms_generations').select('*').eq('id', body.retry).maybeSingle();
-      if (!row) {
-        return new Response(JSON.stringify({ error: 'not found' }), {
-          status: 404,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        });
-      }
-      const audioSourceUrls = await gatherAudioSourceUrls(admin, { avatarId: row.avatar_id, format: row.format });
-      const existingRefs: string[] = Array.isArray(row.reference_paths)
-        ? (row.reference_paths as unknown[]).filter(isValidHttpUrl).map(String)
-        : [];
-      const bundle = await buildReferenceBundle(admin, {
-        productId: row.product_id,
-        avatarId: row.avatar_id,
-        keyframePath: row.keyframe_path,
-        keyframeUrl: row.keyframe_url,
-        format: row.format,
-        audioSourceUrls,
-        extraImageUrls: existingRefs,
-      });
-
-      const submission = await submitWithModerationFallback({
-        prompt: row.prompt,
-        bundle,
-        duration: clampDuration(row.duration_seconds ?? 8),
-        resolution: normalizeResolution(row.resolution ?? '720p'),
-        ratio: normalizeRatio(row.aspect ?? '9:16'),
-        generateAudio: true,
-      });
-
-      if (!submission.ok) {
-        await admin
-          .from('ms_generations')
-          .update({ status: 'failed', stage: 'failed', error: submission.error ?? 'Atlas rejected retry' })
-          .eq('id', row.id);
-        return new Response(JSON.stringify({ id: row.id, status: 'failed', error: submission.error, details: submission.raw }), {
-          status: 200,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        });
-      }
-
-      const { data: updated } = await admin
-        .from('ms_generations')
-        .update({
-          status: 'queued',
-          stage: 'videoing',
-          provider: 'atlascloud',
-          provider_endpoint: `bytedance/seedance-2.0/${submission.endpoint}`,
-          fal_request_id: submission.predictionId,
-          fallback_attempted: false,
-          error: null,
-          video_url: null,
-        })
-        .eq('id', row.id)
-        .select()
-        .single();
-      log('INFO', 'retry: submitted', { jobId: row.id, endpoint: submission.endpoint });
-      return new Response(JSON.stringify(updated), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
+      if (!row) return json({ error: 'not found' }, 404);
+      body.reuseGenerationId = row.id;
+      body.prompt = row.prompt;
+      body.productId = row.product_id;
+      body.avatarId = row.avatar_id;
+      body.format = row.format;
+      body.surface = row.surface;
+      body.aspect = row.aspect;
+      body.duration_seconds = row.duration_seconds;
+      body.resolution = row.resolution;
+      body.script_text = row.script_text;
+      body.image_urls = Array.isArray(row.reference_paths) ? row.reference_paths : [];
     }
 
-    // ──── SUBMIT ────
     const {
       prompt,
-      keyframe_url,
-      keyframe_path,
       aspect = '9:16',
       duration_seconds = 8,
       resolution = '720p',
@@ -640,151 +542,94 @@ Deno.serve(async (req) => {
       image_urls,
     } = body;
 
-    if (!prompt || typeof prompt !== 'string') {
-      return new Response(JSON.stringify({ error: 'prompt required' }), {
-        status: 400,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
-    }
-    if (!ATLAS_KEY) {
-      return new Response(JSON.stringify({ error: 'ATLASCLOUD_API_KEY not configured' }), {
-        status: 500,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
-    }
+    if (!prompt || typeof prompt !== 'string') return json({ error: 'prompt required' }, 400);
+    if (!ATLAS_KEY && !FAL_KEY) return json({ error: 'No video provider configured. Need ATLASCLOUD_API_KEY or FAL_KEY.' }, 500);
 
     const duration = clampDuration(duration_seconds);
-    const resolutionN = normalizeResolution(resolution);
-    const ratio = normalizeRatio(aspect);
-
-    const extraImageUrls: string[] = Array.isArray(image_urls)
-      ? (image_urls as unknown[]).filter(isValidHttpUrl).map(String)
-      : [];
-
+    const atlasRatio = normalizeAtlasRatio(aspect);
+    const extraImageUrls = Array.isArray(image_urls) ? uniqueValidUrls(image_urls, 9) : [];
     const audioSourceUrls = await gatherAudioSourceUrls(admin, { avatarId, format });
-    const bundle = await buildReferenceBundle(admin, {
-      productId,
-      avatarId,
-      keyframePath: keyframe_path,
-      keyframeUrl: keyframe_url,
-      format,
-      audioSourceUrls,
-      extraImageUrls,
-    });
+    const bundle = await buildReferenceBundle(admin, { productId, avatarId, extraImageUrls, audioSourceUrls });
+
     log('INFO', 'submit: bundle built', {
       mode: bundle.mode,
-      hasFirstFrame: !!bundle.firstFrame,
-      refImages: bundle.referenceImages?.length ?? 0,
-      refAudios: bundle.referenceAudios?.length ?? 0,
+      refImages: bundle.referenceImages.length,
+      refAudios: bundle.referenceAudios.length,
+      hasAvatar: bundle.hasAvatar,
+      hasProduct: bundle.hasProduct,
+      providerOrder: providerOrder(bundle),
     });
 
-    // Persist row (or update existing one created by orchestrator)
     let row: any;
-    const referenceUrlsForRow =
-      bundle.mode === 'image-to-video' && bundle.firstFrame
-        ? [bundle.firstFrame]
-        : bundle.referenceImages ?? [];
+    const rowPayload = {
+      prompt,
+      script_text: script_text ?? null,
+      keyframe_url: null,
+      keyframe_path: null,
+      reference_paths: bundle.referenceImages,
+      status: 'queued',
+      stage: 'videoing',
+      provider: null,
+      provider_endpoint: null,
+      fal_request_id: null,
+      fallback_attempted: false,
+      error: null,
+      video_url: null,
+      aspect: atlasRatio,
+      duration_seconds: duration,
+      resolution: normalizeAtlasResolution(resolution),
+    };
 
     if (reuseGenerationId) {
-      const { data: updated, error: updErr } = await admin
-        .from('ms_generations')
-        .update({
-          prompt,
-          script_text: script_text ?? null,
-          keyframe_url: keyframe_url ?? null,
-          reference_paths: referenceUrlsForRow,
-          status: 'queued',
-          stage: 'videoing',
-          provider: null,
-          provider_endpoint: null,
-          fal_request_id: null,
-          fallback_attempted: false,
-          error: null,
-          video_url: null,
-          aspect: ratio,
-          duration_seconds: duration,
-          resolution: resolutionN,
-        })
-        .eq('id', reuseGenerationId)
-        .select()
-        .single();
-      if (updErr) throw updErr;
+      const { data: updated, error } = await admin.from('ms_generations').update(rowPayload).eq('id', reuseGenerationId).select().single();
+      if (error) throw error;
       row = updated;
     } else {
-      const { data: inserted, error: insErr } = await admin
-        .from('ms_generations')
-        .insert({
-          user_id: null,
-          project_id: projectId ?? null,
-          product_id: productId ?? null,
-          avatar_id: avatarId ?? null,
-          format,
-          surface,
-          aspect: ratio,
-          duration_seconds: duration,
-          resolution: resolutionN,
-          prompt,
-          script_text: script_text ?? null,
-          keyframe_url: keyframe_url ?? null,
-          reference_paths: referenceUrlsForRow,
-          status: 'queued',
-          stage: 'videoing',
-        })
-        .select()
-        .single();
-      if (insErr) throw insErr;
+      const { data: inserted, error } = await admin.from('ms_generations').insert({
+        user_id: null,
+        project_id: projectId ?? null,
+        product_id: productId ?? null,
+        avatar_id: avatarId ?? null,
+        format,
+        surface,
+        ...rowPayload,
+      }).select().single();
+      if (error) throw error;
       row = inserted;
     }
-    log('INFO', 'submit: row persisted', { jobId: row.id, mode: bundle.mode });
 
-    const submission = await submitWithModerationFallback({
+    const submission = await submitAcrossProviders({
       prompt,
       bundle,
       duration,
-      resolution: resolutionN,
-      ratio,
+      resolution,
+      ratio: atlasRatio,
       generateAudio: true,
     });
 
     if (!submission.ok) {
-      await admin
-        .from('ms_generations')
-        .update({ status: 'failed', stage: 'failed', error: submission.error ?? 'Atlas rejected submit' })
-        .eq('id', row.id);
-      return new Response(
-        JSON.stringify({ id: row.id, status: 'failed', error: submission.error, details: submission.raw }),
-        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
-      );
+      await admin.from('ms_generations').update({ status: 'failed', stage: 'failed', error: submission.error ?? 'All video providers rejected submit' }).eq('id', row.id);
+      return json({ id: row.id, status: 'failed', error: submission.error, details: submission.raw });
     }
 
-    const { data: updated } = await admin
-      .from('ms_generations')
-      .update({
-        provider: 'atlascloud',
-        provider_endpoint: `bytedance/seedance-2.0/${submission.endpoint}`,
-        fal_request_id: submission.predictionId,
-      })
-      .eq('id', row.id)
-      .select()
-      .single();
+    const { data: updated } = await admin.from('ms_generations').update({
+      provider: submission.provider,
+      provider_endpoint: submission.endpoint,
+      fal_request_id: submission.requestId,
+      fallback_attempted: !!submission.usedFallback,
+    }).eq('id', row.id).select().single();
 
-    log('INFO', 'submit: done', { jobId: row.id, endpoint: submission.endpoint, predictionId: submission.predictionId });
+    log('INFO', 'submit: done', { jobId: row.id, provider: submission.provider, endpoint: submission.endpoint, requestId: submission.requestId });
 
-    return new Response(
-      JSON.stringify({
-        id: updated.id,
-        provider: 'atlascloud',
-        endpoint: submission.endpoint,
-        fal_request_id: submission.predictionId,
-        status: 'queued',
-      }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
-    );
+    return json({
+      id: updated.id,
+      provider: submission.provider,
+      endpoint: submission.endpoint,
+      fal_request_id: submission.requestId,
+      status: 'queued',
+    });
   } catch (e) {
     log('ERROR', 'unhandled', { err: e instanceof Error ? e.message : String(e) });
-    return new Response(JSON.stringify({ error: e instanceof Error ? e.message : 'unknown' }), {
-      status: 500,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    });
+    return json({ error: e instanceof Error ? e.message : 'unknown' }, 500);
   }
 });

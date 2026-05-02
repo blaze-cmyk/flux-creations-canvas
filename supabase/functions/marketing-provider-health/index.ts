@@ -1,6 +1,4 @@
-// AtlasCloud health probe for Marketing Studio video generation.
-// GET → returns cached status (≤ 60s) for AtlasCloud Seedance.
-// POST { force: true } → bypass cache.
+// Non-billing health probe for Marketing Studio providers.
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -9,10 +7,11 @@ const corsHeaders = {
 };
 
 const ATLAS_KEY = Deno.env.get('ATLASCLOUD_API_KEY') ?? '';
+const FAL_KEY = Deno.env.get('FAL_KEY') ?? '';
 
 type ProviderStatus = 'ok' | 'balance_error' | 'down' | 'unconfigured';
 interface ProbeResult { status: ProviderStatus; message: string; latencyMs: number; }
-interface CachedHealth { checkedAt: number; atlas: ProbeResult; blockGeneration: boolean; }
+interface CachedHealth { checkedAt: number; atlas: ProbeResult; fal: ProbeResult; blockGeneration: boolean; }
 
 let cache: CachedHealth | null = null;
 const CACHE_TTL_MS = 60_000;
@@ -26,57 +25,50 @@ async function probeAtlas(): Promise<ProbeResult> {
   if (!ATLAS_KEY) return { status: 'unconfigured', message: 'ATLASCLOUD_API_KEY not set', latencyMs: 0 };
   const started = Date.now();
   try {
-    const res = await fetch('https://api.atlascloud.ai/api/v1/model/generateVideo', {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${ATLAS_KEY}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model: 'bytedance/seedance-2.0/text-to-video',
-        prompt: 'health check',
-        duration: 5,
-        resolution: '720p',
-        ratio: 'adaptive',
-        generate_audio: false,
-        watermark: false,
-      }),
+    const res = await fetch('https://api.atlascloud.ai/api/v1/model/prediction/health-check', {
+      headers: { Authorization: `Bearer ${ATLAS_KEY}` },
     });
     const text = await res.text();
     const latencyMs = Date.now() - started;
-    let parsed: any = {};
-    try { parsed = JSON.parse(text); } catch { /* ignore */ }
-    const code = parsed?.code ?? res.status;
-    if (res.ok && (code === 200 || parsed?.data?.id)) {
-      return { status: 'ok', message: 'accepted', latencyMs };
-    }
-    if (isBalanceError(code, text)) {
-      return { status: 'balance_error', message: parsed?.message || parsed?.msg || `balance error (${code})`, latencyMs };
-    }
-    return { status: 'down', message: parsed?.message || parsed?.msg || `http ${res.status}`, latencyMs };
+    if (res.status === 401 || res.status === 403) return { status: 'down', message: 'auth rejected', latencyMs };
+    if (isBalanceError(res.status, text)) return { status: 'balance_error', message: 'balance/auth issue', latencyMs };
+    return { status: 'ok', message: 'configured', latencyMs };
+  } catch (e) {
+    return { status: 'down', message: e instanceof Error ? e.message : 'network error', latencyMs: Date.now() - started };
+  }
+}
+
+async function probeFal(): Promise<ProbeResult> {
+  if (!FAL_KEY) return { status: 'unconfigured', message: 'FAL_KEY not set', latencyMs: 0 };
+  const started = Date.now();
+  try {
+    const res = await fetch('https://queue.fal.run/bytedance/seedance-2.0/reference-to-video/requests/health-check/status', {
+      headers: { Authorization: `Key ${FAL_KEY}`, Accept: 'application/json' },
+    });
+    const text = await res.text();
+    const latencyMs = Date.now() - started;
+    if (res.status === 401 || res.status === 403) return { status: 'down', message: 'auth rejected', latencyMs };
+    if (isBalanceError(res.status, text)) return { status: 'balance_error', message: 'balance/auth issue', latencyMs };
+    return { status: 'ok', message: 'configured', latencyMs };
   } catch (e) {
     return { status: 'down', message: e instanceof Error ? e.message : 'network error', latencyMs: Date.now() - started };
   }
 }
 
 async function runProbes(): Promise<CachedHealth> {
-  const atlas = await probeAtlas();
-  return { checkedAt: Date.now(), atlas, blockGeneration: atlas.status !== 'ok' };
+  const [atlas, fal] = await Promise.all([probeAtlas(), probeFal()]);
+  return { checkedAt: Date.now(), atlas, fal, blockGeneration: atlas.status !== 'ok' && fal.status !== 'ok' };
 }
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response(null, { headers: corsHeaders });
   let force = false;
   if (req.method === 'POST') {
-    try {
-      const body = await req.json();
-      force = !!body?.force;
-    } catch { /* ignore */ }
+    try { force = !!(await req.json())?.force; } catch { /* ignore */ }
   }
   if (!force && cache && Date.now() - cache.checkedAt < CACHE_TTL_MS) {
-    return new Response(JSON.stringify({ ...cache, cached: true }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    });
+    return new Response(JSON.stringify({ ...cache, cached: true }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
   }
   cache = await runProbes();
-  return new Response(JSON.stringify({ ...cache, cached: false }), {
-    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-  });
+  return new Response(JSON.stringify({ ...cache, cached: false }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
 });
