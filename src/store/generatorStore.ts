@@ -187,7 +187,11 @@ async function saveToDb(img: GeneratedImage, storageUrl: string) {
 export const useGeneratorStore = create<GeneratorState>()((set, get) => ({
   prompt: localStorage.getItem('gen-last-prompt') || '',
   referenceImages: loadPersistedReferenceImages(),
-  model: (localStorage.getItem('gen-last-model') as string) || 'gemini-3.1-flash-image',
+  model: (() => {
+    const stored = localStorage.getItem('gen-last-model');
+    const valid = ['nano-banana-pro','nano-banana-2','seedream-4','seedream-5-lite','grok-imagine','kling','flux','wan'];
+    return stored && valid.includes(stored) ? stored : 'nano-banana-pro';
+  })(),
   quality: (localStorage.getItem('gen-last-quality') as string) || '2K',
   aspectRatio: (localStorage.getItem('gen-last-ar') as string) || '1:1',
   quantity: 4,
