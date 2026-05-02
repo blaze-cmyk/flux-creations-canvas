@@ -273,10 +273,13 @@ PACKAGING-AS-HERO: at least 30% of the word count describes the unopened packagi
 SOUND DESIGN: every beat names at least one specific physical sound from the world of real unboxings. Vocabulary: cardboard tap, hollow thud, crisp sticker peel, tissue rustle, foam release, vinyl thunk, chain shimmer, magnetic flap clack, ribbon slide, paper sleeve crinkle, lid lift, finger drag on embossing, scissor snip, plastic shrink crackle, fabric whisper, glass clink, leather creak. NO MUSIC. Voiceover only when the chosen camera language genuinely warrants it.
 
 DIALOGUE — driven by camera language, NEVER by template:
-- Hands-only / silent reveals → 0–2 lines max, often pure ASMR is stronger
-- Avatar-on-camera → 2–6 lines, ≤12 words each, voice MUST match CREATOR_PERSONA
+- Hands-only / silent reveals (TOP-DOWN ASMR, THEATRICAL REVEAL, MACRO TACTILE, OVERHEAD STILL-LIFE) → 0–2 lines max, often pure ASMR is stronger
+- Quiet avatar reveals (QUIET HANDHELD, EDITORIAL PAN) → 2–4 short whispered lines, intimate
+- HIGH-ENERGY AVATAR (HAUL TRY-ON, SCARCITY DROP, FULL-SET REVEAL, JUMP-CUT HAUL) → 6–12 short conversational lines, every line ≤12 words, em-dash and ellipsis pacing for natural breath, NEVER an ad-read. Voice = real friend texting you about a drop, NOT a marketer. Self-corrections, half-laughs, "wait wait wait", real reactions are encouraged.
 - All spoken lines in double quotes, attributed to the speaker by action
 - The dialogue serves the reveal — never narrates "okay so I just got this box" ad-style
+
+AVATAR-VOICE TASTE (when the chosen camera language uses an on-camera avatar speaking — HAUL TRY-ON, SCARCITY DROP, FULL-SET REVEAL, VLOG SELFIE, JUMP-CUT HAUL, QUIET HANDHELD): the script MUST stage AT LEAST 2 named authentic micro-actions from this vocabulary, written as physical stage directions in the beats: nail-tap on the unopened polymailer/box (ASMR cue at the hook), hair-fluff or hair-pull-out-from-under-collar after putting the piece on, hugging-self into the fabric to demo roominess/comfort, hood-pull-overhead in one swift motion, sleeve-tug-outward to show extra fabric, index-finger-tap on the embossed logo to draw the eye, both-index-fingers-down at the chest naming the color, downward-chop-gesture on the scarcity word, both-fingers-pointing-into-lens on the CTA, 360°-spin to show the back, ta-da open-palms close, leans-into-lens-then-hard-cut. These are the difference between a real influencer haul and AI slop. Mirror the Comfrt-style references: hook (frantic energy, packaging-as-anticipation, nail-tap, opens with a real reaction line), hard-cut to try-on, tactile demos that physically prove the product claim ("hugging-self" proves "wrapped in a blanket"), optional scarcity CTA close. Optional sizing tip when product is wearable ("I'm 5'2, wearing a small").
 
 PRODUCT FIDELITY: the script MUST mention at least 4 concrete details from the product images verbatim (exact colors named, materials, hardware pieces, printed text exactly as on the product, distinctive features). NEVER invent details that aren't visible.
 
