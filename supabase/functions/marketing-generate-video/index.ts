@@ -144,6 +144,10 @@ function providerLabel(p: Provider) {
   return p === 'atlascloud' ? 'AtlasCloud' : 'fal.ai';
 }
 
+function isAvatarStorageUrl(url: string) {
+  return /\/storage\/v1\/object\/sign\/ms-avatars\//i.test(url) || /\/storage\/v1\/object\/public\/ms-avatars\//i.test(url);
+}
+
 async function signedStorageUrl(admin: any, bucket: string, path: string, ttl = 60 * 60 * 24): Promise<string | null> {
   const { data } = await admin.storage.from(bucket).createSignedUrl(path, ttl);
   return data?.signedUrl ?? null;
@@ -233,6 +237,15 @@ async function buildReferenceBundle(admin: any, opts: {
 }): Promise<ReferenceBundle> {
   const productUrls = opts.productId ? await fetchProductImageUrls(admin, opts.productId, 7) : [];
   const avatarUrl = opts.avatarId ? await fetchAvatarImageUrl(admin, opts.avatarId) : null;
+  const extraImageUrls = uniqueValidUrls(opts.extraImageUrls ?? [], 9).filter((url) => {
+    if (!opts.avatarId) return true;
+    // Never pass the original avatar upload as an extra reference. The working
+    // pipeline only sent the wsrv-cropped avatar headshot; the raw signed avatar
+    // URL trips Atlas/Seedance real-person moderation during polling.
+    if (url === avatarUrl) return false;
+    if (url.includes('wsrv.nl') && url.includes('ms-avatars')) return false;
+    return !isAvatarStorageUrl(url);
+  });
 
   // Order matters for Seedance reference-to-video: product refs first, avatar
   // (already wsrv-cropped to a 640x640 headshot) last. Putting a raw full-body
@@ -241,7 +254,7 @@ async function buildReferenceBundle(admin: any, opts: {
   const orderedRefs = uniqueValidUrls([
     ...productUrls,
     ...(avatarUrl ? [avatarUrl] : []),
-    ...(opts.extraImageUrls ?? []),
+    ...extraImageUrls,
   ], 9);
 
   return {
