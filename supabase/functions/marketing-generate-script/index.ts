@@ -656,8 +656,19 @@ function isWeak(
     const genericCineRx = /\b(generic cinematic|cinematic background|aesthetic background|clean setup|beautiful setup|premium background|minimal setup)\b/i;
     const genericCineHit = finalPrompt.match(genericCineRx);
     if (genericCineHit) return { weak: true, reason: `unboxing contains generic cinematography slop: "${genericCineHit[0]}"` };
-    const homeUgcRx = /\b(bedroom|unmade duvet|wrinkled sheet|desk|bathroom vanity|kitchen counter|coffee table|couch|sofa|rug|closet floor|car seat|cafe table|gym locker|window daylight|side window|phone|iPhone|handheld|front camera|charger cable|coffee mug|keys|remote|mail|towel|half-open drawer|laundry chair|shelf|blanket)\b/i;
-    if (!homeUgcRx.test(finalPrompt)) return { weak: true, reason: 'unboxing missing creator-at-home UGC environment details' };
+    // Creator-at-home UGC requirement is FAMILY-SCOPED. Silent/theatrical/macro/overhead ASMR
+    // families live on tabletops + controlled light + sleeve+nail color harmony (the Froggy
+    // Prince + jewelry-diorama references). They satisfy taste through a different vocabulary
+    // (wooden desk, white silk, sage sweater sleeves, foam insert, tissue, ribbon, paper-stage
+    // diorama, window daylight) — which is already covered by the SCENE_TEXTURE gate above.
+    if (!isSilentAsmr) {
+      const homeUgcRx = /\b(bedroom|unmade duvet|wrinkled sheet|desk|bathroom vanity|kitchen counter|coffee table|couch|sofa|rug|closet floor|car seat|cafe table|gym locker|window daylight|side window|phone|iPhone|handheld|front camera|charger cable|coffee mug|keys|remote|mail|towel|half-open drawer|laundry chair|shelf|blanket)\b/i;
+      if (!homeUgcRx.test(finalPrompt)) return { weak: true, reason: 'unboxing missing creator-at-home UGC environment details' };
+    } else {
+      // Silent ASMR families need their OWN texture proof: a tabletop surface + a motivated light + a sleeve/hand color harmony.
+      const asmrTextureRx = /\b(wooden desk|oak table|white silk|satin|linen|velvet|tissue paper|foam insert|paper-?stage|diorama|window daylight|natural daylight|diffused daylight|side window|golden-hour|sweater sleeves|sleeves|bare wrist|nails)\b/i;
+      if (!asmrTextureRx.test(finalPrompt)) return { weak: true, reason: 'silent-ASMR family missing tabletop/light/hand-harmony detail (e.g. wooden desk, white silk, window daylight, sweater sleeves)' };
+    }
     const renderSlopRx = /\b(product render|catalog (?:shot|photo)|packshot|studio render|3d render|floating product|same reference (?:image|photo)|recreate(?:s|d)? the reference|matching the reference (?:image|photo)|static product (?:shot|image)|product sits alone)\b/i;
     const renderHit = finalPrompt.match(renderSlopRx);
     if (renderHit) return { weak: true, reason: `unboxing treats references like a render target: "${renderHit[0]}"` };
