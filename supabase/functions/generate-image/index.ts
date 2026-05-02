@@ -176,6 +176,8 @@ serve(async (req) => {
           const endpoint = `${APIYI_BASE}/v1beta/models/${modelConfig.apiModel}:generateContent`;
           console.log(`Calling Gemini: ${endpoint}, ar=${ar}, size=${imageSize}, refs=${referenceImages.length}`);
 
+          const ctrl = new AbortController();
+          const timer = setTimeout(() => ctrl.abort(), 90_000);
           const response = await fetch(endpoint, {
             method: "POST",
             headers: { Authorization: `Bearer ${APIYI_API_KEY}`, "Content-Type": "application/json" },
@@ -183,7 +185,8 @@ serve(async (req) => {
               contents: [{ parts }],
               generationConfig: { responseModalities: ["IMAGE"], imageConfig: { aspectRatio: ar, imageSize } },
             }),
-          });
+            signal: ctrl.signal,
+          }).finally(() => clearTimeout(timer));
 
           if (!response.ok) {
             const errText = await response.text();
