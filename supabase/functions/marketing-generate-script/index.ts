@@ -988,7 +988,8 @@ Deno.serve(async (req) => {
       'TOP-DOWN ASMR', 'THEATRICAL REVEAL', 'VLOG SELFIE', 'QUIET HANDHELD',
       'EDITORIAL PAN', 'JUMP-CUT HAUL', 'STREET DOC', 'TABLETOP CINEMATIC',
       'POV FIRST-PERSON', 'MACRO TACTILE', 'OVERHEAD STILL-LIFE', 'OUTDOOR DAYLIGHT',
-      'HAUL TRY-ON', 'SCARCITY DROP', 'FULL-SET REVEAL',
+      'BEDROOM WINDOW UGC', 'WORKBENCH MACRO', 'CAFE TABLE REVEAL', 'CAR-SEAT STREET DROP',
+      'GOLDEN-HOUR FLATLAY', 'GALLERY PLINTH REVEAL', 'HAUL TRY-ON', 'SCARCITY DROP', 'FULL-SET REVEAL',
     ];
     const productBlob = `${productMeta?.name || ''} ${productMeta?.description || ''}`.toLowerCase();
     const taxonomyHints: string[] = [];
@@ -1019,20 +1020,20 @@ Deno.serve(async (req) => {
     if (isCollectible || isJewelry) {
       weightedPalette = [
         'TOP-DOWN ASMR', 'THEATRICAL REVEAL', 'MACRO TACTILE', 'OVERHEAD STILL-LIFE',
-        'TABLETOP CINEMATIC', 'POV FIRST-PERSON', 'QUIET HANDHELD', 'EDITORIAL PAN',
+        'GOLDEN-HOUR FLATLAY', 'TABLETOP CINEMATIC', 'POV FIRST-PERSON', 'QUIET HANDHELD',
       ];
     } else if (isQuietLux || isBeauty || isTech) {
       weightedPalette = [
-        'QUIET HANDHELD', 'TABLETOP CINEMATIC', 'EDITORIAL PAN', 'TOP-DOWN ASMR',
-        'MACRO TACTILE', 'POV FIRST-PERSON', 'OVERHEAD STILL-LIFE', 'STREET DOC',
+        'QUIET HANDHELD', 'TABLETOP CINEMATIC', 'EDITORIAL PAN', 'WORKBENCH MACRO',
+        'CAFE TABLE REVEAL', 'GALLERY PLINTH REVEAL', 'MACRO TACTILE', 'STREET DOC',
       ];
     } else if (isFashion) {
       // Fashion is the ONE category where haul/try-on energy is on-brand.
       // Still seed a quiet option first so Claude can pick silent ASMR if the
       // packaging/product personality calls for it (e.g. quiet-luxury fashion).
       weightedPalette = [
-        'HAUL TRY-ON', 'SCARCITY DROP', 'FULL-SET REVEAL', 'VLOG SELFIE',
-        'JUMP-CUT HAUL', 'QUIET HANDHELD', 'EDITORIAL PAN', 'OUTDOOR DAYLIGHT',
+        'BEDROOM WINDOW UGC', 'HAUL TRY-ON', 'SCARCITY DROP', 'FULL-SET REVEAL',
+        'VLOG SELFIE', 'JUMP-CUT HAUL', 'QUIET HANDHELD', 'CAR-SEAT STREET DROP',
       ];
     } else if (isUsedNotOpened) {
       weightedPalette = [
