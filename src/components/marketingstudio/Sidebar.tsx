@@ -36,7 +36,7 @@ export function Sidebar({ onClose }: { onClose?: () => void }) {
       }`}
     >
       {/* Header */}
-      <div className="flex items-center justify-between px-3 h-14 shrink-0 relative">
+      <div className="flex items-center justify-between px-3 pt-6 pb-2 shrink-0 relative">
         <div className={collapsed ? 'transition-opacity duration-150 group-hover/aside:opacity-0 pointer-events-none' : ''}>
           <Logo collapsed={collapsed} />
         </div>
