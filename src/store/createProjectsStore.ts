@@ -153,4 +153,19 @@ export const useCreateProjectsStore = create<State>((set, get) => ({
       .update({ thumb_url: url, updated_at: new Date().toISOString() } as any)
       .eq('id', id);
   },
+
+  reorderProjects: async (orderedIds) => {
+    const projects = get().projects;
+    const map = new Map(projects.map((p) => [p.id, p]));
+    const reordered = orderedIds.map((id) => map.get(id)).filter(Boolean) as CreateProject[];
+    // append any not in orderedIds
+    projects.forEach((p) => { if (!orderedIds.includes(p.id)) reordered.push(p); });
+    set({ projects: reordered });
+    // persist sort_order: spaced increments
+    await Promise.all(
+      reordered.map((p, idx) =>
+        supabase.from('create_projects' as any).update({ sort_order: idx } as any).eq('id', p.id)
+      )
+    );
+  },
 }));
