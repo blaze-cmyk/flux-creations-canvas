@@ -216,7 +216,7 @@ export const useGeneratorStore = create<GeneratorState>()((set, get) => ({
   quantity: 4,
   images: [],
   selectedImageId: null,
-  historyLoaded: false,
+  loadedProjects: new Set<string>(),
 
   setPrompt: (prompt) => { set({ prompt }); localStorage.setItem('gen-last-prompt', prompt); },
   addReferenceImage: (img) => {
