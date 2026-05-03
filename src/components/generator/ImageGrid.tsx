@@ -311,7 +311,7 @@ function ImageCard({ image }: {
   // Failed / NSFW state
   if (image.status === 'failed' || image.status === 'nsfw') {
     return (
-      <div className="relative w-full h-full rounded-xl overflow-hidden bg-ms-surface-2 ring-1 ring-ms-border flex flex-col items-center justify-center gap-3 p-3">
+      <div className="relative w-full h-full overflow-hidden bg-ms-surface-2 flex flex-col items-center justify-center gap-3 p-3">
         <div className="flex items-center gap-1.5">
           {image.status === 'failed' ? (
             <span className="flex items-center gap-1 bg-destructive/80 text-destructive-foreground text-[10px] px-2 py-0.5 rounded-full font-medium">
