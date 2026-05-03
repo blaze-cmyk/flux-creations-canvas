@@ -236,24 +236,26 @@ export function VideoPromptBarInline() {
                 }
               }}
             />
-            <div className="flex items-center gap-1.5">
-              <button
-                onClick={() => setEnhance(!enhance)}
-                className={`flex items-center gap-1 text-[11px] px-2 py-1 rounded-full transition-colors ${
-                  enhance ? 'text-[#FF2D78] bg-[#FF2D78]/10' : 'text-muted-foreground hover:text-foreground'
-                }`}
-              >
-                <Sparkles className="w-3 h-3" /> Enhance {enhance ? 'on' : 'off'}
-              </button>
-              <button
-                onClick={() => setSound(!sound)}
-                className={`flex items-center gap-1 text-[11px] px-2 py-1 rounded-full transition-colors ${
-                  sound ? 'text-[#FF2D78] bg-[#FF2D78]/10' : 'text-muted-foreground hover:text-foreground'
-                }`}
-              >
-                <Volume2 className="w-3 h-3" /> Sound {sound ? 'on' : 'off'}
-              </button>
-            </div>
+            {!isMotion && (
+              <div className="flex items-center gap-1.5">
+                <button
+                  onClick={() => setEnhance(!enhance)}
+                  className={`flex items-center gap-1 text-[11px] px-2 py-1 rounded-full transition-colors ${
+                    enhance ? 'text-[#FF2D78] bg-[#FF2D78]/10' : 'text-muted-foreground hover:text-foreground'
+                  }`}
+                >
+                  <Sparkles className="w-3 h-3" /> Enhance {enhance ? 'on' : 'off'}
+                </button>
+                <button
+                  onClick={() => setSound(!sound)}
+                  className={`flex items-center gap-1 text-[11px] px-2 py-1 rounded-full transition-colors ${
+                    sound ? 'text-[#FF2D78] bg-[#FF2D78]/10' : 'text-muted-foreground hover:text-foreground'
+                  }`}
+                >
+                  <Volume2 className="w-3 h-3" /> Sound {sound ? 'on' : 'off'}
+                </button>
+              </div>
+            )}
           </div>
 
           <button
