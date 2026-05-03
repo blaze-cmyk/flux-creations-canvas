@@ -150,6 +150,8 @@ async function saveVideoToDb(video: GeneratedVideo) {
       thumbnail_url: video.thumbnailUrl || null,
       reference_images: video.referenceImages.filter(Boolean),
       error: video.error || null,
+      project_id: video.projectId ?? null,
+      create_project_id: video.projectId ?? null,
     }, { onConflict: 'id' });
   } catch (e) {
     console.error('Failed to save video to DB:', e);
