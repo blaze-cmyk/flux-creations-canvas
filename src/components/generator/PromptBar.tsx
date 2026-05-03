@@ -404,7 +404,7 @@ export function PromptBar() {
           <Popover open={aspectOpen} onOpenChange={setAspectOpen}>
             <PopoverTrigger asChild>
               <button className="ms-chip-glass flex items-center gap-1.5 px-3.5 h-9 rounded-full text-xs text-foreground transition-all">
-                <AspectIcon ratio={aspectRatio} className="text-[#FF2D78]" />
+                <AspectIcon ratio={aspectRatio} className="text-white" />
                 {aspectRatio}
                 <ChevronDownIcon className="size-3.5 text-muted-foreground/70" />
               </button>
