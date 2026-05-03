@@ -442,7 +442,7 @@ function ImageCard({ image }: {
       </div>
 
       {/* Bottom action row: Reference + Animate (center) + Delete (right) */}
-      <div className="absolute bottom-2 left-2 right-2 flex items-center justify-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+      <div className="absolute bottom-2 right-2 flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
         {image.imageUrl && (
           <>
             <HoverIconBtn
