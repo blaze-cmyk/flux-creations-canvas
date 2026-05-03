@@ -425,7 +425,7 @@ export function VideoPromptBarInline() {
               <PopoverContent align="start" side="top" sideOffset={10}
                 className="w-32 p-1.5 rounded-2xl ms-glass shadow-[0_24px_60px_-20px_rgba(0,0,0,0.7)]">
                 <div className="px-2.5 py-1.5 text-[11px] font-semibold tracking-[0.18em] text-white/50 uppercase">Duration</div>
-                {VIDEO_DURATIONS.map((d) => (
+                {modelDurations.map((d) => (
                   <button
                     key={d}
                     onClick={() => { setDuration(d); setDurationOpen(false); }}
@@ -435,6 +435,34 @@ export function VideoPromptBarInline() {
                   >
                     {d}s
                     {duration === d && <Check className="w-4 h-4 text-[#FF2D78]" />}
+                  </button>
+                ))}
+              </PopoverContent>
+            </Popover>
+          )}
+
+          {/* Resolution — only render when the active model exposes a resolution control */}
+          {!isMotion && modelResolutions.length > 0 && (
+            <Popover open={resolutionOpen} onOpenChange={setResolutionOpen}>
+              <PopoverTrigger asChild>
+                <button className="ms-chip-glass flex items-center gap-1.5 px-3.5 h-9 rounded-full text-xs text-foreground transition-all">
+                  {modelResolutions.includes(resolution) ? resolution : modelResolutions[0]}
+                  <ChevronDownIcon className="size-3.5 text-muted-foreground/70" />
+                </button>
+              </PopoverTrigger>
+              <PopoverContent align="start" side="top" sideOffset={10}
+                className="w-32 p-1.5 rounded-2xl ms-glass shadow-[0_24px_60px_-20px_rgba(0,0,0,0.7)]">
+                <div className="px-2.5 py-1.5 text-[11px] font-semibold tracking-[0.18em] text-white/50 uppercase">Resolution</div>
+                {modelResolutions.map((r) => (
+                  <button
+                    key={r}
+                    onClick={() => { setResolution(r); setResolutionOpen(false); }}
+                    className={`w-full flex items-center justify-between px-2.5 py-2 rounded-lg text-sm transition-colors ${
+                      resolution === r ? 'bg-white/10 text-white' : 'text-white/85 hover:bg-white/5'
+                    }`}
+                  >
+                    {r}
+                    {resolution === r && <Check className="w-4 h-4 text-[#FF2D78]" />}
                   </button>
                 ))}
               </PopoverContent>
