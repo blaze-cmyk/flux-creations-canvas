@@ -24,6 +24,8 @@ export type GeneratedVideo = {
   error?: string;
   progress?: number;
   characterOrientation?: 'video' | 'image';
+  projectId?: string | null;
+  liked?: boolean;
 };
 
 export const VIDEO_MODELS = [
@@ -129,6 +131,7 @@ type VideoState = {
   generate: () => void;
   retryVideo: (id: string) => void;
   deleteVideo: (id: string) => void;
+  toggleLike: (id: string) => void;
   loadHistory: () => Promise<void>;
   _historyLoaded: boolean;
 };
@@ -370,6 +373,12 @@ export const useVideoStore = create<VideoState>()((set, get) => ({
     (supabase as any).from('video_generations').delete().eq('id', id).then(() => {});
   },
 
+  toggleLike: (id) => {
+    const next = !get().videos.find((v) => v.id === id)?.liked;
+    set({ videos: get().videos.map((v) => (v.id === id ? { ...v, liked: next } : v)) });
+    (supabase as any).from('video_generations').update({ liked: next }).eq('id', id).then(() => {});
+  },
+
   loadHistory: async () => {
     if (get()._historyLoaded) return;
     try {
@@ -392,6 +401,7 @@ export const useVideoStore = create<VideoState>()((set, get) => ({
           thumbnailUrl: row.thumbnail_url || undefined,
           createdAt: new Date(row.created_at).getTime(),
           error: row.error || undefined,
+          liked: !!row.liked,
         }));
         // Merge with any in-memory videos (active generations)
         const existingIds = new Set(get().videos.map(v => v.id));

@@ -1,12 +1,13 @@
-import { useGeneratorStore, MODELS } from '@/store/generatorStore';
-import { useVideoStore } from '@/store/videoStore';
+import { useGeneratorStore, MODELS, GeneratedImage } from '@/store/generatorStore';
+import { useVideoStore, GeneratedVideo } from '@/store/videoStore';
 import { usePromptModeStore } from '@/store/promptModeStore';
 import { useCreateProjectsStore } from '@/store/createProjectsStore';
 import { useGridFilterStore } from '@/store/gridFilterStore';
 import { useLayoutStore, ZOOM_ROW_HEIGHTS } from '@/store/layoutStore';
-import { AlertCircle, Eye, RefreshCw, Trash2, Loader2, Download, Link2, Heart, MoreHorizontal, Maximize2, Search, X, ImageIcon, FolderInput, Image as ImageLucide, Check } from 'lucide-react';
+import { AlertCircle, Eye, RefreshCw, Trash2, Loader2, Download, Link2, Heart, MoreHorizontal, Maximize2, Search, X, ImageIcon, FolderInput, Image as ImageLucide, Check, Play } from 'lucide-react';
 import { useGridSelectionStore } from '@/store/gridSelectionStore';
 import { useState, useRef, useEffect, useLayoutEffect, useMemo } from 'react';
+import { create } from 'zustand';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -15,6 +16,19 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+
+// Local UI store for the All / Liked tab on the /create grid.
+type GridTab = 'all' | 'liked';
+const useGridTabStore = create<{ tab: GridTab; setTab: (t: GridTab) => void }>((set) => ({
+  tab: 'all',
+  setTab: (tab) => set({ tab }),
+}));
+
+// Unified media item used by the justified-rows layout.
+type MediaItem =
+  | ({ kind: 'image' } & GeneratedImage)
+  | ({ kind: 'video' } & GeneratedVideo);
+
 
 // Build a resized variant of a Supabase Storage public URL using the
 // `/render/image/` transform endpoint. Falls back to original on non-Supabase URLs.
@@ -37,13 +51,21 @@ function parseRatio(ar: string): number {
 
 export function ImageGrid() {
   const { images: allImages } = useGeneratorStore();
+  const { videos: allVideos } = useVideoStore();
   const activeProjectId = useCreateProjectsStore((s) => s.activeProjectId);
   const { search, modelFilter, dateFilter } = useGridFilterStore();
+  const tab = useGridTabStore((s) => s.tab);
+  const setTab = useGridTabStore((s) => s.setTab);
 
-  const images = useMemo(() => {
-    let list = activeProjectId
-      ? allImages.filter((i) => i.projectId === activeProjectId)
-      : allImages.filter((i) => !i.projectId);
+  // Merge images + videos into a unified, project-scoped, filtered, sorted feed.
+  const items = useMemo<MediaItem[]>(() => {
+    const imgItems: MediaItem[] = allImages.map((i) => ({ kind: 'image', ...i }));
+    const vidItems: MediaItem[] = allVideos.map((v) => ({ kind: 'video', ...v }));
+    let list: MediaItem[] = [...imgItems, ...vidItems];
+
+    list = activeProjectId
+      ? list.filter((i) => i.projectId === activeProjectId)
+      : list.filter((i) => !i.projectId);
 
     if (search.trim()) {
       const q = search.toLowerCase();
@@ -58,8 +80,13 @@ export function ImageGrid() {
       const cutoff = dateFilter === 'today' ? now - day : dateFilter === '7d' ? now - 7 * day : now - 30 * day;
       list = list.filter((i) => i.createdAt >= cutoff);
     }
+    if (tab === 'liked') {
+      list = list.filter((i) => !!i.liked);
+    }
+
+    list.sort((a, b) => b.createdAt - a.createdAt);
     return list;
-  }, [allImages, activeProjectId, search, modelFilter, dateFilter]);
+  }, [allImages, allVideos, activeProjectId, search, modelFilter, dateFilter, tab]);
 
   const zoom = useLayoutStore((s) => s.zoom);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -77,44 +104,32 @@ export function ImageGrid() {
   }, []);
 
   const gap = 4;
-  // Higgsfield-style: row height is driven by a 9:16 reference at the current zoom level.
-  // All other aspect ratios in the same row scale to that height.
-  // Use a 9:16 reference at 2x the base zoom height so portrait/tall images
-  // are dominant and every other aspect ratio matches that height (wider).
   const targetRowHeight = ZOOM_ROW_HEIGHTS[zoom] * 2;
 
-  // Justified rows layout (à la Higgsfield / Google Images / Flickr):
-  // every row has the SAME height; widths vary by aspect ratio so each row
-  // exactly fills the container width. Order is preserved (newest first).
   const layout = useMemo(() => {
-    type Item = { id: string; left: number; top: number; width: number; height: number };
-    if (!containerWidth) return { items: [] as Item[], totalHeight: 0 };
+    type Pos = { id: string; left: number; top: number; width: number; height: number };
+    if (!containerWidth) return { items: [] as Pos[], totalHeight: 0 };
 
-    const items: Item[] = [];
+    const positioned: Pos[] = [];
     let top = 0;
     let rowStart = 0;
 
     const flushRow = (endExclusive: number, isLast: boolean) => {
-      const rowImgs = images.slice(rowStart, endExclusive);
-      if (rowImgs.length === 0) return;
-      const ratios = rowImgs.map((i) => parseRatio(i.aspectRatio));
+      const row = items.slice(rowStart, endExclusive);
+      if (row.length === 0) return;
+      const ratios = row.map((i) => parseRatio(i.aspectRatio));
       const sumRatio = ratios.reduce((a, b) => a + b, 0);
-      const totalGap = gap * (rowImgs.length - 1);
+      const totalGap = gap * (row.length - 1);
       const available = Math.max(0, containerWidth - totalGap);
-      // Height that makes the row exactly fill the container width.
       let rowHeight = available / sumRatio;
-      // Don't stretch the last partial row beyond the target height.
       if (isLast && rowHeight > targetRowHeight * 1.4) {
         rowHeight = targetRowHeight;
       }
-      // Compute integer widths that sum exactly to `available` to avoid
-      // sub-pixel rounding overflow that pushes the last item past the edge.
       const rawWidths = ratios.map((r) => r * rowHeight);
       const flooredWidths = rawWidths.map((w) => Math.floor(w));
       if (!isLast || rowHeight !== targetRowHeight) {
-        let used = flooredWidths.reduce((a, b) => a + b, 0);
+        const used = flooredWidths.reduce((a, b) => a + b, 0);
         let remainder = available - used;
-        // Distribute leftover pixels one-by-one starting from the largest.
         const order = rawWidths
           .map((w, i) => ({ i, frac: w - Math.floor(w) }))
           .sort((a, b) => b.frac - a.frac);
@@ -126,9 +141,9 @@ export function ImageGrid() {
         }
       }
       let left = 0;
-      rowImgs.forEach((img, idx) => {
+      row.forEach((it, idx) => {
         const w = flooredWidths[idx];
-        items.push({ id: img.id, left, top, width: w, height: rowHeight });
+        positioned.push({ id: it.id, left, top, width: w, height: rowHeight });
         left += w + gap;
       });
       top += rowHeight + gap;
@@ -136,9 +151,8 @@ export function ImageGrid() {
     };
 
     let accRatio = 0;
-    for (let i = 0; i < images.length; i++) {
-      accRatio += parseRatio(images[i].aspectRatio);
-      // Projected row height if we close the row here.
+    for (let i = 0; i < items.length; i++) {
+      accRatio += parseRatio(items[i].aspectRatio);
       const totalGap = gap * (i - rowStart);
       const projected = (containerWidth - totalGap) / accRatio;
       if (projected <= targetRowHeight) {
@@ -146,36 +160,62 @@ export function ImageGrid() {
         accRatio = 0;
       }
     }
-    if (rowStart < images.length) flushRow(images.length, true);
+    if (rowStart < items.length) flushRow(items.length, true);
 
     const totalHeight = Math.max(0, top - gap);
-    return { items, totalHeight };
-  }, [images, containerWidth, targetRowHeight]);
+    return { items: positioned, totalHeight };
+  }, [items, containerWidth, targetRowHeight]);
 
   return (
     <div className="w-full">
-
-      <div ref={containerRef} className="relative w-full" style={{ height: images.length === 0 ? undefined : layout.totalHeight, minHeight: images.length === 0 ? '60vh' : undefined }}>
-      {images.length === 0 && (
-        <div className="flex items-center justify-center min-h-[60vh] text-muted-foreground text-sm">
-          <div className="text-center space-y-2">
-            <p className="text-lg text-foreground font-semibold">No generations yet</p>
-            <p className="text-xs text-muted-foreground/70">Describe what you want below to get started.</p>
-          </div>
-        </div>
-      )}
-      {layout.items.map((pos, i) => {
-        const img = images[i];
-        return (
-          <div
-            key={img.id}
-            className="absolute animate-fade-in"
-            style={{ left: pos.left, top: pos.top, width: pos.width, height: pos.height }}
+      {/* Top tabs row: All / Liked (Marketing Studio parity) */}
+      <div className="flex items-center justify-end mb-3">
+        <div className="flex items-center gap-1 p-1 rounded-full bg-ms-surface-2 border border-ms-border">
+          <button
+            onClick={() => setTab('all')}
+            className={`px-3 h-7 rounded-full text-xs font-medium transition-colors ${
+              tab === 'all' ? 'bg-foreground text-background' : 'text-muted-foreground hover:text-foreground'
+            }`}
           >
-            <ImageCard image={img} />
+            All
+          </button>
+          <button
+            onClick={() => setTab('liked')}
+            className={`flex items-center gap-1 px-3 h-7 rounded-full text-xs font-medium transition-colors ${
+              tab === 'liked' ? 'bg-foreground text-background' : 'text-muted-foreground hover:text-foreground'
+            }`}
+          >
+            <Heart className="w-3 h-3" /> Liked
+          </button>
+        </div>
+      </div>
+
+      <div ref={containerRef} className="relative w-full" style={{ height: items.length === 0 ? undefined : layout.totalHeight, minHeight: items.length === 0 ? '60vh' : undefined }}>
+        {items.length === 0 && (
+          <div className="min-h-[60vh] flex flex-col items-center justify-center text-center">
+            <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-ms-cta to-ms-cta-2 grid place-items-center mb-4 shadow-[0_10px_30px_-10px_hsl(var(--ms-cta)/0.6)]">
+              <Play className="w-6 h-6 text-white fill-white" />
+            </div>
+            <div className="text-lg font-semibold text-foreground">
+              {tab === 'liked' ? 'No liked items yet' : 'No generations yet'}
+            </div>
+            <div className="text-sm text-muted-foreground mt-1">
+              {tab === 'liked' ? 'Tap the heart on any card to save your favourites.' : 'Describe what you want below to get started.'}
+            </div>
           </div>
-        );
-      })}
+        )}
+        {layout.items.map((pos, i) => {
+          const it = items[i];
+          return (
+            <div
+              key={`${it.kind}-${it.id}`}
+              className="absolute animate-fade-in"
+              style={{ left: pos.left, top: pos.top, width: pos.width, height: pos.height }}
+            >
+              {it.kind === 'image' ? <ImageCard image={it} /> : <VideoCard video={it} />}
+            </div>
+          );
+        })}
       </div>
     </div>
   );
@@ -572,5 +612,138 @@ function MenuItem({ icon, label, onClick, destructive }: {
       {icon}
       {label}
     </button>
+  );
+}
+
+// =============================================================
+// VideoCard — sibling to ImageCard, hover-plays, video-specific actions
+// =============================================================
+function VideoCard({ video }: { video: GeneratedVideo & { kind: 'video' } }) {
+  const setSelectedImageId = useGeneratorStore((s) => s.setSelectedImageId);
+  const deleteVideo = useVideoStore((s) => s.deleteVideo);
+  const retryVideo = useVideoStore((s) => s.retryVideo);
+  const toggleLike = useVideoStore((s) => s.toggleLike);
+  const setSelectedVideoId = useVideoStore((s) => s.setSelectedVideoId);
+  const isSelected = useGridSelectionStore((s) => s.selected.has(video.id));
+  const toggleSelect = useGridSelectionStore((s) => s.toggle);
+  const videoRef = useRef<HTMLVideoElement>(null);
+
+  const [, forceTick] = useState(0);
+  useEffect(() => {
+    if (video.status !== 'generating') return;
+    const t = setInterval(() => forceTick((n) => n + 1), 1000);
+    return () => clearInterval(t);
+  }, [video.status]);
+
+  const handleDownload = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!video.videoUrl) return;
+    try {
+      const res = await fetch(video.videoUrl);
+      const blob = await res.blob();
+      const slug = video.prompt.slice(0, 40).replace(/[^a-zA-Z0-9]+/g, '-').replace(/-+$/, '') || 'video';
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${slug}-${video.id.slice(0, 8)}.mp4`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch {
+      window.open(video.videoUrl, '_blank');
+    }
+  };
+
+  // Pending state (Marketing Studio parity)
+  if (video.status === 'generating') {
+    const elapsed = Math.floor((Date.now() - video.createdAt) / 1000);
+    const pct = video.progress ?? Math.min(95, Math.floor((elapsed / 120) * 100));
+    return (
+      <div className="relative w-full h-full overflow-hidden bg-ms-surface-2 ring-1 ring-ms-border">
+        <div className="absolute inset-0 ms-shimmer opacity-40" />
+        <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 text-foreground/90 px-3">
+          <Loader2 className="w-6 h-6 animate-spin" />
+          <div className="text-[11px] font-medium tracking-wide uppercase text-center">Rendering video…</div>
+          <div className="w-3/4 h-1 rounded-full bg-white/10 overflow-hidden">
+            <div className="h-full bg-foreground/80 transition-all" style={{ width: `${pct}%` }} />
+          </div>
+          <div className="text-[10px] text-muted-foreground">{elapsed}s</div>
+        </div>
+      </div>
+    );
+  }
+
+  if (video.status === 'failed' || video.status === 'nsfw') {
+    return (
+      <div className="relative w-full h-full overflow-hidden bg-ms-surface-2 flex flex-col items-center justify-center gap-2 p-3 text-center">
+        <AlertCircle className="w-6 h-6 text-destructive" />
+        <div className="text-[11px] font-semibold text-foreground">Generation failed</div>
+        <div className="text-[10px] text-muted-foreground line-clamp-3">{video.error || 'Try again'}</div>
+        <div className="flex items-center gap-1.5 mt-1">
+          <button onClick={() => retryVideo(video.id)} className="flex items-center gap-1 bg-muted/60 text-foreground text-xs px-3 py-1.5 rounded-lg hover:bg-muted">
+            <RefreshCw className="w-3 h-3" /> Retry
+          </button>
+          <button onClick={() => deleteVideo(video.id)} className="flex items-center gap-1 bg-muted/60 text-foreground text-xs px-3 py-1.5 rounded-lg hover:bg-muted">
+            <Trash2 className="w-3 h-3" /> Delete
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div
+      className="group relative w-full h-full overflow-hidden bg-ms-surface-2 cursor-pointer"
+      onClick={() => setSelectedVideoId(video.id)}
+    >
+      {video.videoUrl ? (
+        <video
+          ref={videoRef}
+          src={`${video.videoUrl}#t=0.1`}
+          poster={video.thumbnailUrl}
+          muted
+          loop
+          playsInline
+          preload="metadata"
+          onMouseEnter={(e) => e.currentTarget.play().catch(() => {})}
+          onMouseLeave={(e) => { e.currentTarget.pause(); e.currentTarget.currentTime = 0.1; }}
+          className="absolute inset-0 w-full h-full object-cover bg-[#0a0a0a]"
+        />
+      ) : (
+        <div className="absolute inset-0 bg-[#0a0a0a]" />
+      )}
+
+      {/* Play badge (top-right corner, subtle) */}
+      <div className="absolute top-2 right-2 w-7 h-7 rounded-full bg-black/55 backdrop-blur-md grid place-items-center ring-1 ring-white/10 opacity-90">
+        <Play className="w-3.5 h-3.5 text-white fill-white" />
+      </div>
+
+      {/* Hover gradient */}
+      <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-black/30 opacity-0 group-hover:opacity-100 transition-opacity duration-200" />
+
+      {/* Top-left selection */}
+      <button
+        onClick={(e) => { e.stopPropagation(); toggleSelect(video.id); }}
+        className={`absolute top-2 left-2 grid place-items-center w-7 h-7 rounded-full backdrop-blur-md ring-1 transition-all ${
+          isSelected
+            ? 'bg-white text-black ring-white opacity-100'
+            : 'bg-black/55 text-white/90 ring-white/15 opacity-0 group-hover:opacity-100 hover:bg-black/75'
+        }`}
+        title={isSelected ? 'Deselect' : 'Select'}
+      >
+        {isSelected ? <Check className="w-3.5 h-3.5" strokeWidth={3} /> : <span className="block w-3.5 h-3.5 rounded-full ring-1 ring-white/70" />}
+      </button>
+
+      {/* Bottom-right action row */}
+      <div className="absolute bottom-2 right-2 flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+        <HoverIconBtn label="Expand" onClick={(e) => { e.stopPropagation(); setSelectedVideoId(video.id); }} svg={<Maximize2 className="w-[18px] h-[18px]" />} />
+        <HoverIconBtn label="Download" onClick={handleDownload} svg={<Download className="w-[18px] h-[18px]" />} />
+        <HoverIconBtn
+          label={video.liked ? 'Unlike' : 'Like'}
+          onClick={(e) => { e.stopPropagation(); toggleLike(video.id); }}
+          svg={<Heart className={`w-[18px] h-[18px] ${video.liked ? 'fill-current text-rose-400' : ''}`} />}
+        />
+        <HoverIconBtn label="Delete" danger onClick={(e) => { e.stopPropagation(); deleteVideo(video.id); }} svg={<Trash2 className="w-[18px] h-[18px]" />} />
+      </div>
+    </div>
   );
 }

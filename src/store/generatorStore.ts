@@ -16,6 +16,7 @@ export type GeneratedImage = {
   createdAt: number;
   error?: string;
   projectId?: string | null;
+  liked?: boolean;
 };
 
 type GeneratorState = {
@@ -43,6 +44,7 @@ type GeneratorState = {
   useAsReference: (imageUrl: string) => void;
   loadHistory: () => Promise<void>;
   moveImageToProject: (id: string, projectId: string | null) => Promise<void>;
+  toggleLike: (id: string) => void;
 };
 
 export const MODELS = [
@@ -287,6 +289,7 @@ export const useGeneratorStore = create<GeneratorState>()((set, get) => ({
           createdAt: new Date(row.created_at).getTime(),
           error: row.error,
           projectId: row.project_id ?? null,
+          liked: !!row.liked,
         }));
 
         const current = get().images;
@@ -461,5 +464,13 @@ export const useGeneratorStore = create<GeneratorState>()((set, get) => ({
       .update({ project_id: projectId } as any)
       .eq('id', id);
     if (error) console.error('Move image error:', error);
+  },
+
+  toggleLike: (id) => {
+    const next = !get().images.find((i) => i.id === id)?.liked;
+    set({ images: get().images.map((i) => (i.id === id ? { ...i, liked: next } : i)) });
+    supabase.from('generations').update({ liked: next } as any).eq('id', id).then(({ error }) => {
+      if (error) console.error('Toggle like error:', error);
+    });
   },
 }));

@@ -1,0 +1,2 @@
+ALTER TABLE public.generations ADD COLUMN IF NOT EXISTS liked BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE public.video_generations ADD COLUMN IF NOT EXISTS liked BOOLEAN NOT NULL DEFAULT false;
