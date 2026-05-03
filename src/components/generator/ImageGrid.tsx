@@ -801,7 +801,12 @@ function MarketingCard({ gen, createProjectId }: { gen: MSGeneration & { kind: '
   const [selected, setSelected] = useState(false);
   const [, forceTick] = useState(0);
 
-  const isPending = gen.status === 'queued' || gen.status === 'queued_pending_persist' || gen.status === 'running';
+  const isPending =
+    gen.status === 'queued' ||
+    gen.status === 'queued_pending_persist' ||
+    gen.status === 'running' ||
+    (gen.status as string) === 'processing' ||
+    (!gen.videoUrl && gen.status !== 'failed' && gen.stage !== 'done');
   const isFailed = gen.status === 'failed';
 
   useEffect(() => {
