@@ -6,6 +6,7 @@ export type CreateProject = {
   name: string;
   slug: string;
   thumbUrl?: string | null;
+  thumbLocked?: boolean;
   createdAt: number;
 };
 
@@ -20,6 +21,8 @@ type State = {
   createProject: (name?: string) => Promise<CreateProject>;
   renameProject: (id: string, name: string) => Promise<void>;
   deleteProject: (id: string) => Promise<void>;
+  setProjectThumbnail: (id: string, url: string, locked?: boolean) => Promise<void>;
+  bumpProjectThumbIfUnlocked: (id: string, url: string) => Promise<void>;
 };
 
 function slugify(name: string) {
@@ -67,9 +70,9 @@ export const useCreateProjectsStore = create<State>((set, get) => ({
       name: r.name,
       slug: r.slug,
       thumbUrl: r.thumb_url,
+      thumbLocked: !!r.thumb_locked,
       createdAt: new Date(r.created_at).getTime(),
     }));
-    // Auto-select most recent project if none active and one exists
     const currentActive = get().activeProjectId;
     const stillExists = currentActive && projects.some((p) => p.id === currentActive);
     let activeProjectId = currentActive;
@@ -94,6 +97,7 @@ export const useCreateProjectsStore = create<State>((set, get) => ({
       name: data.name,
       slug: data.slug,
       thumbUrl: data.thumb_url,
+      thumbLocked: !!data.thumb_locked,
       createdAt: new Date(data.created_at).getTime(),
     };
     set({ projects: [proj, ...get().projects], activeProjectId: proj.id });
@@ -109,11 +113,42 @@ export const useCreateProjectsStore = create<State>((set, get) => ({
   },
 
   deleteProject: async (id) => {
+    const wasActive = get().activeProjectId === id;
+    const remaining = get().projects.filter((p) => p.id !== id);
     set({
-      projects: get().projects.filter((p) => p.id !== id),
-      activeProjectId: get().activeProjectId === id ? null : get().activeProjectId,
+      projects: remaining,
+      activeProjectId: wasActive ? remaining[0]?.id ?? null : get().activeProjectId,
     });
-    if (get().activeProjectId === null) localStorage.removeItem('create-active-project');
+    if (wasActive) {
+      const next = remaining[0]?.id ?? null;
+      if (next) localStorage.setItem('create-active-project', next);
+      else localStorage.removeItem('create-active-project');
+    }
+    // FK cascades delete of generations rows
     await supabase.from('create_projects' as any).delete().eq('id', id);
+  },
+
+  setProjectThumbnail: async (id, url, locked = true) => {
+    set({
+      projects: get().projects.map((p) =>
+        p.id === id ? { ...p, thumbUrl: url, thumbLocked: locked } : p
+      ),
+    });
+    await supabase
+      .from('create_projects' as any)
+      .update({ thumb_url: url, thumb_locked: locked } as any)
+      .eq('id', id);
+  },
+
+  bumpProjectThumbIfUnlocked: async (id, url) => {
+    const proj = get().projects.find((p) => p.id === id);
+    if (!proj || proj.thumbLocked) return;
+    set({
+      projects: get().projects.map((p) => (p.id === id ? { ...p, thumbUrl: url } : p)),
+    });
+    await supabase
+      .from('create_projects' as any)
+      .update({ thumb_url: url, updated_at: new Date().toISOString() } as any)
+      .eq('id', id);
   },
 }));
