@@ -373,6 +373,12 @@ export const useVideoStore = create<VideoState>()((set, get) => ({
     (supabase as any).from('video_generations').delete().eq('id', id).then(() => {});
   },
 
+  toggleLike: (id) => {
+    const next = !get().videos.find((v) => v.id === id)?.liked;
+    set({ videos: get().videos.map((v) => (v.id === id ? { ...v, liked: next } : v)) });
+    (supabase as any).from('video_generations').update({ liked: next }).eq('id', id).then(() => {});
+  },
+
   loadHistory: async () => {
     if (get()._historyLoaded) return;
     try {
