@@ -334,8 +334,9 @@ export function VideoPromptBarInline() {
 
           <div className="flex-1" />
         </div>
-      </div>
-    </div>
+      </motion.div>
+    </motion.div>
+    </LayoutGroup>
   );
 }
 
