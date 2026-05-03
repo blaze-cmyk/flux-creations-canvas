@@ -37,7 +37,7 @@ type GeneratorState = {
   setAspectRatio: (ar: string) => void;
   setQuantity: (qty: number) => void;
   setSelectedImageId: (id: string | null) => void;
-  generate: () => void;
+  generate: () => Promise<void>;
   retryImage: (id: string) => void;
   deleteImage: (id: string) => void;
   useAsReference: (imageUrl: string) => void;
@@ -302,18 +302,23 @@ export const useGeneratorStore = create<GeneratorState>()((set, get) => ({
     }
   },
 
-  generate: () => {
+  generate: async () => {
     const { prompt, referenceImages, model, quality, aspectRatio, quantity } = get();
     if (!prompt.trim()) return;
 
-    // Resolve active project; auto-create one if none exists
+    // Resolve active project FIRST so placeholders carry the correct projectId.
+    // Otherwise the grid (which filters by activeProjectId) would hide them the
+    // moment a brand-new project is auto-created and becomes active.
     const projStore = useCreateProjectsStore.getState();
-    let projectIdPromise: Promise<string | null>;
-    if (projStore.activeProjectId) {
-      projectIdPromise = Promise.resolve(projStore.activeProjectId);
-    } else {
+    let projectId: string | null = projStore.activeProjectId;
+    if (!projectId) {
       const name = prompt.split(/\s+/).slice(0, 5).join(' ').slice(0, 60) || 'New project';
-      projectIdPromise = projStore.createProject(name).then((p) => p.id).catch(() => null);
+      try {
+        const proj = await projStore.createProject(name);
+        projectId = proj.id;
+      } catch {
+        projectId = null;
+      }
     }
 
     const newImages: GeneratedImage[] = Array.from({ length: quantity }, () => ({
@@ -325,13 +330,13 @@ export const useGeneratorStore = create<GeneratorState>()((set, get) => ({
       aspectRatio,
       status: 'generating' as const,
       createdAt: Date.now(),
+      projectId: projectId ?? undefined,
     }));
 
     set({ images: [...newImages, ...get().images] });
 
     newImages.forEach(async (img) => {
       try {
-        const projectId = await projectIdPromise;
         const result = await callGenerateAPI({ prompt, referenceImages, model, quality, aspectRatio });
 
         if (result.error) {
