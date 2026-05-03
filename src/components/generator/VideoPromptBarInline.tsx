@@ -537,7 +537,7 @@ function SceneControlCard({
   setSource: (v: 'video' | 'image') => void;
 }) {
   return (
-    <div className="flex-1 min-w-[220px] max-w-[280px] rounded-xl border border-white/10 bg-white/[0.03] p-3 flex flex-col gap-2.5">
+    <div className={`self-start w-[280px] rounded-xl border border-white/10 bg-white/[0.03] ${on ? 'p-3' : 'px-3 py-2'} flex flex-col gap-2`}>
       <div className="flex items-center justify-between gap-2">
         <span className="text-[12px] font-semibold text-foreground">Scene control mode</span>
         <button
