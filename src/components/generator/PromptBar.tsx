@@ -378,7 +378,7 @@ export function PromptBar() {
               loop
               muted
               playsInline
-              className="absolute inset-0 w-full h-full object-contain pointer-events-none"
+              className="absolute inset-0 w-full h-full object-cover pointer-events-none"
             />
             <span className="absolute inset-0 bg-black/20 pointer-events-none" />
             <span className="relative z-10 flex items-center gap-2">
