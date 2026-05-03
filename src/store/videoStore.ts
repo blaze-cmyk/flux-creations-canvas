@@ -67,6 +67,7 @@ type VideoState = {
   duration: string;
   characterOrientation: 'video' | 'image';
   keepAudio: boolean;
+  resolution: string;
   videos: GeneratedVideo[];
   selectedVideoId: string | null;
   setPrompt: (p: string) => void;
@@ -81,6 +82,7 @@ type VideoState = {
   setDuration: (d: string) => void;
   setCharacterOrientation: (value: 'video' | 'image') => void;
   setKeepAudio: (v: boolean) => void;
+  setResolution: (r: string) => void;
   setSelectedVideoId: (id: string | null) => void;
   generate: () => void;
   retryVideo: (id: string) => void;
@@ -222,6 +224,7 @@ export const useVideoStore = create<VideoState>()((set, get) => ({
   duration: '5',
   characterOrientation: 'video',
   keepAudio: false,
+  resolution: '720p',
   videos: [],
   selectedVideoId: null,
   _historyLoaded: false,
@@ -261,6 +264,7 @@ export const useVideoStore = create<VideoState>()((set, get) => ({
   setDuration: (duration) => set({ duration }),
   setCharacterOrientation: (characterOrientation) => set({ characterOrientation }),
   setKeepAudio: (keepAudio) => set({ keepAudio }),
+  setResolution: (resolution) => set({ resolution }),
   setSelectedVideoId: (selectedVideoId) => set({ selectedVideoId }),
 
   generate: () => {
