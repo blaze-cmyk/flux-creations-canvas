@@ -91,11 +91,13 @@ export function MotionControlPanel({
           ) : (
             <button
               onClick={() => uploadFileAt(0, 'image/*,video/*')}
-              className="w-full aspect-[3/4] border border-dashed border-border rounded-xl flex flex-col items-center justify-center gap-1 text-muted-foreground hover:border-foreground/30 transition-colors"
+              className="w-full aspect-[3/4] border border-dashed border-border rounded-xl flex flex-col items-center justify-center gap-2 text-muted-foreground hover:border-foreground/30 transition-colors px-2"
             >
-              <ImageIcon className="w-5 h-5" />
-              <span className="text-[10px]">Motion video</span>
-              <span className="text-[9px] text-muted-foreground/50">Drop or click</span>
+              <div className="grid place-items-center w-8 h-8 rounded-full bg-muted">
+                <Video className="w-4 h-4" />
+              </div>
+              <span className="text-[11px] font-semibold text-foreground text-center leading-tight">Add motion to copy</span>
+              <span className="text-[9px] text-muted-foreground/70 text-center leading-tight">Video duration:<br/>3–30 seconds</span>
             </button>
           )}
         </DropZone>
@@ -112,11 +114,13 @@ export function MotionControlPanel({
           ) : (
             <button
               onClick={() => uploadFileAt(1, 'image/*')}
-              className="w-full aspect-[3/4] border border-dashed border-border rounded-xl flex flex-col items-center justify-center gap-1.5 text-muted-foreground hover:border-foreground/30 transition-colors"
+              className="w-full aspect-[3/4] border border-dashed border-border rounded-xl flex flex-col items-center justify-center gap-2 text-muted-foreground hover:border-foreground/30 transition-colors px-2"
             >
-              <Plus className="w-5 h-5" />
-              <span className="text-[10px] text-center leading-tight">Add your character</span>
-              <span className="text-[9px] text-muted-foreground/60 text-center px-1">Drop or click</span>
+              <div className="grid place-items-center w-8 h-8 rounded-full bg-muted">
+                <Plus className="w-4 h-4" />
+              </div>
+              <span className="text-[11px] font-semibold text-foreground text-center leading-tight">Add your character</span>
+              <span className="text-[9px] text-muted-foreground/70 text-center leading-tight">Image with visible<br/>face and body</span>
             </button>
           )}
         </DropZone>
