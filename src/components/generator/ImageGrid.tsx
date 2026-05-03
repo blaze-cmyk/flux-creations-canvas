@@ -73,7 +73,9 @@ export function ImageGrid() {
     return () => ro.disconnect();
   }, []);
 
-  const gap = 8;
+  const gap = 4;
+  // Higgsfield-style: row height is driven by a 9:16 reference at the current zoom level.
+  // All other aspect ratios in the same row scale to that height.
   const targetRowHeight = ZOOM_ROW_HEIGHTS[zoom];
 
   // Justified rows layout (à la Higgsfield / Google Images / Flickr):
@@ -296,7 +298,7 @@ function ImageCard({ image }: {
   // Generating state
   if (image.status === 'generating') {
     return (
-      <div className="relative w-full h-full rounded-xl overflow-hidden bg-ms-surface-2 ring-1 ring-ms-border flex items-center justify-center">
+      <div className="relative w-full h-full overflow-hidden bg-ms-surface-2 flex items-center justify-center">
         <div className="absolute inset-0 ms-shimmer opacity-40" />
         <div className="relative flex flex-col items-center gap-2">
           <Loader2 className="w-6 h-6 text-foreground animate-spin" />
@@ -309,7 +311,7 @@ function ImageCard({ image }: {
   // Failed / NSFW state
   if (image.status === 'failed' || image.status === 'nsfw') {
     return (
-      <div className="relative w-full h-full rounded-xl overflow-hidden bg-ms-surface-2 ring-1 ring-ms-border flex flex-col items-center justify-center gap-3 p-3">
+      <div className="relative w-full h-full overflow-hidden bg-ms-surface-2 flex flex-col items-center justify-center gap-3 p-3">
         <div className="flex items-center gap-1.5">
           {image.status === 'failed' ? (
             <span className="flex items-center gap-1 bg-destructive/80 text-destructive-foreground text-[10px] px-2 py-0.5 rounded-full font-medium">
@@ -344,7 +346,7 @@ function ImageCard({ image }: {
 
   return (
     <div
-      className="group relative w-full h-full rounded-xl overflow-hidden bg-ms-surface-2 ring-1 ring-ms-border hover:ring-foreground/30 transition-all cursor-pointer"
+      className="group relative w-full h-full overflow-hidden bg-ms-surface-2 hover:ring-1 hover:ring-foreground/30 transition-all cursor-pointer"
       onClick={() => setSelectedImageId(image.id)}
     >
       {/* Loading skeleton */}
