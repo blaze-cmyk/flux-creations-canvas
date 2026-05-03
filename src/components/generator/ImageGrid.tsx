@@ -614,3 +614,136 @@ function MenuItem({ icon, label, onClick, destructive }: {
     </button>
   );
 }
+
+// =============================================================
+// VideoCard — sibling to ImageCard, hover-plays, video-specific actions
+// =============================================================
+function VideoCard({ video }: { video: GeneratedVideo & { kind: 'video' } }) {
+  const setSelectedImageId = useGeneratorStore((s) => s.setSelectedImageId);
+  const deleteVideo = useVideoStore((s) => s.deleteVideo);
+  const retryVideo = useVideoStore((s) => s.retryVideo);
+  const toggleLike = useVideoStore((s) => s.toggleLike);
+  const setSelectedVideoId = useVideoStore((s) => s.setSelectedVideoId);
+  const isSelected = useGridSelectionStore((s) => s.selected.has(video.id));
+  const toggleSelect = useGridSelectionStore((s) => s.toggle);
+  const videoRef = useRef<HTMLVideoElement>(null);
+
+  const [, forceTick] = useState(0);
+  useEffect(() => {
+    if (video.status !== 'generating') return;
+    const t = setInterval(() => forceTick((n) => n + 1), 1000);
+    return () => clearInterval(t);
+  }, [video.status]);
+
+  const handleDownload = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!video.videoUrl) return;
+    try {
+      const res = await fetch(video.videoUrl);
+      const blob = await res.blob();
+      const slug = video.prompt.slice(0, 40).replace(/[^a-zA-Z0-9]+/g, '-').replace(/-+$/, '') || 'video';
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${slug}-${video.id.slice(0, 8)}.mp4`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch {
+      window.open(video.videoUrl, '_blank');
+    }
+  };
+
+  // Pending state (Marketing Studio parity)
+  if (video.status === 'generating') {
+    const elapsed = Math.floor((Date.now() - video.createdAt) / 1000);
+    const pct = video.progress ?? Math.min(95, Math.floor((elapsed / 120) * 100));
+    return (
+      <div className="relative w-full h-full overflow-hidden bg-ms-surface-2 ring-1 ring-ms-border">
+        <div className="absolute inset-0 ms-shimmer opacity-40" />
+        <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 text-foreground/90 px-3">
+          <Loader2 className="w-6 h-6 animate-spin" />
+          <div className="text-[11px] font-medium tracking-wide uppercase text-center">Rendering video…</div>
+          <div className="w-3/4 h-1 rounded-full bg-white/10 overflow-hidden">
+            <div className="h-full bg-foreground/80 transition-all" style={{ width: `${pct}%` }} />
+          </div>
+          <div className="text-[10px] text-muted-foreground">{elapsed}s</div>
+        </div>
+      </div>
+    );
+  }
+
+  if (video.status === 'failed' || video.status === 'nsfw') {
+    return (
+      <div className="relative w-full h-full overflow-hidden bg-ms-surface-2 flex flex-col items-center justify-center gap-2 p-3 text-center">
+        <AlertCircle className="w-6 h-6 text-destructive" />
+        <div className="text-[11px] font-semibold text-foreground">Generation failed</div>
+        <div className="text-[10px] text-muted-foreground line-clamp-3">{video.error || 'Try again'}</div>
+        <div className="flex items-center gap-1.5 mt-1">
+          <button onClick={() => retryVideo(video.id)} className="flex items-center gap-1 bg-muted/60 text-foreground text-xs px-3 py-1.5 rounded-lg hover:bg-muted">
+            <RefreshCw className="w-3 h-3" /> Retry
+          </button>
+          <button onClick={() => deleteVideo(video.id)} className="flex items-center gap-1 bg-muted/60 text-foreground text-xs px-3 py-1.5 rounded-lg hover:bg-muted">
+            <Trash2 className="w-3 h-3" /> Delete
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div
+      className="group relative w-full h-full overflow-hidden bg-ms-surface-2 cursor-pointer"
+      onClick={() => setSelectedVideoId(video.id)}
+    >
+      {video.videoUrl ? (
+        <video
+          ref={videoRef}
+          src={`${video.videoUrl}#t=0.1`}
+          poster={video.thumbnailUrl}
+          muted
+          loop
+          playsInline
+          preload="metadata"
+          onMouseEnter={(e) => e.currentTarget.play().catch(() => {})}
+          onMouseLeave={(e) => { e.currentTarget.pause(); e.currentTarget.currentTime = 0.1; }}
+          className="absolute inset-0 w-full h-full object-cover bg-[#0a0a0a]"
+        />
+      ) : (
+        <div className="absolute inset-0 bg-[#0a0a0a]" />
+      )}
+
+      {/* Play badge (top-right corner, subtle) */}
+      <div className="absolute top-2 right-2 w-7 h-7 rounded-full bg-black/55 backdrop-blur-md grid place-items-center ring-1 ring-white/10 opacity-90">
+        <Play className="w-3.5 h-3.5 text-white fill-white" />
+      </div>
+
+      {/* Hover gradient */}
+      <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-black/30 opacity-0 group-hover:opacity-100 transition-opacity duration-200" />
+
+      {/* Top-left selection */}
+      <button
+        onClick={(e) => { e.stopPropagation(); toggleSelect(video.id); }}
+        className={`absolute top-2 left-2 grid place-items-center w-7 h-7 rounded-full backdrop-blur-md ring-1 transition-all ${
+          isSelected
+            ? 'bg-white text-black ring-white opacity-100'
+            : 'bg-black/55 text-white/90 ring-white/15 opacity-0 group-hover:opacity-100 hover:bg-black/75'
+        }`}
+        title={isSelected ? 'Deselect' : 'Select'}
+      >
+        {isSelected ? <Check className="w-3.5 h-3.5" strokeWidth={3} /> : <span className="block w-3.5 h-3.5 rounded-full ring-1 ring-white/70" />}
+      </button>
+
+      {/* Bottom-right action row */}
+      <div className="absolute bottom-2 right-2 flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+        <HoverIconBtn label="Expand" onClick={(e) => { e.stopPropagation(); setSelectedVideoId(video.id); }} svg={<Maximize2 className="w-[18px] h-[18px]" />} />
+        <HoverIconBtn label="Download" onClick={handleDownload} svg={<Download className="w-[18px] h-[18px]" />} />
+        <HoverIconBtn
+          label={video.liked ? 'Unlike' : 'Like'}
+          onClick={(e) => { e.stopPropagation(); toggleLike(video.id); }}
+          svg={<Heart className={`w-[18px] h-[18px] ${video.liked ? 'fill-current text-rose-400' : ''}`} />}
+        />
+        <HoverIconBtn label="Delete" danger onClick={(e) => { e.stopPropagation(); deleteVideo(video.id); }} svg={<Trash2 className="w-[18px] h-[18px]" />} />
+      </div>
+    </div>
+  );
+}
