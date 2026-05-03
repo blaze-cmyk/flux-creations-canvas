@@ -42,17 +42,21 @@ export function VideoPromptBarInline() {
   const {
     prompt, setPrompt, referenceImages, setReferenceImageAt, removeReferenceImage,
     model, setModel, aspectRatio, setAspectRatio, duration, setDuration, generate,
-    characterOrientation, setCharacterOrientation,
+    characterOrientation, setCharacterOrientation, resolution, setResolution,
   } = useVideoStore();
   const { videoSubMode, setVideoSubMode } = usePromptModeStore();
   const setStoreMode = useVideoStore(s => s.setMode);
   useEffect(() => { setStoreMode(videoSubMode); }, [videoSubMode, setStoreMode]);
   const [sceneControlOn, setSceneControlOn] = useState(true);
 
+  const modelDurations = useMemo(() => getDurationsForModel(model), [model]);
+  const modelResolutions = useMemo(() => getResolutionsForModel(model), [model]);
+
   const [modelOpen, setModelOpen] = useState(false);
   const [subOpen, setSubOpen] = useState(false);
   const [aspectOpen, setAspectOpen] = useState(false);
   const [durationOpen, setDurationOpen] = useState(false);
+  const [resolutionOpen, setResolutionOpen] = useState(false);
   const [search, setSearch] = useState('');
   const [enhance, setEnhance] = useState(true);
   const [sound, setSound] = useState(true);
