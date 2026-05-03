@@ -70,6 +70,7 @@ export function PromptBar() {
 
   const selectedModel = MODELS.find((m) => m.id === model);
   const maxRefs = getModelMaxRefs(model);
+  const hasPromptContent = prompt.replace(/\u00A0/g, ' ').trim().length > 0;
 
   // Render the prompt string into the contentEditable, parsing "@Image N" into chips.
   const renderToEditor = useCallback((text: string) => {
@@ -158,7 +159,7 @@ export function PromptBar() {
     if (!el) return;
     // Convert DOM to plain text — chips already contain "@Image N" as textContent
     const text = (el.innerText || '').replace(/\u00A0/g, ' ');
-    setPrompt(text);
+    setPrompt(text.trim().length === 0 ? '' : text);
   };
 
   const handleFiles = useCallback((files: FileList | File[]) => {
@@ -203,7 +204,7 @@ export function PromptBar() {
   }, [handleFiles]);
 
   const handleSubmit = () => {
-    if (prompt.trim()) generate();
+    if (hasPromptContent) generate();
   };
 
   return (
@@ -257,7 +258,7 @@ export function PromptBar() {
           {/* Prompt area */}
           <div className="flex-1 min-w-0 flex flex-col gap-1.5 py-1 pr-1">
             <div className="relative">
-              {!prompt && (
+              {!hasPromptContent && (
                 <div className="pointer-events-none absolute left-0 top-0 text-sm leading-[1.6] text-muted-foreground/60 select-none px-0">
                   {referenceImages.length > 0 ? 'Describe the scene… type @ to reference an image' : 'Describe the scene you imagine'}
                 </div>
@@ -368,7 +369,7 @@ export function PromptBar() {
           {/* Generate CTA */}
           <button
             onClick={handleSubmit}
-            disabled={!prompt.trim()}
+            disabled={!hasPromptContent}
             className="ms-cta self-center flex items-center justify-center gap-2 h-[72px] px-7 rounded-2xl text-white text-[15px] font-bold disabled:opacity-50 disabled:cursor-not-allowed shrink-0"
           >
             Generate
