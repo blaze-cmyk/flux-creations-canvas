@@ -416,6 +416,32 @@ function ImageCard({ image }: {
           <MenuItem icon={<Link2 className="w-3.5 h-3.5" />} label="Use as Reference" onClick={() => { if (image.imageUrl) useAsReference(image.imageUrl); setShowMenu(false); }} />
           <MenuItem icon={<Heart className="w-3.5 h-3.5" />} label="Like" onClick={() => setShowMenu(false)} />
           <MenuItem icon={<Download className="w-3.5 h-3.5" />} label="Download" onClick={(e) => { handleDownload(e); setShowMenu(false); }} />
+          {image.imageUrl && image.projectId && (
+            <MenuItem
+              icon={<ImageLucide className="w-3.5 h-3.5" />}
+              label="Set as cover"
+              onClick={() => { setProjectThumbnail(image.projectId!, image.imageUrl!); setShowMenu(false); }}
+            />
+          )}
+          {projects.length > 1 && (
+            <div className="relative group/move">
+              <div className="flex items-center gap-2.5 px-3 py-1.5 text-xs text-foreground/80 hover:bg-muted hover:text-foreground cursor-pointer">
+                <FolderInput className="w-3.5 h-3.5" />
+                Move to project ▸
+              </div>
+              <div className="hidden group-hover/move:block absolute left-full top-0 ml-1 bg-popover border border-border rounded-xl shadow-2xl py-1.5 min-w-[160px] max-h-60 overflow-y-auto">
+                {projects.filter((p) => p.id !== image.projectId).map((p) => (
+                  <button
+                    key={p.id}
+                    onClick={() => { moveImageToProject(image.id, p.id); setShowMenu(false); }}
+                    className="w-full text-left px-3 py-1.5 text-xs text-foreground/80 hover:bg-muted hover:text-foreground truncate"
+                  >
+                    {p.name}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
           <div className="my-1 border-t border-border/50" />
           <MenuItem icon={<Trash2 className="w-3.5 h-3.5" />} label="Delete" onClick={() => { deleteImage(image.id); setShowMenu(false); }} destructive />
         </div>
