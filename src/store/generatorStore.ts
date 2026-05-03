@@ -416,7 +416,7 @@ export const useGeneratorStore = create<GeneratorState>()((set, get) => ({
           const storageUrl = await uploadToStorage(rawUrl, id);
           if (storageUrl) {
             persistentUrl = storageUrl;
-            await saveToDb({ ...img, status: 'complete', imageUrl: persistentUrl }, persistentUrl);
+            await saveToDb({ ...img, status: 'complete', imageUrl: persistentUrl }, persistentUrl, img.projectId ?? null);
           }
         }
         set({
