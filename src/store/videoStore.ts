@@ -100,6 +100,61 @@ export const VIDEO_CATALOG: VideoCatalogEntry[] = [
 export const VIDEO_ASPECT_RATIOS = ['16:9', '9:16', '1:1'];
 export const VIDEO_DURATIONS = ['5', '10'];
 
+// Per-model duration choices (verified from fal.ai / Runware docs).
+// Falls back to VIDEO_DURATIONS when no entry exists.
+export const MODEL_DURATIONS: Record<string, string[]> = {
+  'kling-v3-pro':         ['3','4','5','6','7','8','9','10','11','12','13','14','15'],
+  'kling-v3-motion':      ['5','10'],
+  'ev-kling-v3-motion':   ['5','10'],
+  'kling-o3-pro':         ['5','10'],
+  'kling-v2.5-turbo-pro': ['5','10'],
+  'kling-v2.6-pro':       ['5','10'],
+  'kling-v2.6-motion-std':['5','10'],
+  'kling-v2.6-motion-pro':['5','10'],
+  'veo-3.1':              ['4','6','8'],
+  'veo-3.1-fast':         ['4','6','8'],
+  'veo-3.1-lite':         ['4','6','8'],
+  'minimax-video':        ['5'],            // ignored by API but locked for UI honesty
+  'pixverse-v6':          ['5','8'],
+  'ltx-2-19b':            ['5','10'],
+  'rw-seedance-1.5-pro':  ['5','10','12','15'],
+  'rw-runway-gen4.5':     ['5','10'],
+  'rw-sora-2':            ['8'],
+  'rw-kling-2.5':         ['5','10'],
+  'rw-veo-3.1':           ['8'],
+  'rw-veo-3.1-fast':      ['8'],
+  'grok-imagine':         ['6'],
+  'grok-imagine-edit':    ['6'],
+  'kling-omni-edit':      ['5','10'],
+  'kling-o1-edit-pro':    ['5','10'],
+};
+
+// Per-model resolution choices.
+// Empty list = model has no resolution param (don't render the chip).
+export const MODEL_RESOLUTIONS: Record<string, string[]> = {
+  'pixverse-v6':          ['360p','540p','720p','1080p'],
+  'veo-3.1':              ['720p','1080p'],
+  'veo-3.1-fast':         ['720p','1080p'],
+  'veo-3.1-lite':         ['720p','1080p'],
+  'rw-seedance-1.5-pro':  ['480p','720p'],
+  'grok-imagine':         ['480p','720p'],
+  'grok-imagine-edit':    ['480p','720p'],
+  'rw-runway-gen4.5':     ['720p','1080p'],
+  'rw-kling-2.5':         ['720p','1080p'],
+  'rw-veo-3.1':           ['720p','1080p'],
+  'rw-veo-3.1-fast':      ['720p','1080p'],
+  'rw-sora-2':            ['720p'],
+  'ev-kling-v3-motion':   ['720p','1080p'],
+  // kling fal endpoints, minimax, ltx → no resolution control (use defaults / video_size).
+};
+
+export function getDurationsForModel(model: string): string[] {
+  return MODEL_DURATIONS[model] ?? VIDEO_DURATIONS;
+}
+export function getResolutionsForModel(model: string): string[] {
+  return MODEL_RESOLUTIONS[model] ?? [];
+}
+
 type VideoState = {
   prompt: string;
   motionPrompt: string;
@@ -297,7 +352,16 @@ export const useVideoStore = create<VideoState>()((set, get) => ({
     set({ referenceImages: refs });
   },
   setMotionVideo: (motionVideo) => set({ motionVideo }),
-  setModel: (model) => set({ model }),
+  setModel: (model) => set((state) => {
+    const durations = getDurationsForModel(model);
+    const resolutions = getResolutionsForModel(model);
+    const next: Partial<VideoState> = { model };
+    if (!durations.includes(state.duration)) next.duration = durations[0];
+    if (resolutions.length > 0 && !resolutions.includes(state.resolution)) {
+      next.resolution = resolutions.includes('720p') ? '720p' : resolutions[0];
+    }
+    return next as VideoState;
+  }),
   setMode: (mode) => set((state) => {
     const currentModel = VIDEO_MODELS.find(m => m.id === state.model);
     if (currentModel && (currentModel.modes as readonly string[]).includes(mode)) {

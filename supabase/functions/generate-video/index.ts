@@ -337,17 +337,28 @@ async function handleSubmit(body: Record<string, unknown>) {
       input.keep_audio = body?.keepAudio === true;
     } else {
       input.prompt = prompt;
+      const resolution = typeof body?.resolution === "string" ? body.resolution : undefined;
 
       if (durFormat === "veo-str") {
+        // Veo accepts "4s" / "6s" / "8s"
         input.duration = durNum <= 4 ? "4s" : durNum <= 6 ? "6s" : "8s";
+        // Veo accepts resolution: 720p | 1080p | 4k
+        if (resolution && ["720p", "1080p", "4k"].includes(resolution.toLowerCase())) {
+          input.resolution = resolution.toLowerCase();
+        }
       } else if (durFormat === "pixverse-int") {
         input.duration = Math.max(1, Math.min(15, durNum));
+        // PixVerse accepts: 360p | 540p | 720p | 1080p
+        if (resolution && ["360p", "540p", "720p", "1080p"].includes(resolution)) {
+          input.resolution = resolution;
+        }
       } else if (durFormat === "ltx-frames") {
         input.num_frames = durNum <= 5 ? 121 : 241;
         input.video_size = aspectRatio === "9:16" ? "portrait_16_9" : aspectRatio === "1:1" ? "square" : "landscape_16_9";
       } else if (durFormat === "minimax-none") {
         input.prompt_optimizer = true;
       } else {
+        // Kling family: duration is "5" | "10" string. No resolution param exists.
         input.duration = String(durNum);
       }
 
@@ -414,40 +425,53 @@ async function handleSubmit(body: Record<string, unknown>) {
     const RUNWARE_API_KEY = Deno.env.get("RUNWARE_API_KEY");
     if (!RUNWARE_API_KEY) return jsonResp({ error: "RUNWARE_API_KEY not configured" }, 500);
 
+    const isMotionControl = mode === "motion-control";
     const isVideoEdit = mode === "video-edit";
-    const resolution = (body?.resolution as string) || "720p";
+    const reqResolution = (body?.resolution as string) || "720p";
 
-    let rwWidth: number, rwHeight: number;
-    if (resolution === "1080p") {
-      ({ width: rwWidth, height: rwHeight } = aspectRatio === "9:16"
-        ? { width: 1080, height: 1920 }
-        : aspectRatio === "1:1"
-          ? { width: 1080, height: 1080 }
-          : { width: 1920, height: 1080 });
-    } else {
-      ({ width: rwWidth, height: rwHeight } = aspectRatio === "9:16"
-        ? { width: 720, height: 1280 }
-        : aspectRatio === "1:1"
-          ? { width: 1024, height: 1024 }
-          : { width: 1280, height: 720 });
-    }
+    // Models that accept the `resolution` preset directly (Runware docs).
+    const RUNWARE_RESOLUTION_MODELS = new Set([
+      "bytedance:seedance@1.5-pro",
+      "bytedance:seedance@2.0",
+      "xai:grok-imagine@video",
+      "klingai:6@1",
+      "google:3@2",
+      "google:3@3",
+      "runwayml:gen@4.5",
+    ]);
+
+    const arDims: Record<string, Record<string, [number, number]>> = {
+      "720p": { "16:9": [1280, 720], "9:16": [720, 1280], "1:1": [960, 960], "4:3": [1112, 834], "3:4": [834, 1112] },
+      "1080p": { "16:9": [1920, 1080], "9:16": [1080, 1920], "1:1": [1080, 1080] },
+      "480p": { "16:9": [864, 496], "9:16": [496, 864], "1:1": [640, 640] },
+    };
+    const dims = (arDims[reqResolution] || arDims["720p"])[aspectRatio] || (arDims[reqResolution] || arDims["720p"])["16:9"];
+    const [rwWidth, rwHeight] = dims;
 
     const taskUUID = crypto.randomUUID();
-    const isMotionControl = mode === "motion-control";
     const task: Record<string, unknown> = {
       taskType: "videoInference",
       taskUUID,
       model: config.runwareModel,
       positivePrompt: prompt || "video",
       duration: parseInt(duration) || 5,
-      width: rwWidth,
-      height: rwHeight,
       outputFormat: "MP4",
       outputType: "URL",
       // Async delivery so we can poll via getResponse without holding the connection.
       // https://runware.ai/docs/platform/task-polling
       deliveryMethod: "async",
     };
+
+    // Use `resolution` preset when supported (Runware auto-matches AR from input media);
+    // otherwise fall back to explicit width/height. Never send both — Runware rejects it.
+    const supportsResolutionPreset = RUNWARE_RESOLUTION_MODELS.has(config.runwareModel || "");
+    const hasFrameInput = (mode === "image-to-video" && referenceImages.length > 0) || isMotionControl;
+    if (supportsResolutionPreset && hasFrameInput) {
+      task.resolution = reqResolution;
+    } else {
+      task.width = rwWidth;
+      task.height = rwHeight;
+    }
 
     if (isVideoEdit) {
       const sourceVideo = referenceImages[0];
