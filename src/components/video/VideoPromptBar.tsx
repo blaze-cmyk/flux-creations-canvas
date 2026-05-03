@@ -40,7 +40,7 @@ export function VideoPromptBar() {
 
   const modeButtons = [
     { id: 'text-to-video' as const, label: 'Text to Video', icon: Video },
-    { id: 'image-to-video' as const, label: 'Image to Video', icon: Film },
+    { id: 'video-edit' as const, label: 'Edit Video', icon: Film },
     { id: 'motion-control' as const, label: 'Motion Control', icon: Wand2 },
   ];
 
