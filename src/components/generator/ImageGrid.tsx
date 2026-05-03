@@ -264,6 +264,8 @@ function ImageCard({ image }: {
   const setVideoMode = usePromptModeStore((s) => s.setMode);
   const addVideoReferenceImage = useVideoStore((s) => s.addReferenceImage);
   const setVideoSubMode = useVideoStore((s) => s.setMode);
+  const isSelected = useGridSelectionStore((s) => s.selected.has(image.id));
+  const toggleSelect = useGridSelectionStore((s) => s.toggle);
   const projects = useCreateProjectsStore((s) => s.projects);
   const setProjectThumbnail = useCreateProjectsStore((s) => s.setProjectThumbnail);
   const [showMenu, setShowMenu] = useState(false);
