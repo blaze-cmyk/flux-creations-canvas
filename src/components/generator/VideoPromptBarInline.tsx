@@ -351,8 +351,8 @@ export function VideoPromptBarInline() {
                         onClick={() => { setModel(m.id); setModelOpen(false); }}
                         className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-left hover:bg-white/5 transition-colors ${model === m.id ? 'bg-white/10' : ''}`}
                       >
-                        <span className={`w-8 h-8 rounded-lg grid place-items-center shrink-0 ${model === m.id ? 'bg-[#FF2D78]/15 text-[#FF2D78]' : 'bg-white/5 text-foreground/90'}`}>
-                          <Film className="size-4" />
+                        <span className={`w-8 h-8 rounded-lg grid place-items-center shrink-0 ${model === m.id ? 'bg-[#FF2D78]/15 text-[#FF2D78]' : 'bg-white/5 text-white'}`}>
+                          <VideoModelIcon id={m.id} className="size-4" />
                         </span>
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-1.5">
