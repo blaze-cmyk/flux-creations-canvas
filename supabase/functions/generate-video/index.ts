@@ -50,6 +50,7 @@ const VIDEO_MODEL_MAP: Record<string, VideoModelConfig> = {
   "kling-omni-edit": { type: "fal", videoEdit: "fal-ai/kling-video/o3/pro/video-to-video/edit" },
   "kling-o1-edit-pro": { type: "fal", videoEdit: "fal-ai/kling-video/o1/video-to-video/edit" },
   "grok-imagine-edit": { type: "runware", runwareModel: "xai:grok-imagine@video" },
+  "grok-imagine": { type: "runware", runwareModel: "xai:grok-imagine@video" },
 };
 
 function jsonResp(data: unknown, status = 200) {
