@@ -169,6 +169,8 @@ async function handlePoll(body: Record<string, unknown>) {
   }
 
   // ---- RUNWARE poll ----
+  // Per Runware docs: poll async tasks via the `getResponse` task type.
+  // https://runware.ai/docs/platform/task-polling
   if (provider === "runware") {
     const RUNWARE_API_KEY = Deno.env.get("RUNWARE_API_KEY");
     if (!RUNWARE_API_KEY) return jsonResp({ error: "RUNWARE_API_KEY not configured" }, 500);
@@ -176,16 +178,27 @@ async function handlePoll(body: Record<string, unknown>) {
     const pollResp = await fetch(RUNWARE_BASE, {
       method: "POST",
       headers: { Authorization: `Bearer ${RUNWARE_API_KEY}`, "Content-Type": "application/json" },
-      body: JSON.stringify([{ taskType: "videoInference", taskUUID: taskId }]),
+      body: JSON.stringify([{ taskType: "getResponse", taskUUID: taskId }]),
     });
     if (!pollResp.ok) {
       const t = await pollResp.text();
-      return jsonResp({ status: "processing" }); // Runware may return errors during processing
+      console.error("Runware poll error:", pollResp.status, t);
+      // Don't fail the whole job on a transient poll error — keep polling.
+      return jsonResp({ status: "processing" });
     }
     const pollData = await pollResp.json();
-    const result = pollData?.data?.find((d: any) => d.videoURL);
-    if (result?.videoURL) {
-      return jsonResp({ status: "complete", videoUrl: result.videoURL });
+    // Look at both `data` (in-progress + completed) and `errors`
+    const completed = pollData?.data?.find((d: any) => d.status === "success" && d.videoURL);
+    if (completed?.videoURL) {
+      return jsonResp({ status: "complete", videoUrl: completed.videoURL });
+    }
+    const errored = pollData?.errors?.find?.((e: any) => e.taskUUID === taskId);
+    if (errored) {
+      return jsonResp({ status: "failed", error: errored.message || errored.code || "Runware task failed" });
+    }
+    const errorRow = pollData?.data?.find((d: any) => d.status === "error");
+    if (errorRow) {
+      return jsonResp({ status: "failed", error: errorRow.message || "Runware task failed" });
     }
     return jsonResp({ status: "processing" });
   }
