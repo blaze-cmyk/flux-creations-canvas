@@ -1,4 +1,4 @@
-import { NavLink, useLocation, useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { Image as ImageIcon, Film, Megaphone, Move3d } from 'lucide-react';
 import { usePromptModeStore } from '@/store/promptModeStore';
 
@@ -53,25 +53,17 @@ export function PromptNavBar() {
       style={{ fontFamily: 'Montserrat, system-ui, sans-serif' }}
     >
       <div className="ms-glass rounded-full p-1 flex items-center gap-1">
-        {items.map(({ key, label, Icon, active, onClick, to }) => {
+        {items.map(({ key, label, Icon, active, onClick }) => {
           const cls = `group inline-flex items-center gap-2 px-3 sm:px-4 h-9 rounded-full text-[13px] font-semibold transition-all whitespace-nowrap ${
             active
               ? 'bg-white text-black shadow-[0_4px_14px_-4px_rgba(0,0,0,0.6)]'
               : 'text-white/75 hover:text-white hover:bg-white/5'
           }`;
-          if (onClick) {
-            return (
-              <button key={key} onClick={onClick} className={cls}>
-                <Icon className="w-4 h-4" strokeWidth={1.75} />
-                <span className="hidden sm:inline">{label}</span>
-              </button>
-            );
-          }
           return (
-            <NavLink key={key} to={to!} className={cls}>
+            <button key={key} onClick={onClick} className={cls}>
               <Icon className="w-4 h-4" strokeWidth={1.75} />
               <span className="hidden sm:inline">{label}</span>
-            </NavLink>
+            </button>
           );
         })}
       </div>

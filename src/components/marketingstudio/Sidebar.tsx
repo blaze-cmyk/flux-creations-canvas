@@ -22,9 +22,7 @@ export function Sidebar({ onClose }: { onClose?: () => void }) {
   const filtered = projects.filter((p) => p.name.toLowerCase().includes(query.toLowerCase()));
 
   const handleNew = () => {
-    // Don't eagerly create — just go to the landing prompt page.
-    // The project is created automatically when the user submits a prompt.
-    navigate('/marketingstudio');
+    navigate('/image');
     onClose?.();
   };
 
