@@ -46,6 +46,10 @@ const VIDEO_MODEL_MAP: Record<string, VideoModelConfig> = {
   "rw-kling-2.5": { type: "runware", runwareModel: "klingai:6@1" },
   "rw-veo-3.1": { type: "runware", runwareModel: "google:3@2" },
   "rw-veo-3.1-fast": { type: "runware", runwareModel: "google:3@3" },
+  // Video edit (video-to-video) — fal only
+  "kling-o1-edit-pro": { type: "fal", videoEdit: "fal-ai/kling-video/o1/video-to-video/edit" },
+  "kling-o3-edit-std": { type: "fal", videoEdit: "fal-ai/kling-video/o3/standard/video-to-video/edit" },
+  "kling-o3-edit-pro": { type: "fal", videoEdit: "fal-ai/kling-video/o3/pro/video-to-video/edit" },
 };
 
 function jsonResp(data: unknown, status = 200) {
