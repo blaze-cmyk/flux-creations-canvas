@@ -591,7 +591,7 @@ function SingleUploadTile({
 }: { optional?: boolean; url?: string; onUpload: () => void; onRemove: () => void }) {
   if (url) {
     return (
-      <div className="relative w-full max-w-[560px] rounded-2xl overflow-hidden border border-white/10 aspect-[16/7] bg-black/40">
+      <div className="relative w-full max-w-[260px] rounded-xl overflow-hidden border border-white/10 aspect-video bg-black/40">
         <img src={url} alt="" className="w-full h-full object-cover" />
         <button
           onClick={onRemove}
@@ -605,18 +605,18 @@ function SingleUploadTile({
   return (
     <button
       onClick={onUpload}
-      className="relative w-full max-w-[560px] aspect-[16/7] rounded-2xl bg-white/[0.03] border border-dashed border-white/15 hover:border-white/30 hover:bg-white/[0.06] transition-colors flex flex-col items-center justify-center gap-1.5 text-muted-foreground"
+      className="relative w-full max-w-[260px] aspect-video rounded-xl bg-white/[0.03] border border-dashed border-white/15 hover:border-white/30 hover:bg-white/[0.06] transition-colors flex flex-col items-center justify-center gap-1 text-muted-foreground px-3"
     >
       {optional && (
-        <span className="absolute top-2.5 right-3 text-[10px] text-muted-foreground/80 bg-white/5 rounded-full px-2 py-0.5">Optional</span>
+        <span className="absolute top-1.5 right-2 text-[9px] text-muted-foreground/80 bg-white/5 rounded-full px-1.5 py-0.5">Optional</span>
       )}
-      <div className="w-9 h-9 rounded-full bg-white/5 grid place-items-center">
-        <ImageIcon className="w-4.5 h-4.5" />
+      <div className="w-7 h-7 rounded-full bg-white/5 grid place-items-center">
+        <ImageIcon className="w-3.5 h-3.5" />
       </div>
-      <div className="text-[13px] text-foreground/90">
+      <div className="text-[11px] text-foreground/90 text-center leading-tight">
         Upload image or <span className="text-white underline underline-offset-2">generate it</span>
       </div>
-      <div className="text-[11px] text-muted-foreground/70">PNG, JPG or Paste from clipboard</div>
+      <div className="text-[9px] text-muted-foreground/70 text-center">PNG, JPG or paste</div>
     </button>
   );
 }
