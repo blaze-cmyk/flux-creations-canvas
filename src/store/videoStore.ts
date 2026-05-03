@@ -24,6 +24,8 @@ export type GeneratedVideo = {
   error?: string;
   progress?: number;
   characterOrientation?: 'video' | 'image';
+  projectId?: string | null;
+  liked?: boolean;
 };
 
 export const VIDEO_MODELS = [
