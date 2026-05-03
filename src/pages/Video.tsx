@@ -39,7 +39,10 @@ export default function Video() {
           <div className="flex-1 overflow-y-auto">
             <VideoGrid />
           </div>
-          <VideoPromptBar />
+          <div className="px-3 md:px-6 pb-3">
+            <PromptNavBar />
+            <VideoPromptBar />
+          </div>
         </>
       )}
 
