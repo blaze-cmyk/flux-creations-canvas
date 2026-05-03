@@ -55,7 +55,7 @@ export default function Generator() {
         </div>
 
         <div
-          className="fixed bottom-4 right-0 px-3 md:px-6 z-30 pointer-events-none left-0 md:[left:var(--sb-w)]"
+          className="fixed bottom-4 right-0 px-3 md:px-6 z-30 pointer-events-none left-0 md:[left:var(--sb-w)] transition-[left] duration-200 ease-out"
           style={{ ['--sb-w' as any]: `${sidebarWidth}px` }}
         >
           <div className="pointer-events-auto">
