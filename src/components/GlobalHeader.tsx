@@ -1,6 +1,6 @@
-import { NavLink, Link, useLocation } from 'react-router-dom';
+import { NavLink, Link, useLocation, useNavigate } from 'react-router-dom';
 import { useState } from 'react';
-import { Menu, X, Bell, Gem, User } from 'lucide-react';
+import { Menu, X, Bell, Gem, User, ArrowLeft } from 'lucide-react';
 import logoWhite from '@/assets/korsola-logo-white.png';
 import logoPink from '@/assets/korsola-logo-pink.png';
 import { useLayoutStore } from '@/store/layoutStore';
@@ -20,7 +20,11 @@ const NAV_ITEMS = [
 export function GlobalHeader() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const location = useLocation();
+  const navigate = useNavigate();
   const sidebarCollapsed = useCreateProjectsStore((s) => s.sidebarCollapsed);
+  const activeProjectId = useCreateProjectsStore((s) => s.activeProjectId);
+  const projects = useCreateProjectsStore((s) => s.projects);
+  const activeProject = projects.find((p) => p.id === activeProjectId);
 
   // Hide on marketing studio routes
   if (location.pathname.startsWith('/marketingstudio')) return null;
@@ -59,6 +63,23 @@ export function GlobalHeader() {
                 KORSOLA
               </span>
             </Link>
+          )}
+
+          {isCreate && (
+            <div className="flex items-center gap-2 min-w-0">
+              <button
+                onClick={() => navigate('/home')}
+                className="grid place-items-center w-9 h-9 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors"
+                aria-label="Back to home"
+              >
+                <ArrowLeft className="w-5 h-5" />
+              </button>
+              {activeProject && (
+                <div className="text-sm font-semibold text-foreground truncate max-w-[40vw]">
+                  {activeProject.name}
+                </div>
+              )}
+            </div>
           )}
 
           {!location.pathname.startsWith('/create') && (
