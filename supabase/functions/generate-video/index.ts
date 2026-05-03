@@ -425,40 +425,52 @@ async function handleSubmit(body: Record<string, unknown>) {
     const RUNWARE_API_KEY = Deno.env.get("RUNWARE_API_KEY");
     if (!RUNWARE_API_KEY) return jsonResp({ error: "RUNWARE_API_KEY not configured" }, 500);
 
-    const isVideoEdit = mode === "video-edit";
-    const resolution = (body?.resolution as string) || "720p";
+    const isMotionControl = mode === "motion-control";
+    const reqResolution = (body?.resolution as string) || "720p";
 
-    let rwWidth: number, rwHeight: number;
-    if (resolution === "1080p") {
-      ({ width: rwWidth, height: rwHeight } = aspectRatio === "9:16"
-        ? { width: 1080, height: 1920 }
-        : aspectRatio === "1:1"
-          ? { width: 1080, height: 1080 }
-          : { width: 1920, height: 1080 });
-    } else {
-      ({ width: rwWidth, height: rwHeight } = aspectRatio === "9:16"
-        ? { width: 720, height: 1280 }
-        : aspectRatio === "1:1"
-          ? { width: 1024, height: 1024 }
-          : { width: 1280, height: 720 });
-    }
+    // Models that accept the `resolution` preset directly (Runware docs).
+    const RUNWARE_RESOLUTION_MODELS = new Set([
+      "bytedance:seedance@1.5-pro",
+      "bytedance:seedance@2.0",
+      "xai:grok-imagine@video",
+      "klingai:6@1",
+      "google:3@2",
+      "google:3@3",
+      "runwayml:gen@4.5",
+    ]);
+
+    const arDims: Record<string, Record<string, [number, number]>> = {
+      "720p": { "16:9": [1280, 720], "9:16": [720, 1280], "1:1": [960, 960], "4:3": [1112, 834], "3:4": [834, 1112] },
+      "1080p": { "16:9": [1920, 1080], "9:16": [1080, 1920], "1:1": [1080, 1080] },
+      "480p": { "16:9": [864, 496], "9:16": [496, 864], "1:1": [640, 640] },
+    };
+    const dims = (arDims[reqResolution] || arDims["720p"])[aspectRatio] || (arDims[reqResolution] || arDims["720p"])["16:9"];
+    const [rwWidth, rwHeight] = dims;
 
     const taskUUID = crypto.randomUUID();
-    const isMotionControl = mode === "motion-control";
     const task: Record<string, unknown> = {
       taskType: "videoInference",
       taskUUID,
       model: config.runwareModel,
       positivePrompt: prompt || "video",
       duration: parseInt(duration) || 5,
-      width: rwWidth,
-      height: rwHeight,
       outputFormat: "MP4",
       outputType: "URL",
       // Async delivery so we can poll via getResponse without holding the connection.
       // https://runware.ai/docs/platform/task-polling
       deliveryMethod: "async",
     };
+
+    // Use `resolution` preset when supported (Runware auto-matches AR from input media);
+    // otherwise fall back to explicit width/height. Never send both — Runware rejects it.
+    const supportsResolutionPreset = RUNWARE_RESOLUTION_MODELS.has(config.runwareModel || "");
+    const hasFrameInput = (mode === "image-to-video" && referenceImages.length > 0) || isMotionControl;
+    if (supportsResolutionPreset && hasFrameInput) {
+      task.resolution = reqResolution;
+    } else {
+      task.width = rwWidth;
+      task.height = rwHeight;
+    }
 
     if (isVideoEdit) {
       const sourceVideo = referenceImages[0];
