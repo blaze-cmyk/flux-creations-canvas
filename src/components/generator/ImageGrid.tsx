@@ -100,15 +100,34 @@ export function ImageGrid() {
       const ratios = rowImgs.map((i) => parseRatio(i.aspectRatio));
       const sumRatio = ratios.reduce((a, b) => a + b, 0);
       const totalGap = gap * (rowImgs.length - 1);
+      const available = Math.max(0, containerWidth - totalGap);
       // Height that makes the row exactly fill the container width.
-      let rowHeight = (containerWidth - totalGap) / sumRatio;
+      let rowHeight = available / sumRatio;
       // Don't stretch the last partial row beyond the target height.
       if (isLast && rowHeight > targetRowHeight * 1.4) {
         rowHeight = targetRowHeight;
       }
+      // Compute integer widths that sum exactly to `available` to avoid
+      // sub-pixel rounding overflow that pushes the last item past the edge.
+      const rawWidths = ratios.map((r) => r * rowHeight);
+      const flooredWidths = rawWidths.map((w) => Math.floor(w));
+      if (!isLast || rowHeight !== targetRowHeight) {
+        let used = flooredWidths.reduce((a, b) => a + b, 0);
+        let remainder = available - used;
+        // Distribute leftover pixels one-by-one starting from the largest.
+        const order = rawWidths
+          .map((w, i) => ({ i, frac: w - Math.floor(w) }))
+          .sort((a, b) => b.frac - a.frac);
+        let k = 0;
+        while (remainder > 0 && order.length > 0) {
+          flooredWidths[order[k % order.length].i] += 1;
+          remainder -= 1;
+          k += 1;
+        }
+      }
       let left = 0;
       rowImgs.forEach((img, idx) => {
-        const w = ratios[idx] * rowHeight;
+        const w = flooredWidths[idx];
         items.push({ id: img.id, left, top, width: w, height: rowHeight });
         left += w + gap;
       });
