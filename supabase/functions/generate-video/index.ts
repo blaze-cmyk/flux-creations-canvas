@@ -268,8 +268,43 @@ async function handleSubmit(body: Record<string, unknown>) {
     if (!submitResp.ok) {
       const errText = await submitResp.text();
       console.error("Evolink submit error:", submitResp.status, errText);
+      // Fallback to fal.ai Kling v3 motion-control on any Evolink failure (402, 5xx, etc.)
+      const FAL_KEY_FB = Deno.env.get("FAL_KEY");
+      if (FAL_KEY_FB) {
+        console.log("Falling back to fal.ai kling-v3 motion-control");
+        const falEndpoint = "fal-ai/kling-video/v3/pro/motion-control";
+        const falBody: Record<string, unknown> = {
+          prompt: prompt || "",
+          image_url: characterImage,
+          video_url: motionVideo,
+          duration: "5",
+        };
+        const falResp = await fetch(`https://queue.fal.run/${falEndpoint}`, {
+          method: "POST",
+          headers: { Authorization: `Key ${FAL_KEY_FB}`, "Content-Type": "application/json" },
+          body: JSON.stringify(falBody),
+        });
+        if (falResp.ok) {
+          const falData = await falResp.json();
+          const requestId = falData.request_id;
+          if (requestId) {
+            console.log(`Fal fallback submitted: ${requestId}`);
+            return jsonResp({
+              submitted: true,
+              provider: "fal",
+              taskId: requestId,
+              statusUrl: falData.status_url,
+              responseUrl: falData.response_url,
+              endpoint: falEndpoint,
+            });
+          }
+        } else {
+          const fbErr = await falResp.text();
+          console.error("Fal fallback failed:", falResp.status, fbErr);
+        }
+      }
       if (submitResp.status === 402) {
-        return jsonResp({ error: "Insufficient Evolink credits. Please top up your Evolink account." }, 402);
+        return jsonResp({ error: "Motion-control provider out of credits and fallback failed. Please try again later." }, 402);
       }
       return jsonResp({ error: `Evolink API error: ${submitResp.status}`, details: errText }, 502);
     }
