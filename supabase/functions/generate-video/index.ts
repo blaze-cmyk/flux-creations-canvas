@@ -246,13 +246,16 @@ async function handleSubmit(body: Record<string, unknown>) {
     }
 
     const evolinkQuality = (body?.resolution === "1080p" || body?.quality === "1080p") ? "1080p" : "720p";
+    const durSec = Math.min(10, Math.max(5, parseInt(duration) || 5));
     const evolinkBody: Record<string, unknown> = {
       model: config.evolinkModel,
       image_urls: [characterImage],
       video_urls: [motionVideo],
       quality: evolinkQuality,
+      duration: durSec,
       model_params: {
         character_orientation: body?.characterOrientation === "image" ? "image" : "video",
+        duration: durSec,
       },
     };
     if (prompt) evolinkBody.prompt = prompt;
@@ -277,7 +280,7 @@ async function handleSubmit(body: Record<string, unknown>) {
           prompt: prompt || "",
           image_url: characterImage,
           video_url: motionVideo,
-          duration: "5",
+          duration: (parseInt(duration) || 5) >= 10 ? "10" : "5",
         };
         const falResp = await fetch(`https://queue.fal.run/${falEndpoint}`, {
           method: "POST",
