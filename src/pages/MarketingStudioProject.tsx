@@ -165,7 +165,8 @@ export default function MarketingStudioProject() {
         (g) =>
           (g.status === 'queued' ||
             g.status === 'queued_pending_persist' ||
-            g.status === 'running') &&
+            g.status === 'running' ||
+            (g.status as string) === 'processing') &&
           /^[0-9a-f-]{36}$/i.test(g.id),
       );
 
@@ -320,7 +321,8 @@ export default function MarketingStudioProject() {
     (g) =>
       g.status === 'queued' ||
       g.status === 'queued_pending_persist' ||
-      g.status === 'running',
+      g.status === 'running' ||
+      (g.status as string) === 'processing',
   );
 
   return (
@@ -354,7 +356,9 @@ export default function MarketingStudioProject() {
               const isPending =
                 g.status === 'queued' ||
                 g.status === 'queued_pending_persist' ||
-                g.status === 'running';
+                g.status === 'running' ||
+                (g.status as string) === 'processing' ||
+                (!g.videoUrl && g.status !== 'failed' && g.stage !== 'done');
               const isFailed = g.status === 'failed';
               const elapsed = Math.floor((Date.now() - (g.submittedAt || g.createdAt)) / 1000);
               const pct = Math.min(95, Math.floor((elapsed / 120) * 100)); // fake progress to 95% over 2min
