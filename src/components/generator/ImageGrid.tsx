@@ -4,7 +4,8 @@ import { usePromptModeStore } from '@/store/promptModeStore';
 import { useCreateProjectsStore } from '@/store/createProjectsStore';
 import { useGridFilterStore } from '@/store/gridFilterStore';
 import { useLayoutStore, ZOOM_ROW_HEIGHTS } from '@/store/layoutStore';
-import { AlertCircle, Eye, RefreshCw, Trash2, Loader2, Download, Link2, Heart, MoreHorizontal, Maximize2, Search, X, ImageIcon, FolderInput, Image as ImageLucide } from 'lucide-react';
+import { AlertCircle, Eye, RefreshCw, Trash2, Loader2, Download, Link2, Heart, MoreHorizontal, Maximize2, Search, X, ImageIcon, FolderInput, Image as ImageLucide, Check } from 'lucide-react';
+import { useGridSelectionStore } from '@/store/gridSelectionStore';
 import { useState, useRef, useEffect, useLayoutEffect, useMemo } from 'react';
 import {
   DropdownMenu,
@@ -263,6 +264,8 @@ function ImageCard({ image }: {
   const setVideoMode = usePromptModeStore((s) => s.setMode);
   const addVideoReferenceImage = useVideoStore((s) => s.addReferenceImage);
   const setVideoSubMode = useVideoStore((s) => s.setMode);
+  const isSelected = useGridSelectionStore((s) => s.selected.has(image.id));
+  const toggleSelect = useGridSelectionStore((s) => s.toggle);
   const projects = useCreateProjectsStore((s) => s.projects);
   const setProjectThumbnail = useCreateProjectsStore((s) => s.setProjectThumbnail);
   const [showMenu, setShowMenu] = useState(false);
@@ -379,51 +382,72 @@ function ImageCard({ image }: {
       {/* Hover gradient overlay */}
       <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-black/30 opacity-0 group-hover:opacity-100 transition-opacity duration-200" />
 
+      {/* Top-left selection checkbox */}
+      <button
+        onClick={(e) => { e.stopPropagation(); toggleSelect(image.id); }}
+        className={`absolute top-2 left-2 grid place-items-center w-7 h-7 rounded-full backdrop-blur-md ring-1 transition-all ${
+          isSelected
+            ? 'bg-white text-black ring-white opacity-100'
+            : 'bg-black/55 text-white/90 ring-white/15 opacity-0 group-hover:opacity-100 hover:bg-black/75'
+        }`}
+        title={isSelected ? 'Deselect' : 'Select'}
+      >
+        {isSelected ? <Check className="w-3.5 h-3.5" strokeWidth={3} /> : <span className="block w-3.5 h-3.5 rounded-full ring-1 ring-white/70" />}
+      </button>
+
       {/* Top-right action icons on hover */}
       <div className="absolute top-2 right-2 flex flex-col gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
         <button
           onClick={(e) => { e.stopPropagation(); setSelectedImageId(image.id); }}
-          className="flex items-center justify-center w-7 h-7 rounded-full bg-black/50 text-white/90 hover:bg-black/70 hover:text-white backdrop-blur-sm transition-colors"
+          className="flex items-center justify-center w-7 h-7 rounded-full bg-black/55 text-white/90 hover:bg-black/75 hover:text-white backdrop-blur-md ring-1 ring-white/10 transition-colors"
           title="Open"
         >
           <Maximize2 className="w-3.5 h-3.5" />
         </button>
         <button
           onClick={handleDownload}
-          className="flex items-center justify-center w-7 h-7 rounded-full bg-black/50 text-white/90 hover:bg-black/70 hover:text-white backdrop-blur-sm transition-colors"
+          className="flex items-center justify-center w-7 h-7 rounded-full bg-black/55 text-white/90 hover:bg-black/75 hover:text-white backdrop-blur-md ring-1 ring-white/10 transition-colors"
           title="Download"
         >
           <Download className="w-3.5 h-3.5" />
         </button>
         <button
           onClick={(e) => { e.stopPropagation(); setShowMenu(!showMenu); }}
-          className="flex items-center justify-center w-7 h-7 rounded-full bg-black/50 text-white/90 hover:bg-black/70 hover:text-white backdrop-blur-sm transition-colors"
+          className="flex items-center justify-center w-7 h-7 rounded-full bg-black/55 text-white/90 hover:bg-black/75 hover:text-white backdrop-blur-md ring-1 ring-white/10 transition-colors"
           title="More"
         >
           <MoreHorizontal className="w-3.5 h-3.5" />
         </button>
       </div>
 
-      {/* Bottom-center Reference + Animate pill */}
-      {image.imageUrl && (
-        <div className="absolute bottom-2 left-1/2 -translate-x-1/2 flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-          <HoverIconBtn
-            label="Reference"
-            onClick={(e) => { e.stopPropagation(); useAsReference(image.imageUrl!); }}
-            svg={<svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path fillRule="evenodd" clipRule="evenodd" d="M3 4.75C3 3.7835 3.7835 3 4.75 3H19.25C20.2165 3 21 3.7835 21 4.75V19.25C21 20.2165 20.2165 21 19.25 21H4.75C3.7835 21 3 20.2165 3 19.25V4.75ZM4.75 4.5C4.61193 4.5 4.5 4.61193 4.5 4.75V14.4393L6.76256 12.1768C7.44598 11.4934 8.55402 11.4934 9.23744 12.1768L16.5607 19.5H19.25C19.3881 19.5 19.5 19.3881 19.5 19.25V4.75C19.5 4.61193 19.3881 4.5 19.25 4.5H4.75Z" fill="currentColor"/><path d="M13.4255 8.53727C13.4738 8.51308 13.5131 8.47385 13.5373 8.42546L14.2764 6.94721C14.3685 6.76295 14.6315 6.76295 14.7236 6.94721L15.4627 8.42546C15.4869 8.47385 15.5262 8.51308 15.5745 8.53727L17.0528 9.27639C17.237 9.36852 17.237 9.63148 17.0528 9.72361L15.5745 10.4627C15.5262 10.4869 15.4869 10.5262 15.4627 10.5745L14.7236 12.0528C14.6315 12.237 14.3685 12.237 14.2764 12.0528L13.5373 10.5745C13.5131 10.5262 13.4738 10.4869 13.4255 10.4627L11.9472 9.72361C11.763 9.63148 11.763 9.36852 11.9472 9.27639L13.4255 8.53727Z" fill="currentColor"/></svg>}
-          />
-          <HoverIconBtn
-            label="Animate"
-            onClick={(e) => {
-              e.stopPropagation();
-              addVideoReferenceImage(image.imageUrl!);
-              setVideoSubMode('image-to-video');
-              setVideoMode('video');
-            }}
-            svg={<svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path fillRule="evenodd" clipRule="evenodd" d="M2 5.75C2 4.7835 2.7835 4 3.75 4H14.25C15.2165 4 16 4.7835 16 5.75V8.78669L20.191 6.6912C21.0221 6.27563 22 6.88 22 7.80923V16.1912C22 17.1204 21.0221 17.7248 20.191 17.3092L16 15.2137V18.25C16 19.2165 15.2165 20 14.25 20H3.75C2.7835 20 2 19.2165 2 18.25V5.75ZM16 13.5367L20.5 15.7867V8.21374L16 10.4637V13.5367Z" fill="currentColor"/></svg>}
-          />
-        </div>
-      )}
+      {/* Bottom action row: Reference + Animate (center) + Delete (right) */}
+      <div className="absolute bottom-2 left-2 right-2 flex items-center justify-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+        {image.imageUrl && (
+          <>
+            <HoverIconBtn
+              label="Reference"
+              onClick={(e) => { e.stopPropagation(); useAsReference(image.imageUrl!); }}
+              svg={<svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path fillRule="evenodd" clipRule="evenodd" d="M3 4.75C3 3.7835 3.7835 3 4.75 3H19.25C20.2165 3 21 3.7835 21 4.75V19.25C21 20.2165 20.2165 21 19.25 21H4.75C3.7835 21 3 20.2165 3 19.25V4.75ZM4.75 4.5C4.61193 4.5 4.5 4.61193 4.5 4.75V14.4393L6.76256 12.1768C7.44598 11.4934 8.55402 11.4934 9.23744 12.1768L16.5607 19.5H19.25C19.3881 19.5 19.5 19.3881 19.5 19.25V4.75C19.5 4.61193 19.3881 4.5 19.25 4.5H4.75Z" fill="currentColor"/><path d="M13.4255 8.53727C13.4738 8.51308 13.5131 8.47385 13.5373 8.42546L14.2764 6.94721C14.3685 6.76295 14.6315 6.76295 14.7236 6.94721L15.4627 8.42546C15.4869 8.47385 15.5262 8.51308 15.5745 8.53727L17.0528 9.27639C17.237 9.36852 17.237 9.63148 17.0528 9.72361L15.5745 10.4627C15.5262 10.4869 15.4869 10.5262 15.4627 10.5745L14.7236 12.0528C14.6315 12.237 14.3685 12.237 14.2764 12.0528L13.5373 10.5745C13.5131 10.5262 13.4738 10.4869 13.4255 10.4627L11.9472 9.72361C11.763 9.63148 11.763 9.36852 11.9472 9.27639L13.4255 8.53727Z" fill="currentColor"/></svg>}
+            />
+            <HoverIconBtn
+              label="Animate"
+              onClick={(e) => {
+                e.stopPropagation();
+                addVideoReferenceImage(image.imageUrl!);
+                setVideoSubMode('image-to-video');
+                setVideoMode('video');
+              }}
+              svg={<svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path fillRule="evenodd" clipRule="evenodd" d="M2 5.75C2 4.7835 2.7835 4 3.75 4H14.25C15.2165 4 16 4.7835 16 5.75V8.78669L20.191 6.6912C21.0221 6.27563 22 6.88 22 7.80923V16.1912C22 17.1204 21.0221 17.7248 20.191 17.3092L16 15.2137V18.25C16 19.2165 15.2165 20 14.25 20H3.75C2.7835 20 2 19.2165 2 18.25V5.75ZM16 13.5367L20.5 15.7867V8.21374L16 10.4637V13.5367Z" fill="currentColor"/></svg>}
+            />
+          </>
+        )}
+        <HoverIconBtn
+          label="Delete"
+          danger
+          onClick={(e) => { e.stopPropagation(); deleteImage(image.id); }}
+          svg={<Trash2 className="w-[18px] h-[18px]" />}
+        />
+      </div>
 
       {/* Context menu */}
       {showMenu && (
@@ -467,36 +491,21 @@ function ImageCard({ image }: {
           <MenuItem icon={<Trash2 className="w-3.5 h-3.5" />} label="Delete" onClick={() => { deleteImage(image.id); setShowMenu(false); }} destructive />
         </div>
       )}
-
-      {/* Delete icon - always visible on hover, bottom-right */}
-      {!showMenu && (
-        <button
-          onClick={(e) => { e.stopPropagation(); deleteImage(image.id); }}
-          className="absolute bottom-2 right-2 flex items-center justify-center w-7 h-7 rounded-full bg-black/50 text-white/90 hover:bg-red-600/80 hover:text-white backdrop-blur-sm transition-colors opacity-0 group-hover:opacity-100 duration-200"
-          title="Delete"
-        >
-          <Trash2 className="w-3.5 h-3.5" />
-        </button>
-      )}
-
-      {/* Bottom info on hover */}
-      <div className="absolute bottom-2 left-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-        <p className="text-[10px] text-white/70 truncate">{image.prompt}</p>
-      </div>
     </div>
   );
 }
 
-function HoverIconBtn({ label, svg, onClick }: {
+function HoverIconBtn({ label, svg, onClick, danger }: {
   label: string;
   svg: React.ReactNode;
   onClick: (e: React.MouseEvent) => void;
+  danger?: boolean;
 }) {
   return (
     <div className="relative group/hib">
       <button
         onClick={onClick}
-        className="flex items-center justify-center w-9 h-9 rounded-full bg-black/55 text-white hover:bg-black/75 backdrop-blur-md ring-1 ring-white/10 transition-colors"
+        className={`flex items-center justify-center w-9 h-9 rounded-full backdrop-blur-md ring-1 ring-white/10 transition-colors ${danger ? 'bg-black/55 text-white hover:bg-red-600/85' : 'bg-black/55 text-white hover:bg-black/75'}`}
         aria-label={label}
       >
         {svg}
