@@ -413,7 +413,15 @@ async function falSubmit(opts: { prompt: string; bundle: ReferenceBundle; durati
     const prefix = isBalanceError(res.status, text) ? 'fal.ai balance/auth' : 'fal.ai';
     return { ok: false, provider: 'fal', endpoint, error: `${prefix}: ${msg}`, raw: parsed || text };
   }
-  return { ok: true, provider: 'fal', endpoint, requestId: String(requestId), raw: parsed };
+  return {
+    ok: true,
+    provider: 'fal',
+    endpoint,
+    requestId: String(requestId),
+    statusUrl: isValidHttpUrl(parsed?.status_url) ? String(parsed.status_url) : undefined,
+    responseUrl: isValidHttpUrl(parsed?.response_url) ? String(parsed.response_url) : undefined,
+    raw: parsed,
+  };
 }
 
 async function submitAcrossProviders(opts: {
@@ -536,6 +544,8 @@ async function submitFallbackFromRow(admin: any, row: any, provider: Provider): 
       provider: submission.provider,
       provider_endpoint: submission.endpoint,
       fal_request_id: submission.requestId,
+      status_url: submission.statusUrl ?? null,
+      response_url: submission.responseUrl ?? null,
       fallback_attempted: true,
       error: null,
       video_url: null,
