@@ -52,7 +52,7 @@ export function VideoPromptBarInline() {
   const [sceneControlOn, setSceneControlOn] = useState(true);
 
   const modelDurations = useMemo(() => getDurationsForModel(model), [model]);
-  const modelResolutions = useMemo(() => getResolutionsForModel(model), [model]);
+  const nativeResolutionOptions = useMemo(() => getResolutionsForModel(model), [model]);
 
   const [modelOpen, setModelOpen] = useState(false);
   const [subOpen, setSubOpen] = useState(false);
@@ -84,6 +84,17 @@ export function VideoPromptBarInline() {
   // Display name: prefer catalog entry (clean, no provider) for Create Video
   const displayModelName =
     (isCreate && catalogEntry?.name) || selectedModel?.name || 'Select model';
+
+  const resolutionOptions = useMemo(() => {
+    if (nativeResolutionOptions.length > 0) return nativeResolutionOptions;
+    return isCreate && catalogEntry?.resolution ? [catalogEntry.resolution] : [];
+  }, [catalogEntry?.resolution, isCreate, nativeResolutionOptions]);
+
+  useEffect(() => {
+    if (resolutionOptions.length > 0 && !resolutionOptions.includes(resolution)) {
+      setResolution(resolutionOptions.includes('720p') ? '720p' : resolutionOptions[0]);
+    }
+  }, [resolution, resolutionOptions, setResolution]);
 
   const isVideoEdit = videoSubMode === 'video-edit';
   const isMotion = videoSubMode === 'motion-control';
@@ -485,19 +496,20 @@ export function VideoPromptBarInline() {
             </Popover>
           )}
 
-          {/* Resolution — only render when the active model exposes a resolution control */}
-          {!isMotion && modelResolutions.length > 0 && (
+          {/* Resolution */}
+          {!isMotion && resolutionOptions.length > 0 && (
             <Popover open={resolutionOpen} onOpenChange={setResolutionOpen}>
               <PopoverTrigger asChild>
                 <button className="ms-chip-glass flex items-center gap-1.5 px-3.5 h-9 rounded-full text-xs text-foreground transition-all">
-                  {modelResolutions.includes(resolution) ? resolution : modelResolutions[0]}
+                  <Tag className="w-3.5 h-3.5 text-muted-foreground" />
+                  {resolutionOptions.includes(resolution) ? resolution : resolutionOptions[0]}
                   <ChevronDownIcon className="size-3.5 text-muted-foreground/70" />
                 </button>
               </PopoverTrigger>
               <PopoverContent align="start" side="top" sideOffset={10}
                 className="w-32 p-1.5 rounded-2xl ms-glass shadow-[0_24px_60px_-20px_rgba(0,0,0,0.7)]">
                 <div className="px-2.5 py-1.5 text-[11px] font-semibold tracking-[0.18em] text-white/50 uppercase">Resolution</div>
-                {modelResolutions.map((r) => (
+                {resolutionOptions.map((r) => (
                   <button
                     key={r}
                     onClick={() => { setResolution(r); setResolutionOpen(false); }}
