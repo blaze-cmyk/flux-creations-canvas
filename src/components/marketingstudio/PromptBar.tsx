@@ -529,9 +529,13 @@ export function PromptBar({ projectId, createProjectId, ensureCreateProject }: P
             <button onClick={() => setAvatarOpen(true)} className="ms-glass-2 flex-1 h-12 rounded-xl text-[11px] font-semibold text-foreground">
               + AVATAR
             </button>
-            <button onClick={handleGenerate} className="ms-cta flex-1 h-12 rounded-xl text-white text-[11px] font-extrabold">
-              GENERATE ✦ {(cost / 100).toFixed(2)}
-            </button>
+            <GenerateButton
+              onClick={handleGenerate}
+              className="flex-1 h-12 text-[11px] font-extrabold"
+              label="GENERATE"
+              showSparkles={false}
+              trailing={<span className="text-[11px] font-extrabold">✦ {(cost / 100).toFixed(2)}</span>}
+            />
           </div>
         </div>
       </div>
