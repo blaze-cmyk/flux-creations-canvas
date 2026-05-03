@@ -447,4 +447,15 @@ export const useGeneratorStore = create<GeneratorState>()((set, get) => ({
       set({ referenceImages: [...refs, imageUrl], selectedImageId: null });
     }
   },
+
+  moveImageToProject: async (id, projectId) => {
+    set({
+      images: get().images.map((i) => (i.id === id ? { ...i, projectId } : i)),
+    });
+    const { error } = await supabase
+      .from('generations')
+      .update({ project_id: projectId } as any)
+      .eq('id', id);
+    if (error) console.error('Move image error:', error);
+  },
 }));
