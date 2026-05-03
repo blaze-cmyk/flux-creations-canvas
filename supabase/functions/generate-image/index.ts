@@ -338,13 +338,9 @@ serve(async (req) => {
       const outputImage = resultData?.images?.[0] ?? resultData?.image;
       const outUrl = typeof outputImage === "string" ? outputImage : outputImage?.url;
       if (outUrl) {
-        const imgResp = await fetch(outUrl);
-        if (imgResp.ok) {
-          const buf = await imgResp.arrayBuffer();
-          imageBase64 = toBase64DataUri(new Uint8Array(buf), imgResp.headers.get("content-type") || "image/png");
-        } else {
-          imageUrl = outUrl;
-        }
+        // Always return the URL — let the client upload to our bucket.
+        // Returning base64 from 4K renders blows past the 6MB edge worker limit.
+        imageUrl = outUrl;
       } else {
         return new Response(JSON.stringify({ error: "No image in fal.ai response", details: JSON.stringify(resultData).slice(0, 500) }), {
           status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" },

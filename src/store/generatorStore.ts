@@ -28,7 +28,7 @@ type GeneratorState = {
   quantity: number;
   images: GeneratedImage[];
   selectedImageId: string | null;
-  historyLoaded: boolean;
+  loadedProjects: Set<string>;
   setPrompt: (prompt: string) => void;
   addReferenceImage: (img: string) => void;
   removeReferenceImage: (index: number) => void;
@@ -42,7 +42,7 @@ type GeneratorState = {
   retryImage: (id: string) => void;
   deleteImage: (id: string) => void;
   useAsReference: (imageUrl: string) => void;
-  loadHistory: () => Promise<void>;
+  loadHistory: (projectId?: string | null) => Promise<void>;
   moveImageToProject: (id: string, projectId: string | null) => Promise<void>;
   toggleLike: (id: string) => void;
 };
@@ -191,6 +191,7 @@ async function saveToDb(img: GeneratedImage, storageUrl: string, projectId: stri
     status: img.status,
     error: img.error || null,
     project_id: projectId,
+    create_project_id: projectId,
   } as any);
   if (error) console.error('DB insert error:', error);
 
@@ -215,7 +216,7 @@ export const useGeneratorStore = create<GeneratorState>()((set, get) => ({
   quantity: 4,
   images: [],
   selectedImageId: null,
-  historyLoaded: false,
+  loadedProjects: new Set<string>(),
 
   setPrompt: (prompt) => { set({ prompt }); localStorage.setItem('gen-last-prompt', prompt); },
   addReferenceImage: (img) => {
@@ -262,46 +263,43 @@ export const useGeneratorStore = create<GeneratorState>()((set, get) => ({
   setQuantity: (qty) => set({ quantity: Math.max(1, Math.min(4, qty)) }),
   setSelectedImageId: (id) => set({ selectedImageId: id }),
 
-  loadHistory: async () => {
-    if (get().historyLoaded) return;
+  loadHistory: async (projectId?: string | null) => {
+    const key = projectId ?? '__all__';
+    if (get().loadedProjects.has(key)) return;
     try {
-      const { data, error } = await supabase
+      let q = supabase
         .from('generations')
-        .select('*')
+        .select('id,prompt,model,quality,aspect_ratio,status,image_url,created_at,error,project_id,create_project_id,liked')
         .order('created_at', { ascending: false })
-        .limit(500) as any;
-
+        .limit(200);
+      if (projectId) q = q.or(`create_project_id.eq.${projectId},project_id.eq.${projectId}`);
+      const { data, error } = await (q as any);
       if (error) {
         console.error('Load history error:', error);
         return;
       }
-
-      if (data && data.length > 0) {
-        const loaded: GeneratedImage[] = data.map((row: any) => ({
-          id: row.id,
-          prompt: row.prompt,
-          referenceImages: [],
-          model: row.model,
-          quality: row.quality,
-          aspectRatio: row.aspect_ratio,
-          status: row.status as GeneratedImage['status'],
-          imageUrl: row.image_url,
-          createdAt: new Date(row.created_at).getTime(),
-          error: row.error,
-          projectId: row.project_id ?? null,
-          liked: !!row.liked,
-        }));
-
-        const current = get().images;
-        const currentIds = new Set(current.map((i) => i.id));
-        const newFromDb = loaded.filter((i) => !currentIds.has(i.id));
-        set({ images: [...current, ...newFromDb], historyLoaded: true });
-      } else {
-        set({ historyLoaded: true });
-      }
+      const loaded: GeneratedImage[] = (data || []).map((row: any) => ({
+        id: row.id,
+        prompt: row.prompt,
+        referenceImages: [],
+        model: row.model,
+        quality: row.quality,
+        aspectRatio: row.aspect_ratio,
+        status: row.status as GeneratedImage['status'],
+        imageUrl: row.image_url,
+        createdAt: new Date(row.created_at).getTime(),
+        error: row.error,
+        projectId: row.create_project_id ?? row.project_id ?? null,
+        liked: !!row.liked,
+      }));
+      const current = get().images;
+      const currentIds = new Set(current.map((i) => i.id));
+      const newFromDb = loaded.filter((i) => !currentIds.has(i.id));
+      const nextLoaded = new Set(get().loadedProjects);
+      nextLoaded.add(key);
+      set({ images: [...current, ...newFromDb], loadedProjects: nextLoaded });
     } catch (e) {
       console.error('Load history error:', e);
-      set({ historyLoaded: true });
     }
   },
 

@@ -132,8 +132,9 @@ type VideoState = {
   retryVideo: (id: string) => void;
   deleteVideo: (id: string) => void;
   toggleLike: (id: string) => void;
-  loadHistory: () => Promise<void>;
+  loadHistory: (projectId?: string | null) => Promise<void>;
   _historyLoaded: boolean;
+  _loadedProjects?: Set<string>;
 };
 
 async function saveVideoToDb(video: GeneratedVideo) {
@@ -150,6 +151,8 @@ async function saveVideoToDb(video: GeneratedVideo) {
       thumbnail_url: video.thumbnailUrl || null,
       reference_images: video.referenceImages.filter(Boolean),
       error: video.error || null,
+      project_id: video.projectId ?? null,
+      create_project_id: video.projectId ?? null,
     }, { onConflict: 'id' });
   } catch (e) {
     console.error('Failed to save video to DB:', e);
@@ -312,7 +315,7 @@ export const useVideoStore = create<VideoState>()((set, get) => ({
   setResolution: (resolution) => set({ resolution }),
   setSelectedVideoId: (selectedVideoId) => set({ selectedVideoId }),
 
-  generate: () => {
+  generate: async () => {
     const { prompt, motionPrompt, referenceImages, model, mode, aspectRatio, duration, characterOrientation, keepAudio, resolution } = get();
     const effectivePrompt = mode === 'motion-control' ? motionPrompt.trim() : prompt.trim();
 
@@ -320,6 +323,19 @@ export const useVideoStore = create<VideoState>()((set, get) => ({
     if (mode === 'image-to-video' && referenceImages.length === 0) return;
     if (mode === 'motion-control' && (!referenceImages[0] || !referenceImages[1])) return;
     if (mode === 'video-edit' && (!referenceImages[0] || !effectivePrompt)) return;
+
+    // Resolve the active /create project so the resulting card lands in the
+    // correct workspace. Auto-create one if none exists yet.
+    const { useCreateProjectsStore } = await import('@/store/createProjectsStore');
+    const projStore = useCreateProjectsStore.getState();
+    let projectId: string | null = projStore.activeProjectId;
+    if (!projectId) {
+      const name = effectivePrompt.split(/\s+/).slice(0, 5).join(' ').slice(0, 60) || 'New project';
+      try {
+        const proj = await projStore.createProject(name);
+        projectId = proj.id;
+      } catch { projectId = null; }
+    }
 
     const newVideo: GeneratedVideo = {
       id: crypto.randomUUID(),
@@ -332,6 +348,7 @@ export const useVideoStore = create<VideoState>()((set, get) => ({
       status: 'generating',
       createdAt: Date.now(),
       characterOrientation: mode === 'motion-control' ? characterOrientation : undefined,
+      projectId,
     };
 
     set({ videos: [newVideo, ...get().videos] });
@@ -379,40 +396,41 @@ export const useVideoStore = create<VideoState>()((set, get) => ({
     (supabase as any).from('video_generations').update({ liked: next }).eq('id', id).then(() => {});
   },
 
-  loadHistory: async () => {
-    if (get()._historyLoaded) return;
+  loadHistory: async (projectId?: string | null) => {
+    const key = projectId ?? '__all__';
+    const loaded = (get() as any)._loadedProjects as Set<string> | undefined;
+    if (loaded?.has(key)) return;
     try {
-      const { data } = await (supabase as any)
+      let q = (supabase as any)
         .from('video_generations')
-        .select('*')
+        .select('id,prompt,model,mode,aspect_ratio,duration,status,video_url,thumbnail_url,reference_images,error,created_at,liked,project_id,create_project_id')
         .order('created_at', { ascending: false })
         .limit(100);
-      if (data && data.length > 0) {
-        const loaded: GeneratedVideo[] = data.map((row: any) => ({
-          id: row.id,
-          prompt: row.prompt || '',
-          referenceImages: row.reference_images || [],
-          model: row.model,
-          mode: row.mode as GeneratedVideo['mode'],
-          aspectRatio: row.aspect_ratio,
-          duration: row.duration,
-          status: row.status === 'processing' ? 'generating' : row.status as GeneratedVideo['status'],
-          videoUrl: row.video_url || undefined,
-          thumbnailUrl: row.thumbnail_url || undefined,
-          createdAt: new Date(row.created_at).getTime(),
-          error: row.error || undefined,
-          liked: !!row.liked,
-        }));
-        // Merge with any in-memory videos (active generations)
-        const existingIds = new Set(get().videos.map(v => v.id));
-        const newOnes = loaded.filter(v => !existingIds.has(v.id));
-        set({ videos: [...get().videos, ...newOnes], _historyLoaded: true });
-      } else {
-        set({ _historyLoaded: true });
-      }
+      if (projectId) q = q.or(`create_project_id.eq.${projectId},project_id.eq.${projectId}`);
+      const { data } = await q;
+      const rows: GeneratedVideo[] = (data || []).map((row: any) => ({
+        id: row.id,
+        prompt: row.prompt || '',
+        referenceImages: row.reference_images || [],
+        model: row.model,
+        mode: row.mode as GeneratedVideo['mode'],
+        aspectRatio: row.aspect_ratio,
+        duration: row.duration,
+        status: row.status === 'processing' ? 'generating' : row.status as GeneratedVideo['status'],
+        videoUrl: row.video_url || undefined,
+        thumbnailUrl: row.thumbnail_url || undefined,
+        createdAt: new Date(row.created_at).getTime(),
+        error: row.error || undefined,
+        liked: !!row.liked,
+        projectId: row.create_project_id ?? row.project_id ?? null,
+      }));
+      const existingIds = new Set(get().videos.map(v => v.id));
+      const newOnes = rows.filter(v => !existingIds.has(v.id));
+      const nextLoaded = new Set(loaded ?? []);
+      nextLoaded.add(key);
+      set({ videos: [...get().videos, ...newOnes], _historyLoaded: true, _loadedProjects: nextLoaded } as any);
     } catch (e) {
       console.error('Failed to load video history:', e);
-      set({ _historyLoaded: true });
     }
   },
 }));

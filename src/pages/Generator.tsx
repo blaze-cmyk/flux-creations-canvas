@@ -34,10 +34,15 @@ export default function Generator() {
   const [mobileOpen, setMobileOpen] = useState(false);
 
   useEffect(() => {
-    loadHistory();
-    loadVideoHistory();
     loadProjects();
-  }, [loadHistory, loadVideoHistory, loadProjects]);
+  }, [loadProjects]);
+
+  // Load (or refresh) history for the active project whenever it changes.
+  useEffect(() => {
+    if (!activeProjectId) return;
+    loadHistory(activeProjectId);
+    loadVideoHistory(activeProjectId);
+  }, [activeProjectId, loadHistory, loadVideoHistory]);
 
   // URL slug ↔ active project sync.
   useEffect(() => {
