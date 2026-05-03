@@ -156,6 +156,7 @@ export type Database = {
           id: string
           keyframe_path: string | null
           keyframe_url: string | null
+          liked: boolean
           product_id: string | null
           project_id: string | null
           prompt: string
@@ -187,6 +188,7 @@ export type Database = {
           id?: string
           keyframe_path?: string | null
           keyframe_url?: string | null
+          liked?: boolean
           product_id?: string | null
           project_id?: string | null
           prompt: string
@@ -218,6 +220,7 @@ export type Database = {
           id?: string
           keyframe_path?: string | null
           keyframe_url?: string | null
+          liked?: boolean
           product_id?: string | null
           project_id?: string | null
           prompt?: string
