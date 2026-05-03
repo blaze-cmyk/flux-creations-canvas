@@ -451,15 +451,24 @@ export default function MarketingStudioProject() {
                     </div>
                   )}
 
-                  <button
+                  <span
                     onClick={(e) => {
                       e.stopPropagation();
                       toggleLike(project.id, g.id);
                     }}
+                    role="button"
+                    tabIndex={0}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        toggleLike(project.id, g.id);
+                      }
+                    }}
                     className="absolute bottom-2 right-2 grid place-items-center w-8 h-8 rounded-full bg-black/40 text-white hover:bg-black/60"
                   >
                     <Heart className={`w-3.5 h-3.5 ${g.liked ? 'fill-ms-cta text-ms-cta' : ''}`} />
-                  </button>
+                  </span>
                 </button>
               );
             })}
