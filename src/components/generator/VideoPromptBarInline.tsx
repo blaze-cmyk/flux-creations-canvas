@@ -279,7 +279,7 @@ export function VideoPromptBarInline() {
           <Popover open={subOpen} onOpenChange={setSubOpen}>
             <PopoverTrigger asChild>
               <button className="ms-chip-glass flex items-center gap-1.5 px-3.5 h-9 rounded-full text-xs text-foreground transition-all">
-                <SubIcon className="w-3.5 h-3.5 text-[#FF2D78]" />
+                <SubIcon className="w-3.5 h-3.5 text-white" />
                 {subLabel}
                 <ChevronDownIcon className="size-3.5 text-muted-foreground/70" />
               </button>
