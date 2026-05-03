@@ -48,9 +48,9 @@ export const VIDEO_MODELS = [
   { id: 'grok-imagine-edit', name: 'Grok Imagine Edit', desc: 'Edit videos with text prompts', featured: true, badge: 'NEW' as const, provider: 'runware', modes: ['video-edit'] as const },
   { id: 'rw-runway-gen4.5', name: 'Runway Gen-4.5', desc: 'Advanced multimodal video generation', featured: true, provider: 'runware', modes: ['text-to-video', 'image-to-video'] as const },
   { id: 'rw-sora-2', name: 'Sora 2', desc: 'OpenAI video generation', featured: true, provider: 'runware', modes: ['text-to-video', 'image-to-video'] as const },
-  { id: 'rw-kling-2.5', name: 'RW Kling 2.5 Turbo Pro', desc: 'Kling via Runware, no filter', featured: false, provider: 'runware', modes: ['text-to-video', 'image-to-video'] as const },
-  { id: 'rw-veo-3.1', name: 'RW Veo 3.1', desc: 'Google Veo via Runware', featured: false, provider: 'runware', modes: ['text-to-video', 'image-to-video'] as const },
-  { id: 'rw-veo-3.1-fast', name: 'RW Veo 3.1 Fast', desc: 'Fast Veo via Runware', featured: false, provider: 'runware', modes: ['text-to-video', 'image-to-video'] as const },
+  { id: 'rw-kling-2.5', name: 'Kling 2.5 Turbo Pro Unfiltered', desc: 'Kling without content filter', featured: false, provider: 'runware', modes: ['text-to-video', 'image-to-video'] as const },
+  { id: 'rw-veo-3.1', name: 'Veo 3.1 Alt', desc: 'Google Veo alternative route', featured: false, provider: 'runware', modes: ['text-to-video', 'image-to-video'] as const },
+  { id: 'rw-veo-3.1-fast', name: 'Veo 3.1 Fast Alt', desc: 'Fast Veo alternative route', featured: false, provider: 'runware', modes: ['text-to-video', 'image-to-video'] as const },
   { id: 'grok-imagine', name: 'Grok Imagine', desc: 'Perfect motion with advanced video control', featured: true, badge: 'NEW' as const, provider: 'runware', modes: ['text-to-video', 'image-to-video'] as const },
 ];
 
