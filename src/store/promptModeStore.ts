@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 
-export type PromptMode = 'image' | 'video';
+export type PromptMode = 'image' | 'video' | 'marketing';
 export type VideoSubMode = 'text-to-video' | 'image-to-video' | 'motion-control' | 'video-edit';
 
 interface PromptModeState {

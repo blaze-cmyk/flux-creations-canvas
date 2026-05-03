@@ -245,7 +245,7 @@ export default function MarketingStudioProject() {
         </div>
       );
     }
-    return <Navigate to="/marketingstudio" replace />;
+    return <Navigate to="/image" replace />;
   }
 
   const items = tab === 'all' ? project.generations : project.generations.filter((g) => g.liked);

@@ -25,7 +25,7 @@ export function TopHeader({
         </button>
         {showBack && (
           <button
-            onClick={() => navigate('/marketingstudio')}
+            onClick={() => navigate('/image')}
             className="grid place-items-center w-9 h-9 rounded-md text-muted-foreground hover:text-foreground hover:bg-ms-surface-2"
             aria-label="Back"
           >

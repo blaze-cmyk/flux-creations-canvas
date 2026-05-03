@@ -42,8 +42,8 @@ export function PromptNavBar() {
       key: 'marketing',
       label: 'Marketing Studio',
       Icon: Megaphone,
-      to: '/marketingstudio',
-      active: pathname.startsWith('/marketingstudio'),
+      active: onImageRoute && mode === 'marketing',
+      onClick: () => { setMode('marketing'); if (!onImageRoute) navigate('/image'); },
     },
   ];
 
