@@ -131,6 +131,7 @@ type VideoState = {
   generate: () => void;
   retryVideo: (id: string) => void;
   deleteVideo: (id: string) => void;
+  toggleLike: (id: string) => void;
   loadHistory: () => Promise<void>;
   _historyLoaded: boolean;
 };
