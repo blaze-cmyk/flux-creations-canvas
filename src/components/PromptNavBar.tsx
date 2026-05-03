@@ -1,9 +1,10 @@
 import { NavLink, useLocation } from 'react-router-dom';
-import { Image as ImageIcon, Film, Megaphone } from 'lucide-react';
+import { Image as ImageIcon, Film, Megaphone, Move3d } from 'lucide-react';
 
 const ITEMS = [
   { to: '/image', label: 'Image', Icon: ImageIcon },
   { to: '/video', label: 'Video', Icon: Film },
+  { to: '/motion-control', label: 'Motion Control', Icon: Move3d },
   { to: '/marketingstudio', label: 'Marketing Studio', Icon: Megaphone },
 ];
 
