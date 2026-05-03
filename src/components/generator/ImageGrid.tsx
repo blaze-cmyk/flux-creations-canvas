@@ -298,7 +298,7 @@ function ImageCard({ image }: {
   // Generating state
   if (image.status === 'generating') {
     return (
-      <div className="relative w-full h-full rounded-xl overflow-hidden bg-ms-surface-2 ring-1 ring-ms-border flex items-center justify-center">
+      <div className="relative w-full h-full overflow-hidden bg-ms-surface-2 flex items-center justify-center">
         <div className="absolute inset-0 ms-shimmer opacity-40" />
         <div className="relative flex flex-col items-center gap-2">
           <Loader2 className="w-6 h-6 text-foreground animate-spin" />
