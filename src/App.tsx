@@ -25,8 +25,9 @@ const App = () => (
         <Routes>
           <Route path="/" element={<Navigate to="/home" replace />} />
           <Route path="/home" element={<Home />} />
-          <Route path="/image" element={<Generator />} />
-          <Route path="/generator" element={<Navigate to="/image" replace />} />
+          <Route path="/create" element={<Generator />} />
+          <Route path="/image" element={<Navigate to="/create" replace />} />
+          <Route path="/generator" element={<Navigate to="/create" replace />} />
           <Route path="/video" element={<Video />} />
           <Route path="/spaces-projects" element={<SpacesProjects />} />
           <Route path="/spaces" element={<Index />} />
