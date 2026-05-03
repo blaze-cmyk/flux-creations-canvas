@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { AnimatePresence, motion } from 'framer-motion';
+import { motion } from 'framer-motion';
 import { PromptBar } from '@/components/generator/PromptBar';
 import { VideoPromptBarInline } from '@/components/generator/VideoPromptBarInline';
 import { PromptNavBar } from '@/components/PromptNavBar';
@@ -31,34 +31,16 @@ export default function Generator() {
           <PromptNavBar />
           <motion.div
             layout
-            transition={{ layout: { duration: 0.42, ease: [0.32, 0.72, 0, 1] } }}
-            style={{ overflow: 'hidden' }}
+            transition={{ layout: { duration: 0.5, ease: [0.32, 0.72, 0, 1] } }}
           >
-            <AnimatePresence mode="popLayout" initial={false}>
-              {mode === 'image' ? (
-                <motion.div
-                  key="image"
-                  layout
-                  initial={{ opacity: 0, filter: 'blur(6px)' }}
-                  animate={{ opacity: 1, filter: 'blur(0px)' }}
-                  exit={{ opacity: 0, filter: 'blur(6px)' }}
-                  transition={{ duration: 0.28, ease: [0.32, 0.72, 0, 1] }}
-                >
-                  <PromptBar />
-                </motion.div>
-              ) : (
-                <motion.div
-                  key="video"
-                  layout
-                  initial={{ opacity: 0, filter: 'blur(6px)' }}
-                  animate={{ opacity: 1, filter: 'blur(0px)' }}
-                  exit={{ opacity: 0, filter: 'blur(6px)' }}
-                  transition={{ duration: 0.28, ease: [0.32, 0.72, 0, 1] }}
-                >
-                  <VideoPromptBarInline />
-                </motion.div>
-              )}
-            </AnimatePresence>
+            <motion.div
+              key={mode}
+              initial={{ opacity: 0, filter: 'blur(8px)' }}
+              animate={{ opacity: 1, filter: 'blur(0px)' }}
+              transition={{ duration: 0.32, ease: [0.32, 0.72, 0, 1] }}
+            >
+              {mode === 'image' ? <PromptBar /> : <VideoPromptBarInline />}
+            </motion.div>
           </motion.div>
         </div>
       </div>
