@@ -28,6 +28,7 @@ import { ReferenceImageStrip } from '@/components/generator/ReferenceImageStrip'
 import { ChevronDownIcon } from '@/components/marketingstudio/FormatIcons';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { ModelIcon } from '@/components/generator/ModelIcons';
+import { GenerateButton } from '@/components/generator/GenerateButton';
 
 function buildChip(idx: number, imgUrl?: string): HTMLElement {
   const chip = document.createElement('span');
