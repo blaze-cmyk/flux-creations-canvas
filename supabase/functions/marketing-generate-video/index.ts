@@ -565,19 +565,6 @@ Deno.serve(async (req) => {
       if (row.status === 'failed' && row.fallback_attempted) return json(row);
       if (!row.fal_request_id || !row.provider_endpoint) return json({ ...row, status: 'queued_pending_persist' });
 
-      const startedAt = Date.parse(row.updated_at || row.created_at || '') || Date.now();
-      const timeoutMs = timeoutForDuration(row.duration_seconds);
-      if (Date.now() - startedAt > timeoutMs) {
-        const fallbackProvider: Provider = row.provider === 'fal' ? 'atlascloud' : 'fal';
-        if (!row.fallback_attempted && (fallbackProvider === 'fal' ? FAL_KEY : ATLAS_KEY)) {
-          const fallback = await submitFallbackFromRow(admin, row, fallbackProvider);
-          if (fallback) return json(fallback);
-        }
-        const msg = `Timed out after ${Math.round(timeoutMs / 60000)} minutes while rendering. Retry will submit a fresh job.`;
-        const { data: updated } = await admin.from('ms_generations').update({ status: 'failed', stage: 'failed', error: msg }).eq('id', row.id).select().single();
-        return json(updated);
-      }
-
       const poll = row.provider === 'fal'
         ? await falPoll(row.provider_endpoint, row.fal_request_id)
         : await atlasPoll(row.fal_request_id);
@@ -598,8 +585,21 @@ Deno.serve(async (req) => {
         return json(updated);
       }
 
-      if (row.status !== 'running') await admin.from('ms_generations').update({ status: 'running' }).eq('id', row.id);
-      return json({ ...row, status: 'running' });
+      const startedAt = Date.parse(row.updated_at || row.created_at || '') || Date.now();
+      const timeoutMs = timeoutForDuration(row.duration_seconds);
+      if (Date.now() - startedAt > timeoutMs) {
+        const fallbackProvider: Provider = row.provider === 'fal' ? 'atlascloud' : 'fal';
+        if (!row.fallback_attempted && (fallbackProvider === 'fal' ? FAL_KEY : ATLAS_KEY)) {
+          const fallback = await submitFallbackFromRow(admin, row, fallbackProvider);
+          if (fallback) return json(fallback);
+        }
+        const msg = `Timed out after ${Math.round(timeoutMs / 60000)} minutes while rendering. Retry will submit a fresh job.`;
+        const { data: updated } = await admin.from('ms_generations').update({ status: 'failed', stage: 'failed', error: msg }).eq('id', row.id).select().single();
+        return json(updated);
+      }
+
+      if (row.status !== 'processing') await admin.from('ms_generations').update({ status: 'processing' }).eq('id', row.id);
+      return json({ ...row, status: 'processing' });
     }
 
     if (body.retry) {
