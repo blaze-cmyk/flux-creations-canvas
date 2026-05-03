@@ -20,6 +20,7 @@ export default function Generator() {
   const navigate = useNavigate();
   const { slug } = useParams<{ slug?: string }>();
   const selectedImageId = useGeneratorStore((s) => s.selectedImageId);
+  const selectedVideoId = useVideoStore((s) => s.selectedVideoId);
   const loadHistory = useGeneratorStore((s) => s.loadHistory);
   const loadVideoHistory = useVideoStore((s) => s.loadHistory);
   const mode = usePromptModeStore((s) => s.mode);
