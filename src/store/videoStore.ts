@@ -51,6 +51,48 @@ export const VIDEO_MODELS = [
   { id: 'rw-kling-2.5', name: 'RW Kling 2.5 Turbo Pro', desc: 'Kling via Runware, no filter', featured: false, provider: 'runware', modes: ['text-to-video', 'image-to-video'] as const },
   { id: 'rw-veo-3.1', name: 'RW Veo 3.1', desc: 'Google Veo via Runware', featured: false, provider: 'runware', modes: ['text-to-video', 'image-to-video'] as const },
   { id: 'rw-veo-3.1-fast', name: 'RW Veo 3.1 Fast', desc: 'Fast Veo via Runware', featured: false, provider: 'runware', modes: ['text-to-video', 'image-to-video'] as const },
+  { id: 'grok-imagine', name: 'Grok Imagine', desc: 'Perfect motion with advanced video control', featured: true, badge: 'NEW' as const, provider: 'runware', modes: ['text-to-video', 'image-to-video'] as const },
+];
+
+// =====================================================================
+// VIDEO_CATALOG — Curated, user-facing list for the Create Video tab.
+// One display name per model, no provider names. Backend routing is
+// handled in supabase/functions/generate-video using the `id` field.
+// =====================================================================
+export type UploadLayout = 'none' | 'start-end' | 'single-required' | 'single-optional';
+
+export type VideoCatalogEntry = {
+  id: string;                 // backend model key (must exist in VIDEO_MODEL_MAP)
+  name: string;               // display name (no provider)
+  family: string;             // grouping key
+  familyLabel: string;        // display label for the family
+  familyDesc: string;         // 1-line family description
+  featured?: boolean;
+  badge?: 'NEW' | 'EXCLUSIVE';
+  resolution: string;         // chip text e.g. '720p' | '1080p' | '4K'
+  durationRange: string;      // chip text e.g. '3s-15s'
+  hasAudio?: boolean;
+  uploadLayout: UploadLayout;
+  modes: readonly ('text-to-video' | 'image-to-video')[];
+};
+
+export const VIDEO_CATALOG: VideoCatalogEntry[] = [
+  // ---------- Featured ----------
+  { id: 'rw-seedance-1.5-pro', name: 'Seedance 2.0', family: 'seedance', familyLabel: 'Seedance', familyDesc: 'Cinematic, multi-shot video creation', featured: true, badge: 'NEW', resolution: '720p', durationRange: '4s-15s', uploadLayout: 'single-optional', modes: ['text-to-video', 'image-to-video'] },
+  { id: 'kling-v3-pro', name: 'Kling 3.0', family: 'kling', familyLabel: 'Kling', familyDesc: 'Perfect motion with advanced video control', featured: true, badge: 'EXCLUSIVE', resolution: '4K', durationRange: '3s-15s', hasAudio: true, uploadLayout: 'start-end', modes: ['text-to-video', 'image-to-video'] },
+  { id: 'veo-3.1-lite', name: 'Google Veo 3.1 Lite', family: 'veo', familyLabel: 'Google Veo', familyDesc: 'Precision video with sound control', featured: true, badge: 'NEW', resolution: '1080p', durationRange: '4s-8s', hasAudio: true, uploadLayout: 'single-required', modes: ['text-to-video', 'image-to-video'] },
+  { id: 'grok-imagine', name: 'Grok Imagine', family: 'grok', familyLabel: 'Grok Imagine', familyDesc: 'Perfect motion with advanced video control', featured: true, resolution: '720p', durationRange: '1s-15s', uploadLayout: 'single-optional', modes: ['text-to-video', 'image-to-video'] },
+
+  // ---------- All models ----------
+  { id: 'minimax-video', name: 'Minimax Hailuo', family: 'hailuo', familyLabel: 'Minimax Hailuo', familyDesc: 'High-dynamic, VFX-ready, fastest and most affordable', resolution: '720p', durationRange: '5s-10s', uploadLayout: 'single-optional', modes: ['text-to-video', 'image-to-video'] },
+  { id: 'kling-v2.6-pro', name: 'Kling 2.6', family: 'kling', familyLabel: 'Kling', familyDesc: 'Perfect motion with advanced video control', resolution: '1080p', durationRange: '5s-10s', hasAudio: true, uploadLayout: 'start-end', modes: ['text-to-video', 'image-to-video'] },
+  { id: 'kling-v2.5-turbo-pro', name: 'Kling 2.5 Turbo Pro', family: 'kling', familyLabel: 'Kling', familyDesc: 'Perfect motion with advanced video control', resolution: '1080p', durationRange: '5s-10s', uploadLayout: 'start-end', modes: ['text-to-video', 'image-to-video'] },
+  { id: 'rw-sora-2', name: 'OpenAI Sora 2', family: 'sora', familyLabel: 'OpenAI Sora 2', familyDesc: 'Multi-shot video with sound generation', resolution: '1080p', durationRange: '5s-10s', hasAudio: true, uploadLayout: 'single-optional', modes: ['text-to-video', 'image-to-video'] },
+  { id: 'veo-3.1', name: 'Google Veo 3.1', family: 'veo', familyLabel: 'Google Veo', familyDesc: 'Precision video with sound control', resolution: '1080p', durationRange: '4s-8s', hasAudio: true, uploadLayout: 'start-end', modes: ['text-to-video', 'image-to-video'] },
+  { id: 'veo-3.1-fast', name: 'Google Veo 3.1 Fast', family: 'veo', familyLabel: 'Google Veo', familyDesc: 'Precision video with sound control', resolution: '1080p', durationRange: '4s-8s', hasAudio: true, uploadLayout: 'start-end', modes: ['text-to-video', 'image-to-video'] },
+  { id: 'rw-runway-gen4.5', name: 'Runway Gen-4.5', family: 'runway', familyLabel: 'Runway', familyDesc: 'Advanced multimodal video generation', resolution: '1080p', durationRange: '5s-10s', uploadLayout: 'single-optional', modes: ['text-to-video', 'image-to-video'] },
+  { id: 'pixverse-v6', name: 'PixVerse V6', family: 'pixverse', familyLabel: 'PixVerse', familyDesc: 'Lifelike physics and striking visuals', resolution: '1080p', durationRange: '5s-10s', uploadLayout: 'start-end', modes: ['text-to-video', 'image-to-video'] },
+  { id: 'ltx-2-19b', name: 'LTX-2', family: 'ltx', familyLabel: 'LTX', familyDesc: 'Video with audio from images', resolution: '1080p', durationRange: '5s-10s', hasAudio: true, uploadLayout: 'start-end', modes: ['text-to-video', 'image-to-video'] },
 ];
 
 export const VIDEO_ASPECT_RATIOS = ['16:9', '9:16', '1:1'];
