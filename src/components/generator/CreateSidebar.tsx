@@ -33,12 +33,15 @@ export function CreateSidebar({ onClose }: { onClose?: () => void }) {
     createProject,
     deleteProject,
     renameProject,
+    reorderProjects,
     loaded,
   } = useCreateProjectsStore();
   const [query, setQuery] = useState('');
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState('');
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const [draggingId, setDraggingId] = useState<string | null>(null);
+  const [dragOverId, setDragOverId] = useState<string | null>(null);
   const collapsed = sidebarCollapsed;
 
   useEffect(() => {
