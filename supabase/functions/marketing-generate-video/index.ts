@@ -38,6 +38,8 @@ type SubmitOutcome = {
   provider?: Provider;
   endpoint?: string;
   requestId?: string;
+  statusUrl?: string;
+  responseUrl?: string;
   usedFallback?: boolean;
   error?: string;
   raw?: unknown;
