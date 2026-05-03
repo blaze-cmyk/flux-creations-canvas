@@ -50,7 +50,7 @@ export const useMarketingFeedStore = create<State>((set, get) => ({
         .select(
           'id, status, stage, video_url, thumb_url, error, fal_request_id, prompt, format, surface, aspect, resolution, duration_seconds, product_id, avatar_id, created_at, updated_at, keyframe_url, liked',
         )
-        .eq('create_project_id', createProjectId)
+        .or(`create_project_id.eq.${createProjectId},project_id.eq.${createProjectId}`)
         .order('created_at', { ascending: false })
         .limit(100) as any);
       if (error || !data) return;
