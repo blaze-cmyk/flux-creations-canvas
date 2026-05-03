@@ -260,6 +260,9 @@ function ImageCard({ image }: {
   image: ReturnType<typeof useGeneratorStore.getState>['images'][0];
 }) {
   const { setSelectedImageId, retryImage, deleteImage, useAsReference, moveImageToProject } = useGeneratorStore();
+  const setVideoMode = usePromptModeStore((s) => s.setMode);
+  const addVideoReferenceImage = useVideoStore((s) => s.addReferenceImage);
+  const setVideoSubMode = useVideoStore((s) => s.setMode);
   const projects = useCreateProjectsStore((s) => s.projects);
   const setProjectThumbnail = useCreateProjectsStore((s) => s.setProjectThumbnail);
   const [showMenu, setShowMenu] = useState(false);
