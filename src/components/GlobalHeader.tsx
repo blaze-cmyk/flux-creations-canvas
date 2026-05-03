@@ -20,8 +20,9 @@ export function GlobalHeader() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const location = useLocation();
 
-  // Hide on marketing studio routes
+  // Hide on marketing studio and create routes (those pages have their own header)
   if (location.pathname.startsWith('/marketingstudio')) return null;
+  if (location.pathname.startsWith('/create')) return null;
 
   return (
     <header className="sticky top-0 z-50 w-full bg-background/80 backdrop-blur-xl">
