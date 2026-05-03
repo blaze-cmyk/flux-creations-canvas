@@ -176,14 +176,11 @@ export default function MarketingStudioProject() {
   useEffect(() => {
     if (!project) return;
     const interval = setInterval(async () => {
-      const active = project.generations.filter(
-        (g) =>
-          (g.status === 'queued' ||
-            g.status === 'queued_pending_persist' ||
-            g.status === 'running' ||
-            (g.status as string) === 'processing') &&
-          /^[0-9a-f-]{36}$/i.test(g.id),
-      );
+      const currentProject = useMarketingStudioStore.getState().projects.find((p) => p.id === project.id);
+      const active = (currentProject?.generations ?? [])
+        .filter((g) => isGenerationActive(g) && /^[0-9a-f-]{36}$/i.test(g.id))
+        .sort((a, b) => (a.submittedAt || a.createdAt) - (b.submittedAt || b.createdAt))
+        .slice(0, 3);
 
       for (const g of active) {
         // Client-side timeout
@@ -249,7 +246,7 @@ export default function MarketingStudioProject() {
           /* swallow transient network errors */
         }
       }
-    }, 4000);
+    }, 12000);
     return () => clearInterval(interval);
   }, [project, updateGeneration]);
 
