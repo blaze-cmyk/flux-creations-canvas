@@ -62,22 +62,35 @@ export function ImageGrid() {
   const tab = useGridTabStore((s) => s.tab);
   const setTab = useGridTabStore((s) => s.setTab);
 
-  // Merge images + videos into a unified, project-scoped, filtered, sorted feed.
-  const items = useMemo<MediaItem[]>(() => {
-    const imgItems: MediaItem[] = allImages.map((i) => ({ kind: 'image', ...i }));
-    const vidItems: MediaItem[] = allVideos.map((v) => ({ kind: 'video', ...v }));
-    let list: MediaItem[] = [...imgItems, ...vidItems];
+  const msFeed = useMarketingFeedStore(
+    (s) => (activeProjectId ? s.byProject[activeProjectId] : undefined) || [],
+  );
 
-    list = activeProjectId
-      ? list.filter((i) => i.projectId === activeProjectId)
-      : list.filter((i) => !i.projectId);
+  // Merge images + videos + marketing-studio generations into a unified feed.
+  const items = useMemo<MediaItem[]>(() => {
+    const imgItems: MediaItem[] = allImages.map((i) => ({ kind: 'image' as const, ...i }));
+    const vidItems: MediaItem[] = allVideos.map((v) => ({ kind: 'video' as const, ...v }));
+    const msItems: MediaItem[] = msFeed.map((g) => ({
+      kind: 'marketing' as const,
+      aspectRatio:
+        g.aspect && g.aspect !== 'Auto' ? g.aspect : '9:16',
+      ...g,
+    }));
+
+    let list: MediaItem[] = [...imgItems, ...vidItems, ...msItems];
+
+    list = list.filter((i) => {
+      if (i.kind === 'marketing') return true; // already scoped to active project by feed
+      const pid = (i as any).projectId as string | undefined;
+      return activeProjectId ? pid === activeProjectId : !pid;
+    });
 
     if (search.trim()) {
       const q = search.toLowerCase();
       list = list.filter((i) => i.prompt?.toLowerCase().includes(q));
     }
     if (modelFilter) {
-      list = list.filter((i) => i.model === modelFilter);
+      list = list.filter((i) => (i as any).model === modelFilter);
     }
     if (dateFilter !== 'all') {
       const now = Date.now();
@@ -91,7 +104,7 @@ export function ImageGrid() {
 
     list.sort((a, b) => b.createdAt - a.createdAt);
     return list;
-  }, [allImages, allVideos, activeProjectId, search, modelFilter, dateFilter, tab]);
+  }, [allImages, allVideos, msFeed, activeProjectId, search, modelFilter, dateFilter, tab]);
 
   const zoom = useLayoutStore((s) => s.zoom);
   const containerRef = useRef<HTMLDivElement>(null);
