@@ -165,6 +165,7 @@ export function VideoPromptBarInline() {
                           url={referenceImages[idx]}
                           onUpload={() => onUploadAt(idx)}
                           onRemove={() => removeReferenceImage(idx)}
+                          onDropFile={(f) => handleFileForIdx(idx, f)}
                         />
                       ));
                     }
@@ -175,6 +176,7 @@ export function VideoPromptBarInline() {
                           url={referenceImages[0]}
                           onUpload={() => onUploadAt(0)}
                           onRemove={() => removeReferenceImage(0)}
+                          onDropFile={(f) => handleFileForIdx(0, f)}
                         />
                       );
                     }
@@ -194,6 +196,7 @@ export function VideoPromptBarInline() {
                         url={referenceImages[idx]}
                         onUpload={() => onUploadAt(idx)}
                         onRemove={() => removeReferenceImage(idx)}
+                        onDropFile={(f) => handleFileForIdx(idx, f)}
                       />
                     ));
                   }
@@ -208,6 +211,7 @@ export function VideoPromptBarInline() {
                           url={referenceImages[0]}
                           onUpload={() => onUploadAt(0)}
                           onRemove={() => removeReferenceImage(0)}
+                          onDropFile={(f) => handleFileForIdx(0, f)}
                         />
                         <MotionSlot
                           kind="character"
@@ -216,6 +220,7 @@ export function VideoPromptBarInline() {
                           url={referenceImages[1]}
                           onUpload={() => onUploadAt(1)}
                           onRemove={() => removeReferenceImage(1)}
+                          onDropFile={(f) => handleFileForIdx(1, f)}
                         />
                         <SceneControlCard
                           on={sceneControlOn}
@@ -232,6 +237,7 @@ export function VideoPromptBarInline() {
                       url={referenceImages[0]}
                       onUpload={() => onUploadAt(0)}
                       onRemove={() => removeReferenceImage(0)}
+                      onDropFile={(f) => handleFileForIdx(0, f)}
                     />
                   );
 
