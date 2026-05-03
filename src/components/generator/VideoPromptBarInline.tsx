@@ -53,6 +53,7 @@ export function VideoPromptBarInline() {
   const [search, setSearch] = useState('');
   const [enhance, setEnhance] = useState(true);
   const [sound, setSound] = useState(true);
+  const [expandedFamily, setExpandedFamily] = useState<string | null>(null);
 
   const isCreate = videoSubMode === 'text-to-video';
 
