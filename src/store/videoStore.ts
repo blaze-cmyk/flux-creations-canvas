@@ -389,9 +389,11 @@ export const useVideoStore = create<VideoState>()((set, get) => ({
   generate: async () => {
     const { prompt, motionPrompt, referenceImages, model, mode, aspectRatio, duration, characterOrientation, keepAudio, resolution } = get();
     const effectivePrompt = mode === 'motion-control' ? motionPrompt.trim() : prompt.trim();
+    const filledReferenceImages = referenceImages.filter(Boolean);
+    const submittedMode = mode === 'text-to-video' && filledReferenceImages.length > 0 ? 'image-to-video' : mode;
 
-    if (!effectivePrompt && mode === 'text-to-video') return;
-    if (mode === 'image-to-video' && referenceImages.length === 0) return;
+    if (!effectivePrompt && submittedMode === 'text-to-video') return;
+    if (submittedMode === 'image-to-video' && filledReferenceImages.length === 0) return;
     if (mode === 'motion-control' && (!referenceImages[0] || !referenceImages[1])) return;
     if (mode === 'video-edit' && (!referenceImages[0] || !effectivePrompt)) return;
 
@@ -411,9 +413,9 @@ export const useVideoStore = create<VideoState>()((set, get) => ({
     const newVideo: GeneratedVideo = {
       id: crypto.randomUUID(),
       prompt: effectivePrompt,
-      referenceImages: [...referenceImages],
+      referenceImages: mode === 'text-to-video' ? filledReferenceImages : [...referenceImages],
       model,
-      mode,
+      mode: submittedMode,
       aspectRatio,
       duration,
       resolution,
@@ -427,9 +429,9 @@ export const useVideoStore = create<VideoState>()((set, get) => ({
     saveVideoToDb(newVideo);
     callGenerate({
       prompt: effectivePrompt,
-      referenceImages: [...referenceImages],
+      referenceImages: mode === 'text-to-video' ? filledReferenceImages : [...referenceImages],
       model,
-      mode,
+      mode: submittedMode,
       aspectRatio,
       duration,
       characterOrientation,
