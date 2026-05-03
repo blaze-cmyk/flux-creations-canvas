@@ -1,20 +1,27 @@
 import { Link } from 'react-router-dom';
+import logoWhite from '@/assets/korsola-logo-white.png';
+import logoPink from '@/assets/korsola-logo-pink.png';
 
 export function Logo({ collapsed = false }: { collapsed?: boolean }) {
   return (
-    <Link to="/marketingstudio" className="flex items-center gap-2.5 group">
-      {/* Black tile with white mark */}
-      <div className="w-9 h-9 rounded-xl bg-white grid place-items-center shrink-0">
-        <svg viewBox="0 0 24 24" className="w-[18px] h-[18px] text-black" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M5 18 L12 5 L19 18" />
-          <path d="M8.5 13 L15.5 13" />
-        </svg>
-      </div>
+    <Link to="/home" className="group shrink-0 flex items-center gap-2" aria-label="Korsola home">
+      <span className="relative w-11 h-11 rounded-[10px] overflow-hidden bg-white block">
+        <img
+          src={logoWhite}
+          alt="Korsola"
+          className="absolute inset-0 w-full h-full object-contain transition-opacity duration-200 group-hover:opacity-0"
+        />
+        <img
+          src={logoPink}
+          alt=""
+          aria-hidden
+          className="absolute inset-0 w-full h-full object-cover opacity-0 transition-opacity duration-200 group-hover:opacity-100"
+        />
+      </span>
       {!collapsed && (
-        <div className="leading-[1.05]">
-          <div className="text-[11px] font-extrabold tracking-[0.12em] text-foreground">KORSOLA</div>
-          <div className="text-[11px] font-extrabold tracking-[0.12em] text-foreground">.AI</div>
-        </div>
+        <span className="text-[13px] font-extrabold tracking-[0.14em] text-foreground">
+          KORSOLA
+        </span>
       )}
     </Link>
   );
