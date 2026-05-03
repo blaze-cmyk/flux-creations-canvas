@@ -24,7 +24,12 @@ function parseRatio(ar: string): number {
 }
 
 export function ImageGrid() {
-  const { images } = useGeneratorStore();
+  const { images: allImages } = useGeneratorStore();
+  const activeProjectId = useCreateProjectsStore((s) => s.activeProjectId);
+  const images = useMemo(
+    () => (activeProjectId ? allImages.filter((i) => i.projectId === activeProjectId) : allImages.filter((i) => !i.projectId)),
+    [allImages, activeProjectId],
+  );
   const zoom = useLayoutStore((s) => s.zoom);
   const containerRef = useRef<HTMLDivElement>(null);
   const [containerWidth, setContainerWidth] = useState(0);
