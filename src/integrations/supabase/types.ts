@@ -14,6 +14,36 @@ export type Database = {
   }
   public: {
     Tables: {
+      create_projects: {
+        Row: {
+          created_at: string
+          id: string
+          name: string
+          slug: string
+          thumb_url: string | null
+          updated_at: string
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          name?: string
+          slug: string
+          thumb_url?: string | null
+          updated_at?: string
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          name?: string
+          slug?: string
+          thumb_url?: string | null
+          updated_at?: string
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       generations: {
         Row: {
           aspect_ratio: string
@@ -22,6 +52,7 @@ export type Database = {
           id: string
           image_url: string | null
           model: string
+          project_id: string | null
           prompt: string
           quality: string
           status: string
@@ -33,6 +64,7 @@ export type Database = {
           id?: string
           image_url?: string | null
           model: string
+          project_id?: string | null
           prompt: string
           quality?: string
           status?: string
@@ -44,6 +76,7 @@ export type Database = {
           id?: string
           image_url?: string | null
           model?: string
+          project_id?: string | null
           prompt?: string
           quality?: string
           status?: string
