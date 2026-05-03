@@ -54,6 +54,7 @@ export type Database = {
           error: string | null
           id: string
           image_url: string | null
+          liked: boolean
           model: string
           project_id: string | null
           prompt: string
@@ -66,6 +67,7 @@ export type Database = {
           error?: string | null
           id?: string
           image_url?: string | null
+          liked?: boolean
           model: string
           project_id?: string | null
           prompt: string
@@ -78,6 +80,7 @@ export type Database = {
           error?: string | null
           id?: string
           image_url?: string | null
+          liked?: boolean
           model?: string
           project_id?: string | null
           prompt?: string
@@ -524,6 +527,7 @@ export type Database = {
           duration: string
           error: string | null
           id: string
+          liked: boolean
           mode: string
           model: string
           prompt: string
@@ -542,6 +546,7 @@ export type Database = {
           duration?: string
           error?: string | null
           id?: string
+          liked?: boolean
           mode?: string
           model: string
           prompt?: string
@@ -560,6 +565,7 @@ export type Database = {
           duration?: string
           error?: string | null
           id?: string
+          liked?: boolean
           mode?: string
           model?: string
           prompt?: string
