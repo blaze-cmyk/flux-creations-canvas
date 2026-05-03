@@ -575,7 +575,7 @@ function AspectIcon({ ratio, className = '' }: { ratio: string; className?: stri
   const scale = max / Math.max(w, h);
   return (
     <span className={`w-4 h-4 flex items-center justify-center ${className}`}>
-      <span className="border border-current rounded-sm opacity-90" style={{ width: w * scale, height: h * scale }} />
+      <span className="border-2 border-white rounded-sm" style={{ width: w * scale, height: h * scale }} />
     </span>
   );
 }
