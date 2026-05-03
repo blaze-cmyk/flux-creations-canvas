@@ -1,4 +1,4 @@
-import { useRef, useState, useCallback } from 'react';
+import { useRef, useState, useEffect } from 'react';
 import { useVideoStore, VIDEO_MODELS, VIDEO_ASPECT_RATIOS, VIDEO_DURATIONS } from '@/store/videoStore';
 import { usePromptModeStore, type VideoSubMode } from '@/store/promptModeStore';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -43,9 +43,8 @@ export function VideoPromptBarInline() {
     model, setModel, aspectRatio, setAspectRatio, duration, setDuration, generate,
   } = useVideoStore();
   const { videoSubMode, setVideoSubMode } = usePromptModeStore();
-  // Sync into video store mode
   const setStoreMode = useVideoStore(s => s.setMode);
-  if (useVideoStore.getState().mode !== videoSubMode) setStoreMode(videoSubMode);
+  useEffect(() => { setStoreMode(videoSubMode); }, [videoSubMode, setStoreMode]);
 
   const [modelOpen, setModelOpen] = useState(false);
   const [subOpen, setSubOpen] = useState(false);
