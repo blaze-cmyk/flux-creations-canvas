@@ -495,8 +495,8 @@ export function VideoPromptBarInline() {
 }
 
 function FrameSlot({
-  label, optional, url, onUpload, onRemove, onDropFile,
-}: { label: string; optional?: boolean; url?: string; onUpload: () => void; onRemove: () => void; onDropFile?: (f: File) => void }) {
+  label, optional, url, onUpload, onRemove, onDropFile, portrait,
+}: { label: string; optional?: boolean; url?: string; onUpload: () => void; onRemove: () => void; onDropFile?: (f: File) => void; portrait?: boolean }) {
   const [over, setOver] = useState(false);
   const dropProps = {
     onDragOver: (e: React.DragEvent) => { e.preventDefault(); setOver(true); },
@@ -507,9 +507,10 @@ function FrameSlot({
       if (f && onDropFile) onDropFile(f);
     },
   };
+  const shape = portrait ? 'aspect-[3/4] max-w-[200px]' : 'aspect-video max-w-[180px]';
   if (url) {
     return (
-      <div {...dropProps} className={`relative flex-1 max-w-[180px] rounded-xl overflow-hidden border aspect-video bg-black/40 ${over ? 'border-[#9C3FED]' : 'border-white/10'}`}>
+      <div {...dropProps} className={`relative flex-1 ${shape} rounded-xl overflow-hidden border bg-black/40 ${over ? 'border-[#9C3FED]' : 'border-white/10'}`}>
         {url.startsWith('data:video') || url.match(/\.(mp4|mov|webm)$/i) ? (
           <video src={url} className="w-full h-full object-cover" muted />
         ) : (
@@ -517,11 +518,11 @@ function FrameSlot({
         )}
         <button
           onClick={onRemove}
-          className="absolute top-1 right-1 w-5 h-5 rounded-full bg-black/70 text-white text-[10px] grid place-items-center hover:bg-black/90 transition"
+          className="absolute top-1.5 right-1.5 w-6 h-6 rounded-full bg-black/70 text-white grid place-items-center hover:bg-black/90 transition"
         >
-          <X className="w-3 h-3" />
+          <X className="w-3.5 h-3.5" />
         </button>
-        <div className="absolute bottom-1 left-2 text-[10px] text-white/80">{label}</div>
+        <div className="absolute bottom-2 left-2.5 text-[12px] font-semibold text-white drop-shadow">{label}</div>
       </div>
     );
   }
@@ -529,15 +530,15 @@ function FrameSlot({
     <button
       onClick={onUpload}
       {...dropProps}
-      className={`relative flex-1 max-w-[180px] aspect-video rounded-xl bg-white/[0.03] border border-dashed transition-colors flex flex-col items-center justify-center gap-1 text-muted-foreground ${over ? 'border-[#9C3FED] bg-white/[0.08]' : 'border-white/15 hover:border-white/30 hover:bg-white/[0.06]'}`}
+      className={`relative flex-1 ${shape} rounded-xl bg-white/[0.03] border border-dashed transition-colors flex flex-col items-center justify-center gap-2 text-muted-foreground ${over ? 'border-[#9C3FED] bg-white/[0.08]' : 'border-white/15 hover:border-white/30 hover:bg-white/[0.06]'}`}
     >
       {optional && (
-        <span className="absolute top-1.5 right-2 text-[9px] text-muted-foreground/70 bg-white/5 rounded-full px-1.5 py-0.5">Optional</span>
+        <span className="absolute top-2 right-2 text-[10px] text-muted-foreground/80 bg-white/5 rounded-full px-2 py-0.5">Optional</span>
       )}
-      <div className="w-8 h-8 rounded-full bg-white/5 grid place-items-center">
-        <ImagePlus className="w-4 h-4" />
+      <div className={`${portrait ? 'w-10 h-10' : 'w-8 h-8'} rounded-full bg-white/5 grid place-items-center`}>
+        <ImagePlus className={portrait ? 'w-5 h-5' : 'w-4 h-4'} />
       </div>
-      <span className="text-[11px]">{label}</span>
+      <span className={`${portrait ? 'text-[13px] font-semibold text-foreground' : 'text-[11px]'}`}>{label}</span>
     </button>
   );
 }
