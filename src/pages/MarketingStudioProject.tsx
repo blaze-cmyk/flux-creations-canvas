@@ -321,7 +321,8 @@ export default function MarketingStudioProject() {
     (g) =>
       g.status === 'queued' ||
       g.status === 'queued_pending_persist' ||
-      g.status === 'running',
+      g.status === 'running' ||
+      (g.status as string) === 'processing',
   );
 
   return (
