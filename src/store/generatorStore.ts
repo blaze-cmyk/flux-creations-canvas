@@ -28,7 +28,7 @@ type GeneratorState = {
   quantity: number;
   images: GeneratedImage[];
   selectedImageId: string | null;
-  historyLoaded: boolean;
+  loadedProjects: Set<string>;
   setPrompt: (prompt: string) => void;
   addReferenceImage: (img: string) => void;
   removeReferenceImage: (index: number) => void;
@@ -42,7 +42,7 @@ type GeneratorState = {
   retryImage: (id: string) => void;
   deleteImage: (id: string) => void;
   useAsReference: (imageUrl: string) => void;
-  loadHistory: () => Promise<void>;
+  loadHistory: (projectId?: string | null) => Promise<void>;
   moveImageToProject: (id: string, projectId: string | null) => Promise<void>;
   toggleLike: (id: string) => void;
 };
