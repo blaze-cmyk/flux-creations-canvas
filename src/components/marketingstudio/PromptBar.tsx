@@ -37,6 +37,7 @@ import {
 } from '@/store/marketingStudioStore';
 import { useNavigate } from 'react-router-dom';
 import { toast } from '@/hooks/use-toast';
+import { GenerateButton } from '@/components/generator/GenerateButton';
 
 
 const RESOLUTIONS: MSResolution[] = ['480p', '720p', '1080p'];
