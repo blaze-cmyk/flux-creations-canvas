@@ -23,6 +23,7 @@ export default function Generator() {
       {/* Floating prompt bar (Higgsfield / marketing-studio style) */}
       <div className="fixed bottom-4 left-0 right-0 px-3 md:px-6 z-30 pointer-events-none">
         <div className="pointer-events-auto">
+          <PromptNavBar />
           <PromptBar />
         </div>
       </div>
