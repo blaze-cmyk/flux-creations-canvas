@@ -162,7 +162,8 @@ export function VideoPromptBarInline() {
                         <FrameSlot
                           key={label}
                           label={label}
-                          optional
+                          optional={idx === 1}
+                          portrait
                           url={referenceImages[idx]}
                           onUpload={() => onUploadAt(idx)}
                           onRemove={() => removeReferenceImage(idx)}
