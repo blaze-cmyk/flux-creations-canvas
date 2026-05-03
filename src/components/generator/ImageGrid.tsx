@@ -127,7 +127,9 @@ export function ImageGrid() {
   }, [images, containerWidth, targetRowHeight]);
 
   return (
-    <div ref={containerRef} className="relative w-full" style={{ height: images.length === 0 ? undefined : layout.totalHeight, minHeight: images.length === 0 ? '60vh' : undefined }}>
+    <div className="w-full">
+      <FilterToolbar />
+      <div ref={containerRef} className="relative w-full" style={{ height: images.length === 0 ? undefined : layout.totalHeight, minHeight: images.length === 0 ? '60vh' : undefined }}>
       {images.length === 0 && (
         <div className="flex items-center justify-center min-h-[60vh] text-muted-foreground text-sm">
           <div className="text-center space-y-2">
