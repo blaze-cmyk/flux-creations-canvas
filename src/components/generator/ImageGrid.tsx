@@ -51,13 +51,21 @@ function parseRatio(ar: string): number {
 
 export function ImageGrid() {
   const { images: allImages } = useGeneratorStore();
+  const { videos: allVideos } = useVideoStore();
   const activeProjectId = useCreateProjectsStore((s) => s.activeProjectId);
   const { search, modelFilter, dateFilter } = useGridFilterStore();
+  const tab = useGridTabStore((s) => s.tab);
+  const setTab = useGridTabStore((s) => s.setTab);
 
-  const images = useMemo(() => {
-    let list = activeProjectId
-      ? allImages.filter((i) => i.projectId === activeProjectId)
-      : allImages.filter((i) => !i.projectId);
+  // Merge images + videos into a unified, project-scoped, filtered, sorted feed.
+  const items = useMemo<MediaItem[]>(() => {
+    const imgItems: MediaItem[] = allImages.map((i) => ({ kind: 'image', ...i }));
+    const vidItems: MediaItem[] = allVideos.map((v) => ({ kind: 'video', ...v }));
+    let list: MediaItem[] = [...imgItems, ...vidItems];
+
+    list = activeProjectId
+      ? list.filter((i) => i.projectId === activeProjectId)
+      : list.filter((i) => !i.projectId);
 
     if (search.trim()) {
       const q = search.toLowerCase();
@@ -72,8 +80,13 @@ export function ImageGrid() {
       const cutoff = dateFilter === 'today' ? now - day : dateFilter === '7d' ? now - 7 * day : now - 30 * day;
       list = list.filter((i) => i.createdAt >= cutoff);
     }
+    if (tab === 'liked') {
+      list = list.filter((i) => !!i.liked);
+    }
+
+    list.sort((a, b) => b.createdAt - a.createdAt);
     return list;
-  }, [allImages, activeProjectId, search, modelFilter, dateFilter]);
+  }, [allImages, allVideos, activeProjectId, search, modelFilter, dateFilter, tab]);
 
   const zoom = useLayoutStore((s) => s.zoom);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -91,44 +104,32 @@ export function ImageGrid() {
   }, []);
 
   const gap = 4;
-  // Higgsfield-style: row height is driven by a 9:16 reference at the current zoom level.
-  // All other aspect ratios in the same row scale to that height.
-  // Use a 9:16 reference at 2x the base zoom height so portrait/tall images
-  // are dominant and every other aspect ratio matches that height (wider).
   const targetRowHeight = ZOOM_ROW_HEIGHTS[zoom] * 2;
 
-  // Justified rows layout (à la Higgsfield / Google Images / Flickr):
-  // every row has the SAME height; widths vary by aspect ratio so each row
-  // exactly fills the container width. Order is preserved (newest first).
   const layout = useMemo(() => {
-    type Item = { id: string; left: number; top: number; width: number; height: number };
-    if (!containerWidth) return { items: [] as Item[], totalHeight: 0 };
+    type Pos = { id: string; left: number; top: number; width: number; height: number };
+    if (!containerWidth) return { items: [] as Pos[], totalHeight: 0 };
 
-    const items: Item[] = [];
+    const positioned: Pos[] = [];
     let top = 0;
     let rowStart = 0;
 
     const flushRow = (endExclusive: number, isLast: boolean) => {
-      const rowImgs = images.slice(rowStart, endExclusive);
-      if (rowImgs.length === 0) return;
-      const ratios = rowImgs.map((i) => parseRatio(i.aspectRatio));
+      const row = items.slice(rowStart, endExclusive);
+      if (row.length === 0) return;
+      const ratios = row.map((i) => parseRatio(i.aspectRatio));
       const sumRatio = ratios.reduce((a, b) => a + b, 0);
-      const totalGap = gap * (rowImgs.length - 1);
+      const totalGap = gap * (row.length - 1);
       const available = Math.max(0, containerWidth - totalGap);
-      // Height that makes the row exactly fill the container width.
       let rowHeight = available / sumRatio;
-      // Don't stretch the last partial row beyond the target height.
       if (isLast && rowHeight > targetRowHeight * 1.4) {
         rowHeight = targetRowHeight;
       }
-      // Compute integer widths that sum exactly to `available` to avoid
-      // sub-pixel rounding overflow that pushes the last item past the edge.
       const rawWidths = ratios.map((r) => r * rowHeight);
       const flooredWidths = rawWidths.map((w) => Math.floor(w));
       if (!isLast || rowHeight !== targetRowHeight) {
-        let used = flooredWidths.reduce((a, b) => a + b, 0);
+        const used = flooredWidths.reduce((a, b) => a + b, 0);
         let remainder = available - used;
-        // Distribute leftover pixels one-by-one starting from the largest.
         const order = rawWidths
           .map((w, i) => ({ i, frac: w - Math.floor(w) }))
           .sort((a, b) => b.frac - a.frac);
@@ -140,9 +141,9 @@ export function ImageGrid() {
         }
       }
       let left = 0;
-      rowImgs.forEach((img, idx) => {
+      row.forEach((it, idx) => {
         const w = flooredWidths[idx];
-        items.push({ id: img.id, left, top, width: w, height: rowHeight });
+        positioned.push({ id: it.id, left, top, width: w, height: rowHeight });
         left += w + gap;
       });
       top += rowHeight + gap;
@@ -150,9 +151,8 @@ export function ImageGrid() {
     };
 
     let accRatio = 0;
-    for (let i = 0; i < images.length; i++) {
-      accRatio += parseRatio(images[i].aspectRatio);
-      // Projected row height if we close the row here.
+    for (let i = 0; i < items.length; i++) {
+      accRatio += parseRatio(items[i].aspectRatio);
       const totalGap = gap * (i - rowStart);
       const projected = (containerWidth - totalGap) / accRatio;
       if (projected <= targetRowHeight) {
@@ -160,36 +160,62 @@ export function ImageGrid() {
         accRatio = 0;
       }
     }
-    if (rowStart < images.length) flushRow(images.length, true);
+    if (rowStart < items.length) flushRow(items.length, true);
 
     const totalHeight = Math.max(0, top - gap);
-    return { items, totalHeight };
-  }, [images, containerWidth, targetRowHeight]);
+    return { items: positioned, totalHeight };
+  }, [items, containerWidth, targetRowHeight]);
 
   return (
     <div className="w-full">
-
-      <div ref={containerRef} className="relative w-full" style={{ height: images.length === 0 ? undefined : layout.totalHeight, minHeight: images.length === 0 ? '60vh' : undefined }}>
-      {images.length === 0 && (
-        <div className="flex items-center justify-center min-h-[60vh] text-muted-foreground text-sm">
-          <div className="text-center space-y-2">
-            <p className="text-lg text-foreground font-semibold">No generations yet</p>
-            <p className="text-xs text-muted-foreground/70">Describe what you want below to get started.</p>
-          </div>
-        </div>
-      )}
-      {layout.items.map((pos, i) => {
-        const img = images[i];
-        return (
-          <div
-            key={img.id}
-            className="absolute animate-fade-in"
-            style={{ left: pos.left, top: pos.top, width: pos.width, height: pos.height }}
+      {/* Top tabs row: All / Liked (Marketing Studio parity) */}
+      <div className="flex items-center justify-end mb-3">
+        <div className="flex items-center gap-1 p-1 rounded-full bg-ms-surface-2 border border-ms-border">
+          <button
+            onClick={() => setTab('all')}
+            className={`px-3 h-7 rounded-full text-xs font-medium transition-colors ${
+              tab === 'all' ? 'bg-foreground text-background' : 'text-muted-foreground hover:text-foreground'
+            }`}
           >
-            <ImageCard image={img} />
+            All
+          </button>
+          <button
+            onClick={() => setTab('liked')}
+            className={`flex items-center gap-1 px-3 h-7 rounded-full text-xs font-medium transition-colors ${
+              tab === 'liked' ? 'bg-foreground text-background' : 'text-muted-foreground hover:text-foreground'
+            }`}
+          >
+            <Heart className="w-3 h-3" /> Liked
+          </button>
+        </div>
+      </div>
+
+      <div ref={containerRef} className="relative w-full" style={{ height: items.length === 0 ? undefined : layout.totalHeight, minHeight: items.length === 0 ? '60vh' : undefined }}>
+        {items.length === 0 && (
+          <div className="min-h-[60vh] flex flex-col items-center justify-center text-center">
+            <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-ms-cta to-ms-cta-2 grid place-items-center mb-4 shadow-[0_10px_30px_-10px_hsl(var(--ms-cta)/0.6)]">
+              <Play className="w-6 h-6 text-white fill-white" />
+            </div>
+            <div className="text-lg font-semibold text-foreground">
+              {tab === 'liked' ? 'No liked items yet' : 'No generations yet'}
+            </div>
+            <div className="text-sm text-muted-foreground mt-1">
+              {tab === 'liked' ? 'Tap the heart on any card to save your favourites.' : 'Describe what you want below to get started.'}
+            </div>
           </div>
-        );
-      })}
+        )}
+        {layout.items.map((pos, i) => {
+          const it = items[i];
+          return (
+            <div
+              key={`${it.kind}-${it.id}`}
+              className="absolute animate-fade-in"
+              style={{ left: pos.left, top: pos.top, width: pos.width, height: pos.height }}
+            >
+              {it.kind === 'image' ? <ImageCard image={it} /> : <VideoCard video={it} />}
+            </div>
+          );
+        })}
       </div>
     </div>
   );
