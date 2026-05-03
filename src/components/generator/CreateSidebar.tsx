@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Plus, Search, PanelLeft, MoreHorizontal, Trash2, Sparkles, Pencil } from 'lucide-react';
 import { Logo } from '@/components/marketingstudio/Logo';
+import projectPlaceholder from '@/assets/project-placeholder.jpg';
 import { useCreateProjectsStore } from '@/store/createProjectsStore';
 import {
   DropdownMenu,
@@ -178,11 +179,7 @@ export function CreateSidebar({ onClose }: { onClose?: () => void }) {
                 }`}
               >
                 <div className="w-6 h-6 rounded-md bg-ms-border overflow-hidden shrink-0 grid place-items-center">
-                  {p.thumbUrl ? (
-                    <img src={p.thumbUrl} alt="" className="w-full h-full object-cover" />
-                  ) : (
-                    <Sparkles className="w-3 h-3 text-muted-foreground" />
-                  )}
+                  <img src={p.thumbUrl || projectPlaceholder} alt="" className="w-full h-full object-cover" />
                 </div>
                 {!collapsed && (
                   <>
