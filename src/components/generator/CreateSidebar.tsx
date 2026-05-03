@@ -68,7 +68,7 @@ export function CreateSidebar({ onClose }: { onClose?: () => void }) {
 
   return (
     <aside
-      className={`group/aside flex flex-col h-full bg-ms-surface border-r border-ms-border transition-[width] duration-200 ${
+      className={`group/aside flex flex-col h-full bg-ms-surface transition-[width] duration-200 ${
         collapsed ? 'w-16' : 'w-64'
       }`}
     >
