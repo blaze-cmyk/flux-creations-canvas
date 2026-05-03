@@ -62,9 +62,10 @@ export function ImageGrid() {
   const tab = useGridTabStore((s) => s.tab);
   const setTab = useGridTabStore((s) => s.setTab);
 
-  const msFeed = useMarketingFeedStore(
-    (s) => (activeProjectId ? s.byProject[activeProjectId] : undefined) || [],
+  const msFeedRaw = useMarketingFeedStore(
+    (s) => (activeProjectId ? s.byProject[activeProjectId] : undefined),
   );
+  const msFeed = msFeedRaw ?? EMPTY_MS_FEED;
 
   // Merge images + videos + marketing-studio generations into a unified feed.
   const items = useMemo<MediaItem[]>(() => {
