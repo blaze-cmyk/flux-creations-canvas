@@ -346,7 +346,7 @@ function ImageCard({ image }: {
 
   return (
     <div
-      className="group relative w-full h-full overflow-hidden bg-ms-surface-2 hover:ring-1 hover:ring-foreground/30 transition-all cursor-pointer"
+      className="group relative w-full h-full overflow-hidden bg-ms-surface-2 transition-all cursor-pointer"
       onClick={() => setSelectedImageId(image.id)}
     >
       {/* Loading skeleton */}
