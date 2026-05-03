@@ -1,11 +1,10 @@
-import { useRef, useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useVideoStore, VIDEO_MODELS, VIDEO_ASPECT_RATIOS, VIDEO_DURATIONS } from '@/store/videoStore';
 import { usePromptModeStore, type VideoSubMode } from '@/store/promptModeStore';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { ChevronDownIcon } from '@/components/marketingstudio/FormatIcons';
 import {
-  Sparkles, Search, Check, Plus, ImagePlus, Film, Wand2, Move3d, X,
-  Volume2, ImageIcon as LImage,
+  Sparkles, Search, Check, ImagePlus, Film, Wand2, Move3d, X, Volume2,
 } from 'lucide-react';
 
 const SUB_MODES: { id: VideoSubMode; label: string; Icon: any; desc: string }[] = [
@@ -39,7 +38,7 @@ function readFile(file: File): Promise<string> {
 
 export function VideoPromptBarInline() {
   const {
-    prompt, setPrompt, referenceImages, addReferenceImage, setReferenceImageAt, removeReferenceImage,
+    prompt, setPrompt, referenceImages, setReferenceImageAt, removeReferenceImage,
     model, setModel, aspectRatio, setAspectRatio, duration, setDuration, generate,
   } = useVideoStore();
   const { videoSubMode, setVideoSubMode } = usePromptModeStore();
@@ -53,8 +52,6 @@ export function VideoPromptBarInline() {
   const [search, setSearch] = useState('');
   const [enhance, setEnhance] = useState(true);
   const [sound, setSound] = useState(true);
-
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const filteredModels = VIDEO_MODELS.filter(m =>
     (m.modes as readonly string[]).includes(videoSubMode) &&
