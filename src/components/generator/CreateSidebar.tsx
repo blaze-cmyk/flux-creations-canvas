@@ -163,9 +163,8 @@ export function CreateSidebar({ onClose }: { onClose?: () => void }) {
           {filtered.map((p) => {
             const active = p.id === activeProjectId;
             return (
-              <a
+              <div
                 key={p.id}
-                href={`/create/${p.slug}`}
                 onClick={(e) => {
                   e.preventDefault();
                   openProject(p.id, p.slug);
@@ -244,7 +243,7 @@ export function CreateSidebar({ onClose }: { onClose?: () => void }) {
                     </DropdownMenu>
                   </>
                 )}
-              </a>
+              </div>
             );
           })}
         </div>
