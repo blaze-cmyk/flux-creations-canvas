@@ -8,7 +8,6 @@ import { PromptNavBar } from '@/components/PromptNavBar';
 import { CreateSidebar } from '@/components/generator/CreateSidebar';
 import { ImageGrid } from '@/components/generator/ImageGrid';
 import { ImageDetailModal } from '@/components/generator/ImageDetailModal';
-import { VideoDetailModal } from '@/components/video/VideoDetailModal';
 import { Sheet, SheetContent } from '@/components/ui/sheet';
 import { useGeneratorStore } from '@/store/generatorStore';
 import { useVideoStore } from '@/store/videoStore';
@@ -20,7 +19,6 @@ export default function Generator() {
   const navigate = useNavigate();
   const { slug } = useParams<{ slug?: string }>();
   const selectedImageId = useGeneratorStore((s) => s.selectedImageId);
-  const selectedVideoId = useVideoStore((s) => s.selectedVideoId);
   const loadHistory = useGeneratorStore((s) => s.loadHistory);
   const loadVideoHistory = useVideoStore((s) => s.loadHistory);
   const mode = usePromptModeStore((s) => s.mode);
@@ -140,7 +138,6 @@ export default function Generator() {
       </div>
 
       {selectedImageId && <ImageDetailModal />}
-      {selectedVideoId && <VideoDetailModal />}
     </div>
   );
 }
