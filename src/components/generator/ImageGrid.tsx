@@ -31,7 +31,8 @@ const useGridTabStore = create<{ tab: GridTab; setTab: (t: GridTab) => void }>((
 // Unified media item used by the justified-rows layout.
 type MediaItem =
   | ({ kind: 'image' } & GeneratedImage)
-  | ({ kind: 'video' } & GeneratedVideo);
+  | ({ kind: 'video' } & GeneratedVideo)
+  | ({ kind: 'marketing'; aspectRatio: string } & MSGeneration);
 
 
 // Build a resized variant of a Supabase Storage public URL using the
