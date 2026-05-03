@@ -277,7 +277,7 @@ async function handleSubmit(body: Record<string, unknown>) {
           prompt: prompt || "",
           image_url: characterImage,
           video_url: motionVideo,
-          duration: "5",
+          duration: (parseInt(duration) || 5) >= 10 ? "10" : "5",
         };
         const falResp = await fetch(`https://queue.fal.run/${falEndpoint}`, {
           method: "POST",
