@@ -54,6 +54,14 @@ export function VideoPromptBarInline() {
   const [enhance, setEnhance] = useState(true);
   const [sound, setSound] = useState(true);
 
+  const isCreate = videoSubMode === 'text-to-video';
+
+  // Catalog entry for the currently-selected model (Create Video uses VIDEO_CATALOG)
+  const catalogEntry: VideoCatalogEntry | undefined = useMemo(
+    () => VIDEO_CATALOG.find(e => e.id === model),
+    [model],
+  );
+
   const filteredModels = VIDEO_MODELS.filter(m =>
     (m.modes as readonly string[]).includes(videoSubMode) &&
     m.name.toLowerCase().includes(search.toLowerCase())
@@ -63,17 +71,20 @@ export function VideoPromptBarInline() {
     VIDEO_MODELS.find(m => m.id === model && (m.modes as readonly string[]).includes(videoSubMode)) ??
     VIDEO_MODELS.find(m => (m.modes as readonly string[]).includes(videoSubMode));
 
-  const supportsStartEnd =
-    videoSubMode === 'image-to-video' ||
-    (videoSubMode === 'text-to-video' && selectedModel && START_END_FRAME_MODELS.has(selectedModel.id));
+  // Display name: prefer catalog entry (clean, no provider) for Create Video
+  const displayModelName =
+    (isCreate && catalogEntry?.name) || selectedModel?.name || 'Select model';
+
   const isVideoEdit = videoSubMode === 'video-edit';
   const isMotion = videoSubMode === 'motion-control';
   const isGrokEdit = isVideoEdit && model === 'grok-imagine-edit';
   const editSupportsImageRefs = isVideoEdit && (model === 'kling-omni-edit' || model === 'kling-o1-edit-pro');
 
+  // Create Video upload layout comes from the catalog entry
+  const createLayout = isCreate ? (catalogEntry?.uploadLayout ?? 'start-end') : 'none';
+
   const showFrames =
-    (videoSubMode === 'text-to-video' && supportsStartEnd) ||
-    videoSubMode === 'image-to-video' ||
+    (isCreate && createLayout !== 'none') ||
     isMotion ||
     isVideoEdit;
 
