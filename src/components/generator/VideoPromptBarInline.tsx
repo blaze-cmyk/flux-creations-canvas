@@ -713,8 +713,8 @@ function CreateModelPicker({
                   onClick={() => setExpandedFamily(f.family)}
                   className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-left hover:bg-white/5 transition-colors ${hasSelected ? 'bg-white/[0.06]' : ''}`}
                 >
-                  <span className="w-9 h-9 rounded-lg grid place-items-center shrink-0 bg-white/5 text-foreground/90">
-                    <Film className="size-4" />
+                  <span className="w-9 h-9 rounded-lg grid place-items-center shrink-0 bg-white/5 text-white">
+                    <VideoModelIcon family={f.family} id={f.entries[0].id} className="size-4" />
                   </span>
                   <div className="flex-1 min-w-0">
                     <div className="text-sm text-foreground">{f.familyLabel}</div>
