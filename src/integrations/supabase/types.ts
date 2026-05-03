@@ -146,6 +146,7 @@ export type Database = {
         Row: {
           aspect: string | null
           avatar_id: string | null
+          create_project_id: string | null
           created_at: string
           duration_seconds: number | null
           error: string | null
@@ -176,6 +177,7 @@ export type Database = {
         Insert: {
           aspect?: string | null
           avatar_id?: string | null
+          create_project_id?: string | null
           created_at?: string
           duration_seconds?: number | null
           error?: string | null
@@ -206,6 +208,7 @@ export type Database = {
         Update: {
           aspect?: string | null
           avatar_id?: string | null
+          create_project_id?: string | null
           created_at?: string
           duration_seconds?: number | null
           error?: string | null
