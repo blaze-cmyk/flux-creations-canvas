@@ -44,6 +44,7 @@ type GeneratorState = {
   useAsReference: (imageUrl: string) => void;
   loadHistory: () => Promise<void>;
   moveImageToProject: (id: string, projectId: string | null) => Promise<void>;
+  toggleLike: (id: string) => void;
 };
 
 export const MODELS = [
