@@ -50,8 +50,10 @@ export type Database = {
       generations: {
         Row: {
           aspect_ratio: string
+          create_project_id: string | null
           created_at: string
           error: string | null
+          height: number | null
           id: string
           image_url: string | null
           liked: boolean
@@ -60,11 +62,14 @@ export type Database = {
           prompt: string
           quality: string
           status: string
+          width: number | null
         }
         Insert: {
           aspect_ratio?: string
+          create_project_id?: string | null
           created_at?: string
           error?: string | null
+          height?: number | null
           id?: string
           image_url?: string | null
           liked?: boolean
@@ -73,11 +78,14 @@ export type Database = {
           prompt: string
           quality?: string
           status?: string
+          width?: number | null
         }
         Update: {
           aspect_ratio?: string
+          create_project_id?: string | null
           created_at?: string
           error?: string | null
+          height?: number | null
           id?: string
           image_url?: string | null
           liked?: boolean
@@ -86,8 +94,16 @@ export type Database = {
           prompt?: string
           quality?: string
           status?: string
+          width?: number | null
         }
         Relationships: [
+          {
+            foreignKeyName: "generations_create_project_fk"
+            columns: ["create_project_id"]
+            isOneToOne: false
+            referencedRelation: "create_projects"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "generations_project_id_fkey"
             columns: ["project_id"]
@@ -245,6 +261,13 @@ export type Database = {
             columns: ["avatar_id"]
             isOneToOne: false
             referencedRelation: "ms_avatars"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ms_generations_create_project_fk"
+            columns: ["create_project_id"]
+            isOneToOne: false
+            referencedRelation: "create_projects"
             referencedColumns: ["id"]
           },
           {
@@ -529,6 +552,7 @@ export type Database = {
       video_generations: {
         Row: {
           aspect_ratio: string
+          create_project_id: string | null
           created_at: string
           duration: string
           error: string | null
@@ -536,6 +560,7 @@ export type Database = {
           liked: boolean
           mode: string
           model: string
+          project_id: string | null
           prompt: string
           provider: string | null
           reference_images: string[] | null
@@ -548,6 +573,7 @@ export type Database = {
         }
         Insert: {
           aspect_ratio?: string
+          create_project_id?: string | null
           created_at?: string
           duration?: string
           error?: string | null
@@ -555,6 +581,7 @@ export type Database = {
           liked?: boolean
           mode?: string
           model: string
+          project_id?: string | null
           prompt?: string
           provider?: string | null
           reference_images?: string[] | null
@@ -567,6 +594,7 @@ export type Database = {
         }
         Update: {
           aspect_ratio?: string
+          create_project_id?: string | null
           created_at?: string
           duration?: string
           error?: string | null
@@ -574,6 +602,7 @@ export type Database = {
           liked?: boolean
           mode?: string
           model?: string
+          project_id?: string | null
           prompt?: string
           provider?: string | null
           reference_images?: string[] | null
@@ -584,7 +613,15 @@ export type Database = {
           thumbnail_url?: string | null
           video_url?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "video_generations_create_project_fk"
+            columns: ["create_project_id"]
+            isOneToOne: false
+            referencedRelation: "create_projects"
+            referencedColumns: ["id"]
+          },
+        ]
       }
     }
     Views: {
