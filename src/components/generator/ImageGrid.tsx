@@ -1,4 +1,5 @@
 import { useGeneratorStore } from '@/store/generatorStore';
+import { useCreateProjectsStore } from '@/store/createProjectsStore';
 import { useLayoutStore, ZOOM_ROW_HEIGHTS } from '@/store/layoutStore';
 import { AlertCircle, Eye, RefreshCw, Trash2, Loader2, Download, Link2, Heart, MoreHorizontal, Maximize2 } from 'lucide-react';
 import { useState, useRef, useEffect, useLayoutEffect, useMemo } from 'react';
