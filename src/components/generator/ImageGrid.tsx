@@ -1,4 +1,5 @@
 import { useGeneratorStore } from '@/store/generatorStore';
+import { useCreateProjectsStore } from '@/store/createProjectsStore';
 import { useLayoutStore, ZOOM_ROW_HEIGHTS } from '@/store/layoutStore';
 import { AlertCircle, Eye, RefreshCw, Trash2, Loader2, Download, Link2, Heart, MoreHorizontal, Maximize2 } from 'lucide-react';
 import { useState, useRef, useEffect, useLayoutEffect, useMemo } from 'react';
@@ -23,7 +24,12 @@ function parseRatio(ar: string): number {
 }
 
 export function ImageGrid() {
-  const { images } = useGeneratorStore();
+  const { images: allImages } = useGeneratorStore();
+  const activeProjectId = useCreateProjectsStore((s) => s.activeProjectId);
+  const images = useMemo(
+    () => (activeProjectId ? allImages.filter((i) => i.projectId === activeProjectId) : allImages.filter((i) => !i.projectId)),
+    [allImages, activeProjectId],
+  );
   const zoom = useLayoutStore((s) => s.zoom);
   const containerRef = useRef<HTMLDivElement>(null);
   const [containerWidth, setContainerWidth] = useState(0);

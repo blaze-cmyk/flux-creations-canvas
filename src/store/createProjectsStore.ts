@@ -69,7 +69,16 @@ export const useCreateProjectsStore = create<State>((set, get) => ({
       thumbUrl: r.thumb_url,
       createdAt: new Date(r.created_at).getTime(),
     }));
-    set({ projects, loaded: true });
+    // Auto-select most recent project if none active and one exists
+    const currentActive = get().activeProjectId;
+    const stillExists = currentActive && projects.some((p) => p.id === currentActive);
+    let activeProjectId = currentActive;
+    if (!stillExists) {
+      activeProjectId = projects[0]?.id ?? null;
+      if (activeProjectId) localStorage.setItem('create-active-project', activeProjectId);
+      else localStorage.removeItem('create-active-project');
+    }
+    set({ projects, activeProjectId, loaded: true });
   },
 
   createProject: async (name = 'New project') => {

@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { supabase } from '@/integrations/supabase/client';
+import { useCreateProjectsStore } from '@/store/createProjectsStore';
 
 export type GeneratedImage = {
   id: string;
@@ -14,6 +15,7 @@ export type GeneratedImage = {
   height?: number;
   createdAt: number;
   error?: string;
+  projectId?: string | null;
 };
 
 type GeneratorState = {
@@ -175,7 +177,7 @@ function loadPersistedReferenceImages(): string[] {
 }
 
 // Save a completed generation to the database
-async function saveToDb(img: GeneratedImage, storageUrl: string) {
+async function saveToDb(img: GeneratedImage, storageUrl: string, projectId: string | null) {
   const { error } = await supabase.from('generations').insert({
     id: img.id,
     prompt: img.prompt,
@@ -185,8 +187,17 @@ async function saveToDb(img: GeneratedImage, storageUrl: string) {
     image_url: storageUrl,
     status: img.status,
     error: img.error || null,
+    project_id: projectId,
   } as any);
   if (error) console.error('DB insert error:', error);
+
+  // Set/refresh project thumbnail with the latest image
+  if (projectId && storageUrl) {
+    await supabase
+      .from('create_projects' as any)
+      .update({ thumb_url: storageUrl, updated_at: new Date().toISOString() } as any)
+      .eq('id', projectId);
+  }
 }
 
 export const useGeneratorStore = create<GeneratorState>()((set, get) => ({
@@ -256,7 +267,7 @@ export const useGeneratorStore = create<GeneratorState>()((set, get) => ({
         .from('generations')
         .select('*')
         .order('created_at', { ascending: false })
-        .limit(100) as any;
+        .limit(500) as any;
 
       if (error) {
         console.error('Load history error:', error);
@@ -275,9 +286,9 @@ export const useGeneratorStore = create<GeneratorState>()((set, get) => ({
           imageUrl: row.image_url,
           createdAt: new Date(row.created_at).getTime(),
           error: row.error,
+          projectId: row.project_id ?? null,
         }));
 
-        // Merge: keep any in-progress images, append loaded history
         const current = get().images;
         const currentIds = new Set(current.map((i) => i.id));
         const newFromDb = loaded.filter((i) => !currentIds.has(i.id));
@@ -295,6 +306,16 @@ export const useGeneratorStore = create<GeneratorState>()((set, get) => ({
     const { prompt, referenceImages, model, quality, aspectRatio, quantity } = get();
     if (!prompt.trim()) return;
 
+    // Resolve active project; auto-create one if none exists
+    const projStore = useCreateProjectsStore.getState();
+    let projectIdPromise: Promise<string | null>;
+    if (projStore.activeProjectId) {
+      projectIdPromise = Promise.resolve(projStore.activeProjectId);
+    } else {
+      const name = prompt.split(/\s+/).slice(0, 5).join(' ').slice(0, 60) || 'New project';
+      projectIdPromise = projStore.createProject(name).then((p) => p.id).catch(() => null);
+    }
+
     const newImages: GeneratedImage[] = Array.from({ length: quantity }, () => ({
       id: crypto.randomUUID(),
       prompt,
@@ -310,6 +331,7 @@ export const useGeneratorStore = create<GeneratorState>()((set, get) => ({
 
     newImages.forEach(async (img) => {
       try {
+        const projectId = await projectIdPromise;
         const result = await callGenerateAPI({ prompt, referenceImages, model, quality, aspectRatio });
 
         if (result.error) {
@@ -321,17 +343,15 @@ export const useGeneratorStore = create<GeneratorState>()((set, get) => ({
           });
         } else {
           const rawUrl = result.imageBase64 || result.imageUrl;
-          
-          // Upload to storage for persistence
           let persistentUrl = rawUrl;
           if (rawUrl) {
             const storageUrl = await uploadToStorage(rawUrl, img.id);
             if (storageUrl) {
               persistentUrl = storageUrl;
-              // Save to database
               await saveToDb(
-                { ...img, status: 'complete', imageUrl: persistentUrl },
-                persistentUrl
+                { ...img, status: 'complete', imageUrl: persistentUrl, projectId },
+                persistentUrl,
+                projectId,
               );
             }
           }
@@ -339,10 +359,19 @@ export const useGeneratorStore = create<GeneratorState>()((set, get) => ({
           set({
             images: get().images.map((i) =>
               i.id === img.id
-                ? { ...i, status: 'complete' as const, imageUrl: persistentUrl }
+                ? { ...i, status: 'complete' as const, imageUrl: persistentUrl, projectId }
                 : i
             ),
           });
+
+          // Update project thumb in store
+          if (projectId && persistentUrl) {
+            useCreateProjectsStore.setState((s) => ({
+              projects: s.projects.map((p) =>
+                p.id === projectId ? { ...p, thumbUrl: persistentUrl } : p
+              ),
+            }));
+          }
         }
       } catch (e) {
         console.error('Generation error:', e);
@@ -387,7 +416,7 @@ export const useGeneratorStore = create<GeneratorState>()((set, get) => ({
           const storageUrl = await uploadToStorage(rawUrl, id);
           if (storageUrl) {
             persistentUrl = storageUrl;
-            await saveToDb({ ...img, status: 'complete', imageUrl: persistentUrl }, persistentUrl);
+            await saveToDb({ ...img, status: 'complete', imageUrl: persistentUrl }, persistentUrl, img.projectId ?? null);
           }
         }
         set({
