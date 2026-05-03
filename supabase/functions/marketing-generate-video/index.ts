@@ -482,10 +482,18 @@ function extractFalVideoUrl(payload: any): string | null {
   return null;
 }
 
+function falQueueEndpoint(endpoint: string): string {
+  // fal Seedance 2.0 submit endpoint is mode-specific, but the returned
+  // queue status/result URLs use the parent endpoint: /bytedance/seedance-2.0/requests/{id}
+  if (endpoint.startsWith('bytedance/seedance-2.0/')) return 'bytedance/seedance-2.0';
+  return endpoint;
+}
+
 async function falPoll(endpoint: string, requestId: string): Promise<PollOutcome> {
   if (requestId.startsWith('immediate:')) return { status: 'done', videoUrl: requestId.slice('immediate:'.length) };
+  const queueEndpoint = falQueueEndpoint(endpoint);
   const headers = { Authorization: `Key ${FAL_KEY}`, Accept: 'application/json' };
-  const statusRes = await fetch(`${FAL_QUEUE}/${endpoint}/requests/${requestId}/status`, { headers });
+  const statusRes = await fetch(`${FAL_QUEUE}/${queueEndpoint}/requests/${requestId}/status`, { headers });
   const statusText = await statusRes.text();
   let statusJson: any = {};
   try { statusJson = JSON.parse(statusText); } catch { /* keep text */ }
@@ -499,9 +507,9 @@ async function falPoll(endpoint: string, requestId: string): Promise<PollOutcome
     return { status: 'failed', error: (statusJson?.detail ?? statusJson?.message ?? statusText) || `fal.ai status http ${statusRes.status}` };
   }
 
-  let resultRes = await fetch(`${FAL_QUEUE}/${endpoint}/requests/${requestId}`, { headers });
+  let resultRes = await fetch(`${FAL_QUEUE}/${queueEndpoint}/requests/${requestId}`, { headers });
   if (resultRes.status === 405 || resultRes.status === 404) {
-    resultRes = await fetch(`${FAL_QUEUE}/${endpoint}/requests/${requestId}/response`, { headers });
+    resultRes = await fetch(`${FAL_QUEUE}/${queueEndpoint}/requests/${requestId}/response`, { headers });
   }
   if (resultRes.status === 202 || resultRes.status === 404) return { status: 'processing' };
   const resultText = await resultRes.text();
