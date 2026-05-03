@@ -123,7 +123,7 @@ export function VideoPromptBarInline() {
         <AnimatePresence initial={false}>
           {showFrames && (
             <motion.div
-              key={`frames-${videoSubMode}-${supportsStartEnd}`}
+              key={`frames-${videoSubMode}-${createLayout}`}
               layout
               initial={{ opacity: 0, height: 0, marginBottom: 0 }}
               animate={{ opacity: 1, height: 'auto', marginBottom: 0 }}
@@ -133,18 +133,44 @@ export function VideoPromptBarInline() {
             >
               <div className="flex gap-2 px-1 pt-1">
                 {(() => {
+                  // Create Video — drive layout from the catalog entry
+                  if (isCreate) {
+                    if (createLayout === 'start-end') {
+                      return ['Start frame', 'End frame'].map((label, idx) => (
+                        <FrameSlot
+                          key={label}
+                          label={label}
+                          optional
+                          url={referenceImages[idx]}
+                          onUpload={() => onUploadAt(idx)}
+                          onRemove={() => removeReferenceImage(idx)}
+                        />
+                      ));
+                    }
+                    if (createLayout === 'single-required' || createLayout === 'single-optional') {
+                      return (
+                        <SingleUploadTile
+                          optional={createLayout === 'single-optional'}
+                          url={referenceImages[0]}
+                          onUpload={() => onUploadAt(0)}
+                          onRemove={() => removeReferenceImage(0)}
+                        />
+                      );
+                    }
+                    return null;
+                  }
+
+                  // Edit Video / Motion Control — existing behavior
                   const labels = isVideoEdit
                     ? (editSupportsImageRefs
                         ? ['Source video', 'Image 1', 'Image 2', 'Image 3', 'Image 4']
                         : ['Source video'])
-                    : supportsStartEnd
-                      ? ['Start frame', 'End frame']
-                      : isMotion
-                        ? ['Driving video', 'Character image']
-                        : ['Image'];
+                    : isMotion
+                      ? ['Driving video', 'Character image']
+                      : ['Image'];
                   return labels.map((label, idx) => {
                     const img = referenceImages[idx];
-                    const isOptional = (supportsStartEnd && idx === 1) || (isVideoEdit && idx > 0);
+                    const isOptional = isVideoEdit && idx > 0;
                     return (
                       <FrameSlot
                         key={label}
