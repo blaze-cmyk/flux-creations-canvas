@@ -495,12 +495,15 @@ async function falPoll(endpoint: string, requestId: string): Promise<PollOutcome
       return { status: 'failed', error: statusJson?.error ?? statusJson?.detail ?? 'fal.ai reported failure' };
     }
     if (status !== 'COMPLETED') return { status: 'processing' };
-  } else if (statusRes.status !== 202 && statusRes.status !== 404) {
+  } else if (statusRes.status !== 202 && statusRes.status !== 404 && statusRes.status !== 405) {
     return { status: 'failed', error: (statusJson?.detail ?? statusJson?.message ?? statusText) || `fal.ai status http ${statusRes.status}` };
   }
 
-  const resultRes = await fetch(`${FAL_QUEUE}/${endpoint}/requests/${requestId}/response`, { headers });
-  if (resultRes.status === 202) return { status: 'processing' };
+  let resultRes = await fetch(`${FAL_QUEUE}/${endpoint}/requests/${requestId}`, { headers });
+  if (resultRes.status === 405 || resultRes.status === 404) {
+    resultRes = await fetch(`${FAL_QUEUE}/${endpoint}/requests/${requestId}/response`, { headers });
+  }
+  if (resultRes.status === 202 || resultRes.status === 404) return { status: 'processing' };
   const resultText = await resultRes.text();
   let resultJson: any = {};
   try { resultJson = JSON.parse(resultText); } catch { /* keep text */ }
