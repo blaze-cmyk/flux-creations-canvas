@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { AnimatePresence, motion, LayoutGroup } from 'framer-motion';
-import { useVideoStore, VIDEO_MODELS, VIDEO_CATALOG, VIDEO_ASPECT_RATIOS, VIDEO_DURATIONS, type VideoCatalogEntry } from '@/store/videoStore';
+import { useVideoStore, VIDEO_MODELS, VIDEO_CATALOG, VIDEO_ASPECT_RATIOS, VIDEO_DURATIONS, getDurationsForModel, getResolutionsForModel, type VideoCatalogEntry } from '@/store/videoStore';
 import { usePromptModeStore, type VideoSubMode } from '@/store/promptModeStore';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { ChevronDownIcon } from '@/components/marketingstudio/FormatIcons';
