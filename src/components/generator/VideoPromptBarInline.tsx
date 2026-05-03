@@ -245,22 +245,18 @@ export function VideoPromptBarInline() {
               }}
             />
             {!isMotion && (
-              <div className="flex items-center gap-1.5">
+              <div className="flex items-center gap-2">
                 <button
                   onClick={() => setEnhance(!enhance)}
-                  className={`flex items-center gap-1 text-[11px] px-2 py-1 rounded-full transition-colors ${
-                    enhance ? 'text-[#FF2D78] bg-[#FF2D78]/10' : 'text-muted-foreground hover:text-foreground'
-                  }`}
+                  className={`flex items-center gap-1.5 text-[12px] font-medium px-3 py-1.5 rounded-full bg-white/[0.06] hover:bg-white/[0.1] transition-colors ${enhance ? 'text-white' : 'text-white/50'}`}
                 >
-                  <Sparkles className="w-3 h-3" /> Enhance {enhance ? 'on' : 'off'}
+                  <EnhanceIcon className="w-3.5 h-3.5" /> Enhance {enhance ? 'on' : 'off'}
                 </button>
                 <button
                   onClick={() => setSound(!sound)}
-                  className={`flex items-center gap-1 text-[11px] px-2 py-1 rounded-full transition-colors ${
-                    sound ? 'text-[#FF2D78] bg-[#FF2D78]/10' : 'text-muted-foreground hover:text-foreground'
-                  }`}
+                  className={`flex items-center gap-1.5 text-[12px] font-medium px-3 py-1.5 rounded-full bg-white/[0.06] hover:bg-white/[0.1] transition-colors ${sound ? 'text-white' : 'text-white/50'}`}
                 >
-                  <Volume2 className="w-3 h-3" /> Sound {sound ? 'on' : 'off'}
+                  <SpeakerIcon className="w-3.5 h-3.5" /> {sound ? 'On' : 'Off'}
                 </button>
               </div>
             )}
