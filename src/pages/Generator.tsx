@@ -32,30 +32,15 @@ export default function Generator() {
           <motion.div
             layout
             transition={{ layout: { duration: 0.5, ease: [0.32, 0.72, 0, 1] } }}
-            className="relative"
           >
-            {/* Active bar drives layout height */}
             <motion.div
               key={mode}
-              layout
               initial={{ opacity: 0, filter: 'blur(8px)' }}
               animate={{ opacity: 1, filter: 'blur(0px)' }}
               transition={{ duration: 0.32, ease: [0.32, 0.72, 0, 1] }}
             >
               {mode === 'image' ? <PromptBar /> : <VideoPromptBarInline />}
             </motion.div>
-            {/* Outgoing bar fades on top, absolute so it doesn't push layout */}
-            <AnimatePresence>
-              <motion.div
-                key={`ghost-${mode}`}
-                initial={{ opacity: 1, filter: 'blur(0px)' }}
-                animate={{ opacity: 0, filter: 'blur(8px)' }}
-                exit={{ opacity: 0 }}
-                transition={{ duration: 0.28, ease: [0.32, 0.72, 0, 1] }}
-                className="absolute inset-0 pointer-events-none"
-                style={{ display: 'none' }}
-              />
-            </AnimatePresence>
           </motion.div>
         </div>
       </div>
