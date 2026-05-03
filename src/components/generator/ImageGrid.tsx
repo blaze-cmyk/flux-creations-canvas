@@ -1,8 +1,17 @@
-import { useGeneratorStore } from '@/store/generatorStore';
+import { useGeneratorStore, MODELS } from '@/store/generatorStore';
 import { useCreateProjectsStore } from '@/store/createProjectsStore';
+import { useGridFilterStore } from '@/store/gridFilterStore';
 import { useLayoutStore, ZOOM_ROW_HEIGHTS } from '@/store/layoutStore';
-import { AlertCircle, Eye, RefreshCw, Trash2, Loader2, Download, Link2, Heart, MoreHorizontal, Maximize2 } from 'lucide-react';
+import { AlertCircle, Eye, RefreshCw, Trash2, Loader2, Download, Link2, Heart, MoreHorizontal, Maximize2, Search, X, ImageIcon, FolderInput, Image as ImageLucide } from 'lucide-react';
 import { useState, useRef, useEffect, useLayoutEffect, useMemo } from 'react';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 
 // Build a resized variant of a Supabase Storage public URL using the
 // `/render/image/` transform endpoint. Falls back to original on non-Supabase URLs.
@@ -26,10 +35,29 @@ function parseRatio(ar: string): number {
 export function ImageGrid() {
   const { images: allImages } = useGeneratorStore();
   const activeProjectId = useCreateProjectsStore((s) => s.activeProjectId);
-  const images = useMemo(
-    () => (activeProjectId ? allImages.filter((i) => i.projectId === activeProjectId) : allImages.filter((i) => !i.projectId)),
-    [allImages, activeProjectId],
-  );
+  const { search, modelFilter, dateFilter } = useGridFilterStore();
+
+  const images = useMemo(() => {
+    let list = activeProjectId
+      ? allImages.filter((i) => i.projectId === activeProjectId)
+      : allImages.filter((i) => !i.projectId);
+
+    if (search.trim()) {
+      const q = search.toLowerCase();
+      list = list.filter((i) => i.prompt?.toLowerCase().includes(q));
+    }
+    if (modelFilter) {
+      list = list.filter((i) => i.model === modelFilter);
+    }
+    if (dateFilter !== 'all') {
+      const now = Date.now();
+      const day = 86400000;
+      const cutoff = dateFilter === 'today' ? now - day : dateFilter === '7d' ? now - 7 * day : now - 30 * day;
+      list = list.filter((i) => i.createdAt >= cutoff);
+    }
+    return list;
+  }, [allImages, activeProjectId, search, modelFilter, dateFilter]);
+
   const zoom = useLayoutStore((s) => s.zoom);
   const containerRef = useRef<HTMLDivElement>(null);
   const [containerWidth, setContainerWidth] = useState(0);
@@ -99,7 +127,9 @@ export function ImageGrid() {
   }, [images, containerWidth, targetRowHeight]);
 
   return (
-    <div ref={containerRef} className="relative w-full" style={{ height: images.length === 0 ? undefined : layout.totalHeight, minHeight: images.length === 0 ? '60vh' : undefined }}>
+    <div className="w-full">
+      <FilterToolbar />
+      <div ref={containerRef} className="relative w-full" style={{ height: images.length === 0 ? undefined : layout.totalHeight, minHeight: images.length === 0 ? '60vh' : undefined }}>
       {images.length === 0 && (
         <div className="flex items-center justify-center min-h-[60vh] text-muted-foreground text-sm">
           <div className="text-center space-y-2">
@@ -120,6 +150,88 @@ export function ImageGrid() {
           </div>
         );
       })}
+      </div>
+    </div>
+  );
+}
+
+function FilterToolbar() {
+  const { search, modelFilter, dateFilter, setSearch, setModelFilter, setDateFilter, reset } =
+    useGridFilterStore();
+  const activeProjectId = useCreateProjectsStore((s) => s.activeProjectId);
+  const activeProject = useCreateProjectsStore((s) =>
+    s.projects.find((p) => p.id === s.activeProjectId)
+  );
+  const hasActiveFilters = !!search || !!modelFilter || dateFilter !== 'all';
+
+  if (!activeProjectId) return null;
+
+  const dateLabel = { all: 'All time', today: 'Today', '7d': 'Last 7 days', '30d': 'Last 30 days' }[dateFilter];
+  const modelLabel = modelFilter ? MODELS.find((m) => m.id === modelFilter)?.name ?? modelFilter : 'All models';
+
+  return (
+    <div className="flex items-center gap-2 mb-3 flex-wrap">
+      <div className="text-sm font-semibold text-foreground truncate mr-2">
+        {activeProject?.name}
+      </div>
+      <div className="relative flex-1 min-w-[180px] max-w-[320px]">
+        <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
+        <input
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Search prompts…"
+          className="w-full h-8 pl-8 pr-7 text-xs rounded-lg bg-ms-surface-2 border border-ms-border text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-foreground/30"
+        />
+        {search && (
+          <button
+            onClick={() => setSearch('')}
+            className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+          >
+            <X className="w-3 h-3" />
+          </button>
+        )}
+      </div>
+
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <button className="h-8 px-3 text-xs rounded-lg bg-ms-surface-2 border border-ms-border text-foreground hover:bg-ms-border transition-colors">
+            {modelLabel}
+          </button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="start" className="bg-ms-surface-2 border-ms-border max-h-72 overflow-y-auto">
+          <DropdownMenuLabel>Model</DropdownMenuLabel>
+          <DropdownMenuItem onClick={() => setModelFilter(null)}>All models</DropdownMenuItem>
+          <DropdownMenuSeparator />
+          {MODELS.map((m) => (
+            <DropdownMenuItem key={m.id} onClick={() => setModelFilter(m.id)}>
+              {m.name}
+            </DropdownMenuItem>
+          ))}
+        </DropdownMenuContent>
+      </DropdownMenu>
+
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <button className="h-8 px-3 text-xs rounded-lg bg-ms-surface-2 border border-ms-border text-foreground hover:bg-ms-border transition-colors">
+            {dateLabel}
+          </button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="start" className="bg-ms-surface-2 border-ms-border">
+          <DropdownMenuItem onClick={() => setDateFilter('all')}>All time</DropdownMenuItem>
+          <DropdownMenuItem onClick={() => setDateFilter('today')}>Today</DropdownMenuItem>
+          <DropdownMenuItem onClick={() => setDateFilter('7d')}>Last 7 days</DropdownMenuItem>
+          <DropdownMenuItem onClick={() => setDateFilter('30d')}>Last 30 days</DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+
+      {hasActiveFilters && (
+        <button
+          onClick={reset}
+          className="h-8 px-2 text-xs text-muted-foreground hover:text-foreground transition-colors"
+        >
+          Clear
+        </button>
+      )}
     </div>
   );
 }
@@ -143,7 +255,9 @@ function getAspectClass(ratio: string): string {
 function ImageCard({ image }: {
   image: ReturnType<typeof useGeneratorStore.getState>['images'][0];
 }) {
-  const { setSelectedImageId, retryImage, deleteImage, useAsReference } = useGeneratorStore();
+  const { setSelectedImageId, retryImage, deleteImage, useAsReference, moveImageToProject } = useGeneratorStore();
+  const projects = useCreateProjectsStore((s) => s.projects);
+  const setProjectThumbnail = useCreateProjectsStore((s) => s.setProjectThumbnail);
   const [showMenu, setShowMenu] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const [naturalAspect, setNaturalAspect] = useState<number | null>(null);
@@ -302,6 +416,32 @@ function ImageCard({ image }: {
           <MenuItem icon={<Link2 className="w-3.5 h-3.5" />} label="Use as Reference" onClick={() => { if (image.imageUrl) useAsReference(image.imageUrl); setShowMenu(false); }} />
           <MenuItem icon={<Heart className="w-3.5 h-3.5" />} label="Like" onClick={() => setShowMenu(false)} />
           <MenuItem icon={<Download className="w-3.5 h-3.5" />} label="Download" onClick={(e) => { handleDownload(e); setShowMenu(false); }} />
+          {image.imageUrl && image.projectId && (
+            <MenuItem
+              icon={<ImageLucide className="w-3.5 h-3.5" />}
+              label="Set as cover"
+              onClick={() => { setProjectThumbnail(image.projectId!, image.imageUrl!); setShowMenu(false); }}
+            />
+          )}
+          {projects.length > 1 && (
+            <div className="relative group/move">
+              <div className="flex items-center gap-2.5 px-3 py-1.5 text-xs text-foreground/80 hover:bg-muted hover:text-foreground cursor-pointer">
+                <FolderInput className="w-3.5 h-3.5" />
+                Move to project ▸
+              </div>
+              <div className="hidden group-hover/move:block absolute left-full top-0 ml-1 bg-popover border border-border rounded-xl shadow-2xl py-1.5 min-w-[160px] max-h-60 overflow-y-auto">
+                {projects.filter((p) => p.id !== image.projectId).map((p) => (
+                  <button
+                    key={p.id}
+                    onClick={() => { moveImageToProject(image.id, p.id); setShowMenu(false); }}
+                    className="w-full text-left px-3 py-1.5 text-xs text-foreground/80 hover:bg-muted hover:text-foreground truncate"
+                  >
+                    {p.name}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
           <div className="my-1 border-t border-border/50" />
           <MenuItem icon={<Trash2 className="w-3.5 h-3.5" />} label="Delete" onClick={() => { deleteImage(image.id); setShowMenu(false); }} destructive />
         </div>

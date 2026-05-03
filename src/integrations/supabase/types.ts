@@ -20,6 +20,7 @@ export type Database = {
           id: string
           name: string
           slug: string
+          thumb_locked: boolean
           thumb_url: string | null
           updated_at: string
           user_id: string | null
@@ -29,6 +30,7 @@ export type Database = {
           id?: string
           name?: string
           slug: string
+          thumb_locked?: boolean
           thumb_url?: string | null
           updated_at?: string
           user_id?: string | null
@@ -38,6 +40,7 @@ export type Database = {
           id?: string
           name?: string
           slug?: string
+          thumb_locked?: boolean
           thumb_url?: string | null
           updated_at?: string
           user_id?: string | null
@@ -81,7 +84,15 @@ export type Database = {
           quality?: string
           status?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "generations_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "create_projects"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       ms_avatars: {
         Row: {

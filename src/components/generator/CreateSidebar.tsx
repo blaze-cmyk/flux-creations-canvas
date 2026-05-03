@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Plus, Search, PanelLeft, MoreHorizontal, Trash2, Sparkles } from 'lucide-react';
+import { Plus, Search, PanelLeft, MoreHorizontal, Trash2, Sparkles, Pencil } from 'lucide-react';
 import { Logo } from '@/components/marketingstudio/Logo';
 import { useCreateProjectsStore } from '@/store/createProjectsStore';
 import {
@@ -8,6 +8,16 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 
 export function CreateSidebar({ onClose }: { onClose?: () => void }) {
   const {
@@ -19,9 +29,13 @@ export function CreateSidebar({ onClose }: { onClose?: () => void }) {
     loadProjects,
     createProject,
     deleteProject,
+    renameProject,
     loaded,
   } = useCreateProjectsStore();
   const [query, setQuery] = useState('');
+  const [renamingId, setRenamingId] = useState<string | null>(null);
+  const [renameValue, setRenameValue] = useState('');
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const collapsed = sidebarCollapsed;
 
   useEffect(() => {
@@ -31,6 +45,17 @@ export function CreateSidebar({ onClose }: { onClose?: () => void }) {
   const filtered = projects.filter((p) =>
     p.name.toLowerCase().includes(query.toLowerCase())
   );
+
+  const startRename = (id: string, currentName: string) => {
+    setRenamingId(id);
+    setRenameValue(currentName);
+  };
+  const commitRename = async () => {
+    if (renamingId && renameValue.trim()) {
+      await renameProject(renamingId, renameValue.trim());
+    }
+    setRenamingId(null);
+  };
 
   const handleNew = async () => {
     try {
@@ -152,7 +177,27 @@ export function CreateSidebar({ onClose }: { onClose?: () => void }) {
                 </div>
                 {!collapsed && (
                   <>
-                    <span className="text-sm text-foreground truncate flex-1">{p.name}</span>
+                    {renamingId === p.id ? (
+                      <input
+                        autoFocus
+                        value={renameValue}
+                        onChange={(e) => setRenameValue(e.target.value)}
+                        onClick={(e) => e.stopPropagation()}
+                        onBlur={commitRename}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') commitRename();
+                          if (e.key === 'Escape') setRenamingId(null);
+                        }}
+                        className="text-sm bg-transparent border border-ms-border rounded px-1.5 py-0.5 flex-1 min-w-0 text-foreground focus:outline-none focus:ring-1 focus:ring-foreground/30"
+                      />
+                    ) : (
+                      <span
+                        className="text-sm text-foreground truncate flex-1"
+                        onDoubleClick={(e) => { e.stopPropagation(); startRename(p.id, p.name); }}
+                      >
+                        {p.name}
+                      </span>
+                    )}
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
                         <button
@@ -167,10 +212,19 @@ export function CreateSidebar({ onClose }: { onClose?: () => void }) {
                         className="bg-ms-surface-2 border-ms-border"
                       >
                         <DropdownMenuItem
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            startRename(p.id, p.name);
+                          }}
+                        >
+                          <Pencil className="w-3.5 h-3.5 mr-2" />
+                          Rename
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
                           className="text-destructive focus:text-destructive"
                           onClick={(e) => {
                             e.stopPropagation();
-                            deleteProject(p.id);
+                            setConfirmDeleteId(p.id);
                           }}
                         >
                           <Trash2 className="w-3.5 h-3.5 mr-2" />
@@ -185,6 +239,29 @@ export function CreateSidebar({ onClose }: { onClose?: () => void }) {
           })}
         </div>
       </div>
+
+      <AlertDialog open={!!confirmDeleteId} onOpenChange={(open) => !open && setConfirmDeleteId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete this project?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This permanently deletes the project and all generations inside it. This cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={async () => {
+                if (confirmDeleteId) await deleteProject(confirmDeleteId);
+                setConfirmDeleteId(null);
+              }}
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </aside>
   );
 }

@@ -42,6 +42,7 @@ type GeneratorState = {
   deleteImage: (id: string) => void;
   useAsReference: (imageUrl: string) => void;
   loadHistory: () => Promise<void>;
+  moveImageToProject: (id: string, projectId: string | null) => Promise<void>;
 };
 
 export const MODELS = [
@@ -191,12 +192,11 @@ async function saveToDb(img: GeneratedImage, storageUrl: string, projectId: stri
   } as any);
   if (error) console.error('DB insert error:', error);
 
-  // Set/refresh project thumbnail with the latest image
+  // Set/refresh project thumbnail with the latest image — only if user hasn't locked one
   if (projectId && storageUrl) {
-    await supabase
-      .from('create_projects' as any)
-      .update({ thumb_url: storageUrl, updated_at: new Date().toISOString() } as any)
-      .eq('id', projectId);
+    try {
+      await useCreateProjectsStore.getState().bumpProjectThumbIfUnlocked(projectId, storageUrl);
+    } catch (e) { console.error('thumb bump error:', e); }
   }
 }
 
@@ -445,5 +445,16 @@ export const useGeneratorStore = create<GeneratorState>()((set, get) => ({
     if (refs.length < max) {
       set({ referenceImages: [...refs, imageUrl], selectedImageId: null });
     }
+  },
+
+  moveImageToProject: async (id, projectId) => {
+    set({
+      images: get().images.map((i) => (i.id === id ? { ...i, projectId } : i)),
+    });
+    const { error } = await supabase
+      .from('generations')
+      .update({ project_id: projectId } as any)
+      .eq('id', id);
+    if (error) console.error('Move image error:', error);
   },
 }));
