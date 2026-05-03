@@ -92,19 +92,16 @@ export function ImageGrid() {
     return { items, totalHeight };
   }, [images, containerWidth, targetRowHeight]);
 
-  if (images.length === 0) {
-    return (
-      <div className="flex items-center justify-center min-h-[60vh] text-muted-foreground text-sm">
-        <div className="text-center space-y-2">
-          <p className="text-lg text-foreground font-semibold">No generations yet</p>
-          <p className="text-xs text-muted-foreground/70">Describe what you want below to get started.</p>
-        </div>
-      </div>
-    );
-  }
-
   return (
-    <div ref={containerRef} className="relative w-full" style={{ height: layout.totalHeight }}>
+    <div ref={containerRef} className="relative w-full" style={{ height: images.length === 0 ? undefined : layout.totalHeight, minHeight: images.length === 0 ? '60vh' : undefined }}>
+      {images.length === 0 && (
+        <div className="flex items-center justify-center min-h-[60vh] text-muted-foreground text-sm">
+          <div className="text-center space-y-2">
+            <p className="text-lg text-foreground font-semibold">No generations yet</p>
+            <p className="text-xs text-muted-foreground/70">Describe what you want below to get started.</p>
+          </div>
+        </div>
+      )}
       {layout.items.map((pos, i) => {
         const img = images[i];
         return (
