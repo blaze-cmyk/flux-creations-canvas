@@ -37,9 +37,9 @@ export default function Generator() {
   const sidebarWidth = sidebarCollapsed ? 64 : 256; // w-16 / w-64
 
   return (
-    <div className="min-h-[calc(100vh-3.5rem)] w-full bg-background text-foreground flex">
+    <div className="min-h-screen w-full bg-background text-foreground flex">
       {/* Desktop sidebar */}
-      <div className="hidden md:flex h-[calc(100vh-3.5rem)] sticky top-14 shrink-0">
+      <div className="hidden md:flex h-screen sticky top-0 shrink-0">
         <MarketingSidebar />
       </div>
       {/* Mobile sidebar */}
