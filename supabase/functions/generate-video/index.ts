@@ -308,6 +308,19 @@ async function handleSubmit(body: Record<string, unknown>) {
       input.character_orientation = body?.characterOrientation === "image" ? "image" : "video";
       input.keep_original_sound = body?.keepOriginalSound !== false;
       if (prompt) input.prompt = prompt;
+    } else if (isVideoEdit) {
+      const sourceVideo = referenceImages[0];
+      if (!sourceVideo) {
+        return jsonResp({ error: "Video edit requires a reference video in slot 0" }, 400);
+      }
+      if (!prompt) {
+        return jsonResp({ error: "Video edit requires a text prompt" }, 400);
+      }
+      input.video_url = sourceVideo;
+      input.prompt = prompt;
+      const extras = referenceImages.slice(1).filter(Boolean).slice(0, 4);
+      if (extras.length > 0) input.image_urls = extras;
+      input.keep_audio = body?.keepAudio === true;
     } else {
       input.prompt = prompt;
 
