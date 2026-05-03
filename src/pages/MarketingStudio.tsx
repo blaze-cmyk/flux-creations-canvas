@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Volume2, VolumeX } from 'lucide-react';
 import { MarketingStudioLayout } from '@/components/marketingstudio/MarketingStudioLayout';
 import { PromptBar } from '@/components/marketingstudio/PromptBar';
+import { PromptNavBar } from '@/components/PromptNavBar';
 import { FORMAT_PRESETS, dispatchRecreate } from '@/components/marketingstudio/formatPresets';
 
 const FORMATS = [
