@@ -30,12 +30,27 @@ export async function createProjectDB(name: string): Promise<MSProject> {
 
 /** Hydrate all projects + their generations from the DB into the store. */
 export async function hydrateMarketingStudio() {
-  const [{ data: projects, error: pErr }, { data: gens, error: gErr }] = await Promise.all([
-    supabase.from('ms_projects').select('*').order('created_at', { ascending: false }),
-    supabase.from('ms_generations').select('*').order('created_at', { ascending: false }),
-  ]);
-  if (pErr || gErr) {
-    console.error('[ms hydrate] failed', pErr || gErr);
+  const { data: projects, error: pErr } = await supabase
+    .from('ms_projects')
+    .select('id, slug, name, thumb_url, created_at')
+    .order('created_at', { ascending: false })
+    .limit(50);
+  if (pErr) {
+    console.error('[ms hydrate] failed', pErr);
+    return;
+  }
+
+  const projectIds = (projects || []).map((p) => p.id);
+  const { data: gens, error: gErr } = projectIds.length
+    ? await supabase
+        .from('ms_generations')
+        .select('id, project_id, status, stage, video_url, thumb_url, error, fal_request_id, prompt, format, surface, aspect, resolution, duration_seconds, product_id, avatar_id, created_at, keyframe_url')
+        .in('project_id', projectIds)
+        .order('created_at', { ascending: false })
+        .limit(300)
+    : { data: [], error: null };
+  if (gErr) {
+    console.error('[ms hydrate] failed', gErr);
     return;
   }
 
@@ -45,7 +60,7 @@ export async function hydrateMarketingStudio() {
     const arr = byProject.get(g.project_id) || [];
     arr.push({
       id: g.id,
-      thumbUrl: g.thumb_url || '',
+      thumbUrl: g.thumb_url || (g as any).keyframe_url || '',
       videoUrl: g.video_url || undefined,
       prompt: g.prompt,
       mode: (g.format as any) || 'UGC',
@@ -58,6 +73,7 @@ export async function hydrateMarketingStudio() {
       createdAt: new Date(g.created_at).getTime(),
       submittedAt: new Date(g.created_at).getTime(),
       status: (g.status as any) || 'queued',
+      stage: ((g as any).stage as any) || 'queued',
       falRequestId: g.fal_request_id || undefined,
       error: g.error || undefined,
     });
