@@ -98,6 +98,15 @@ function friendly(raw: string | undefined): string {
   if (/insufficient balance|402|top.?up|exhausted/i.test(raw)) {
     return 'AtlasCloud is out of credit. Add credits at console.atlascloud.ai then retry.';
   }
+  if (/output audio.*sensitive/i.test(raw)) {
+    return 'Seedance flagged the generated audio. Turn Sound OFF and retry.';
+  }
+  if (/input video.*sensitive/i.test(raw)) {
+    return 'Seedance flagged the input video as containing a real person. Try a shorter clip, a different framing, or remove the reference video.';
+  }
+  if (/input image.*sensitive|sensitive content/i.test(raw)) {
+    return 'Seedance flagged a reference image. Try a different photo or rephrase the prompt.';
+  }
   return raw;
 }
 
@@ -115,13 +124,17 @@ function toWsrvJpg(rawUrl: string, w = 1024, h = 1024): string {
 // Register an image as a portrait asset on AtlasCloud. Returns asset:// URI
 // or null on failure. We register every reference image so identity-bearing
 // shots (faces) reliably pass Seedance's "real person" moderator.
-async function createAtlasAsset(imageUrl: string, label: string): Promise<string | null> {
-  if (!ATLAS_KEY || !imageUrl) return null;
-  const submittedUrl = toWsrvJpg(imageUrl);
+async function createAtlasAsset(
+  rawUrl: string,
+  label: string,
+  assetType: 'Image' | 'Video' = 'Image',
+): Promise<string | null> {
+  if (!ATLAS_KEY || !rawUrl) return null;
+  const submittedUrl = assetType === 'Image' ? toWsrvJpg(rawUrl) : rawUrl;
   const res = await fetch(`${ATLAS_ASSET_BASE}/sd/assets`, {
     method: 'POST',
     headers: { Authorization: `Bearer ${ATLAS_KEY}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ url: submittedUrl, name: label, asset_type: 'Image' }),
+    body: JSON.stringify({ url: submittedUrl, name: label, asset_type: assetType }),
   });
   const text = await res.text();
   let parsed: any = {};
@@ -211,7 +224,7 @@ async function atlasSubmit(p: SubmitParams) {
     if (isBalanceError(res.status, text)) {
       return { ok: false as const, error: 'AtlasCloud is out of credit. Add credits at console.atlascloud.ai then retry.' };
     }
-    return { ok: false as const, error: `AtlasCloud ${code}: ${rawMsg}` };
+    return { ok: false as const, error: friendly(`${rawMsg}`) };
   }
   return { ok: true as const, predictionId: String(predictionId), endpoint: p.variant };
 }
@@ -280,7 +293,7 @@ Deno.serve(async (req) => {
       duration = 5,
       resolution = '720p',
       ratio = 'adaptive',
-      generateAudio = true,
+      generateAudio = false,
       variant,
       videoId,            // existing video_generations row id (created client-side)
       projectId,
@@ -301,18 +314,25 @@ Deno.serve(async (req) => {
     const hasRefs = images.length > 0 || videos.length > 0 || audios.length > 0;
     const chosenVariant = normVariant(variant, hasRefs);
 
-    // Register every image as an asset for reliable face moderation.
+    // Register every image AND video as an asset for reliable moderation
+    // (sending raw storage URLs causes Seedance to flag real people).
     const assetImages: string[] = [];
     for (let i = 0; i < images.length; i++) {
       const label = `seedance-img-${i}-${(videoId ?? 'anon').slice(0, 24)}`;
-      const asset = await createAtlasAsset(images[i], label);
+      const asset = await createAtlasAsset(images[i], label, 'Image');
       assetImages.push(asset ?? images[i]);
+    }
+    const assetVideos: string[] = [];
+    for (let i = 0; i < videos.length; i++) {
+      const label = `seedance-vid-${i}-${(videoId ?? 'anon').slice(0, 24)}`;
+      const asset = await createAtlasAsset(videos[i], label, 'Video');
+      assetVideos.push(asset ?? videos[i]);
     }
 
     const submission = await atlasSubmit({
       prompt: promptText || 'The character in image 1 dances gracefully to the music',
       imageUrls: assetImages,
-      videoUrls: videos,
+      videoUrls: assetVideos,
       audioUrls: audios,
       duration: clampDuration(duration),
       resolution: normRes(resolution),
