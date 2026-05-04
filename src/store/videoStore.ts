@@ -229,6 +229,36 @@ function updateVideoAndSave(videoId: string, updates: Partial<GeneratedVideo>, g
   if (updated) saveVideoToDb(updated);
 }
 
+const activeSeedancePolls = new Set<string>();
+
+async function pollSeedanceVideo(videoId: string, taskId: string, get: () => VideoState, set: (s: Partial<VideoState>) => void) {
+  if (!taskId || activeSeedancePolls.has(videoId)) return;
+  activeSeedancePolls.add(videoId);
+  try {
+    const maxAttempts = 360;
+    let delay = 4000;
+    for (let i = 0; i < maxAttempts; i++) {
+      await new Promise(r => setTimeout(r, delay));
+      delay = Math.min(8000, delay + 250);
+      const { data: poll } = await supabase.functions.invoke('seedance-generate-video', {
+        body: { action: 'poll', predictionId: taskId, videoId },
+      });
+      if (poll?.status === 'complete' && poll.videoUrl) {
+        updateVideoAndSave(videoId, { status: 'complete', videoUrl: poll.videoUrl, progress: 100 }, get, set);
+        return;
+      }
+      if (poll?.status === 'failed') {
+        updateVideoAndSave(videoId, { status: 'failed', error: poll.error || 'Seedance generation failed' }, get, set);
+        return;
+      }
+    }
+  } catch (e) {
+    console.error('Seedance polling failed:', e);
+  } finally {
+    activeSeedancePolls.delete(videoId);
+  }
+}
+
 async function callGenerate(payload: Record<string, unknown>, videoId: string, get: () => VideoState, set: (s: Partial<VideoState>) => void) {
   const refs = payload.referenceImages as string[] | undefined;
 
