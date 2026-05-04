@@ -87,9 +87,6 @@ export function SeedancePromptBar() {
     generateAudio, setGenerateAudio, generate, isSubmitting,
   } = useSeedanceStore();
 
-  const [resOpen, setResOpen] = useState(false);
-  const [ratioOpen, setRatioOpen] = useState(false);
-  const [durOpen, setDurOpen] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const pendingKindRef = useRef<SeedanceAssetKind>('image');
