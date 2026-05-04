@@ -365,7 +365,84 @@ async function atlasSubmit(p: SubmitParams) {
   return { ok: true as const, predictionId: String(predictionId), endpoint: p.variant };
 }
 
-async function atlasPoll(predictionId: string) {
+// ===== BytePlus ModelArk fallback =====
+// Submit a Seedance 2.0 job directly to ByteDance via ModelArk. Accepts public
+// HTTPS URLs in `content[]`, no asset registration required. Used when the
+// AtlasCloud path fails (balance, persistent moderation, timeout).
+async function byteplusSubmit(p: SubmitParams): Promise<{ ok: true; predictionId: string; endpoint: string } | { ok: false; error: string }> {
+  if (!BYTEPLUS_KEY) return { ok: false, error: 'BytePlus fallback not configured (BYTEPLUS_ARK_API_KEY missing).' };
+
+  const content: Array<Record<string, unknown>> = [];
+  if (p.prompt) content.push({ type: 'text', text: p.prompt });
+  for (const url of p.imageUrls) {
+    content.push({ type: 'image_url', image_url: { url }, role: 'reference_image' });
+  }
+  for (const url of p.videoUrls) {
+    content.push({ type: 'video_url', video_url: { url }, role: 'reference_video' });
+  }
+  for (const url of p.audioUrls) {
+    content.push({ type: 'audio_url', audio_url: { url }, role: 'reference_audio' });
+  }
+
+  const useFast = p.variant === SEEDANCE_FAST;
+  const body: Record<string, unknown> = {
+    model: useFast ? BYTEPLUS_MODEL_FAST : BYTEPLUS_MODEL,
+    content,
+    duration: p.duration,
+    resolution: normRes(p.resolution),
+    ratio: normRatio(p.ratio),
+    generate_audio: p.generateAudio,
+    watermark: false,
+  };
+
+  log('INFO', 'byteplus submit', {
+    model: body.model,
+    images: p.imageUrls.length,
+    videos: p.videoUrls.length,
+    audios: p.audioUrls.length,
+    duration: p.duration,
+    resolution: body.resolution,
+    ratio: body.ratio,
+    generateAudio: p.generateAudio,
+  });
+
+  const res = await fetch(BYTEPLUS_BASE, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${BYTEPLUS_KEY}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  const text = await res.text();
+  let parsed: any = {};
+  try { parsed = JSON.parse(text); } catch { /* keep text */ }
+  const taskId = parsed?.id;
+  if (!res.ok || !taskId) {
+    const rawMsg = parsed?.error?.message ?? parsed?.message ?? text ?? `http ${res.status}`;
+    log('WARN', 'byteplus submit failed', { status: res.status, body: text.slice(0, 400) });
+    return { ok: false, error: friendly(`BytePlus: ${rawMsg}`) };
+  }
+  return { ok: true, predictionId: String(taskId), endpoint: String(body.model) };
+}
+
+async function byteplusPoll(taskId: string) {
+  const res = await fetch(`${BYTEPLUS_BASE}/${taskId}`, {
+    headers: { Authorization: `Bearer ${BYTEPLUS_KEY}` },
+  });
+  const text = await res.text();
+  let parsed: any = {};
+  try { parsed = JSON.parse(text); } catch { /* keep text */ }
+  if (!res.ok) {
+    return { status: 'failed' as const, error: friendly(parsed?.error?.message ?? parsed?.message ?? text ?? `poll http ${res.status}`) };
+  }
+  const status = String(parsed?.status ?? '').toLowerCase();
+  if (status === 'succeeded') {
+    const videoUrl = parsed?.content?.video_url;
+    return videoUrl ? { status: 'done' as const, videoUrl: String(videoUrl) } : { status: 'failed' as const, error: 'BytePlus completed without a video URL' };
+  }
+  if (status === 'failed' || status === 'expired' || status === 'cancelled') {
+    return { status: 'failed' as const, error: friendly(parsed?.error?.message ?? `BytePlus reported ${status}`) };
+  }
+  return { status: 'processing' as const };
+}
   const res = await fetch(`${ATLAS_BASE}/prediction/${predictionId}`, {
     headers: { Authorization: `Bearer ${ATLAS_KEY}` },
   });
