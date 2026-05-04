@@ -238,93 +238,19 @@ export function SeedancePromptBar() {
               Seedance 2.0
             </span>
 
-            {/* Aspect */}
-            <Popover open={ratioOpen} onOpenChange={setRatioOpen}>
-              <PopoverTrigger asChild>
-                <button className="ms-chip-glass flex items-center gap-1.5 px-3.5 h-9 rounded-full text-xs text-foreground transition-all">
-                  <AspectIcon ratio={ratio} className="text-white ml-0.5" />
-                  {ratio === 'adaptive' ? 'Auto' : ratio}
-                  <ChevronDownIcon className="size-3.5 text-muted-foreground/70" />
-                </button>
-              </PopoverTrigger>
-              <PopoverContent align="start" side="top" sideOffset={10}
-                className="w-[280px] p-3 rounded-2xl ms-glass shadow-[0_24px_60px_-20px_rgba(0,0,0,0.7)]">
-                <div className="text-[11px] font-semibold tracking-[0.18em] text-white/50 uppercase px-2 pt-1 pb-2">
-                  Aspect Ratio
-                </div>
-                <div className="grid grid-cols-3 gap-1">
-                  {SEEDANCE_RATIOS.map((ar) => {
-                    const active = ratio === ar;
-                    return (
-                      <button
-                        key={ar}
-                        onClick={() => { setRatio(ar); setRatioOpen(false); }}
-                        className={`flex items-center gap-1.5 justify-center px-2 py-2 rounded-lg text-sm transition-colors ${
-                          active ? 'bg-white/10 text-white' : 'text-white/85 hover:bg-white/5'
-                        }`}
-                      >
-                        <AspectIcon ratio={ar} />
-                        <span className="font-medium">{ar === 'adaptive' ? 'Auto' : ar}</span>
-                      </button>
-                    );
-                  })}
-                </div>
-              </PopoverContent>
-            </Popover>
+            {/* Aspect — MS-style chip */}
+            <SeedanceAspectChip value={ratio} onChange={setRatio} />
 
-            {/* Duration */}
-            <Popover open={durOpen} onOpenChange={setDurOpen}>
-              <PopoverTrigger asChild>
-                <button className="ms-chip-glass flex items-center gap-1.5 px-3.5 h-9 rounded-full text-xs text-foreground transition-all">
-                  <Clock className="w-3.5 h-3.5 text-muted-foreground" />
-                  {duration}s
-                  <ChevronDownIcon className="size-3.5 text-muted-foreground/70" />
-                </button>
-              </PopoverTrigger>
-              <PopoverContent align="start" side="top" sideOffset={10}
-                className="w-32 p-1.5 rounded-2xl ms-glass shadow-[0_24px_60px_-20px_rgba(0,0,0,0.7)]">
-                <div className="px-2.5 py-1.5 text-[11px] font-semibold tracking-[0.18em] text-white/50 uppercase">Duration</div>
-                {SEEDANCE_DURATIONS.map((d) => (
-                  <button
-                    key={d}
-                    onClick={() => { setDuration(d); setDurOpen(false); }}
-                    className={`w-full flex items-center justify-between px-2.5 py-2 rounded-lg text-sm transition-colors ${
-                      duration === d ? 'bg-white/10 text-white' : 'text-white/85 hover:bg-white/5'
-                    }`}
-                  >
-                    {d}s
-                    {duration === d && <Check className="w-4 h-4 text-[#9C3FED]" />}
-                  </button>
-                ))}
-              </PopoverContent>
-            </Popover>
+            {/* Resolution — MS-style dropdown chip */}
+            <SeedanceChip
+              icon={<Gem className="w-3.5 h-3.5" />}
+              value={resolution}
+              options={SEEDANCE_RESOLUTIONS as readonly string[]}
+              onChange={setResolution}
+            />
 
-            {/* Resolution */}
-            <Popover open={resOpen} onOpenChange={setResOpen}>
-              <PopoverTrigger asChild>
-                <button className="ms-chip-glass flex items-center gap-1.5 px-3.5 h-9 rounded-full text-xs text-foreground transition-all">
-                  <Tag className="w-3.5 h-3.5 text-muted-foreground" />
-                  {resolution}
-                  <ChevronDownIcon className="size-3.5 text-muted-foreground/70" />
-                </button>
-              </PopoverTrigger>
-              <PopoverContent align="start" side="top" sideOffset={10}
-                className="w-32 p-1.5 rounded-2xl ms-glass shadow-[0_24px_60px_-20px_rgba(0,0,0,0.7)]">
-                <div className="px-2.5 py-1.5 text-[11px] font-semibold tracking-[0.18em] text-white/50 uppercase">Resolution</div>
-                {SEEDANCE_RESOLUTIONS.map((r) => (
-                  <button
-                    key={r}
-                    onClick={() => { setResolution(r); setResOpen(false); }}
-                    className={`w-full flex items-center justify-between px-2.5 py-2 rounded-lg text-sm transition-colors ${
-                      resolution === r ? 'bg-white/10 text-white' : 'text-white/85 hover:bg-white/5'
-                    }`}
-                  >
-                    {r}
-                    {resolution === r && <Check className="w-4 h-4 text-[#9C3FED]" />}
-                  </button>
-                ))}
-              </PopoverContent>
-            </Popover>
+            {/* Duration — MS-style slider chip */}
+            <SeedanceDurationChip value={duration} onChange={setDuration} />
 
             <div className="flex-1" />
           </div>
