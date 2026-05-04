@@ -225,13 +225,11 @@ async function createRequiredAtlasAsset(
   assetType: 'Image' | 'Video' | 'Audio',
 ): Promise<{ assetUrl?: string; error?: string }> {
   if (assetType === 'Video') {
-    // Reference videos with real people must be uploaded, then registered via
-    // sd/assets as asset_type="Video" so Seedance receives asset:// tokens.
+    // Videos do NOT go through sd/assets — only images with faces need that.
+    // Re-host bytes through uploadMedia and pass the hosted URL directly.
     const mediaUrl = await uploadAtlasMedia(rawUrl, label);
-    if (!mediaUrl) return { error: 'AtlasCloud could not ingest the reference video. Retry with a smaller file (<50MB) or remove that reference.' };
-    const assetUrl = await createAtlasAsset(mediaUrl, label, 'Video');
-    if (assetUrl?.startsWith('asset://')) return { assetUrl };
-    return { error: 'AtlasCloud could not register the reference video. Retry with a shorter clip or remove that reference.' };
+    if (mediaUrl) return { assetUrl: mediaUrl };
+    return { error: 'AtlasCloud could not ingest the reference video. Retry with a smaller file (<50MB) or remove that reference.' };
   }
   if (assetType === 'Audio') {
     // Audio references are not sd/assets; re-host bytes through uploadMedia.
