@@ -181,7 +181,7 @@ async function createAtlasAsset(
 ): Promise<string | null> {
   if (!ATLAS_KEY || !rawUrl) return null;
   const submittedUrl = assetType === 'Image' ? toWsrvJpg(rawUrl) : rawUrl;
-  const res = await fetch(`${ATLAS_BASE}/sd/assets`, {
+  const res = await fetch(`${ATLAS_ASSETS_BASE}/sd/assets`, {
     method: 'POST',
     headers: { Authorization: `Bearer ${ATLAS_KEY}`, 'Content-Type': 'application/json' },
     body: JSON.stringify({ url: submittedUrl, name: label, asset_type: assetType }),
