@@ -481,8 +481,15 @@ Deno.serve(async (req) => {
 
     const safeDuration = clampDuration(duration);
 
+    // Resolve any leftover @-tags (client should already have done this, but
+    // retries / direct API calls can land here with raw tokens).
+    const resolvedPrompt = resolvePromptTags(promptText, {
+      images: assetImages.length, videos: assetVideos.length, audios: assetAudios.length,
+    });
+    log('INFO', 'resolved prompt', { original: promptText.slice(0, 200), resolved: resolvedPrompt.slice(0, 240) });
+
     const baseSubmit = {
-      prompt: promptText || 'The character in image 1 dances gracefully to the music',
+      prompt: resolvedPrompt || 'The character in image 1 dances gracefully to the music',
       imageUrls: assetImages,
       videoUrls: assetVideos,
       audioUrls: assetAudios,
