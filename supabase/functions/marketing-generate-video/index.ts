@@ -171,12 +171,23 @@ async function fetchAvatarImageUrl(admin: any, avatarId: string): Promise<string
   return `https://wsrv.nl/?url=${encodeURIComponent(raw)}&w=640&h=640&fit=cover&a=top&output=jpg`;
 }
 
+function toWsrvJpg(rawUrl: string, w = 1024, h = 1024): string {
+  if (!rawUrl) return rawUrl;
+  if (rawUrl.includes('wsrv.nl')) return rawUrl;
+  return `https://wsrv.nl/?url=${encodeURIComponent(rawUrl)}&w=${w}&h=${h}&fit=cover&output=jpg&q=85`;
+}
+
 async function createAtlasPortraitAsset(imageUrl: string, avatarId?: string | null): Promise<string | null> {
   if (!ATLAS_KEY || !imageUrl) return null;
+  // Always route through wsrv to normalize size/format. Seedance asset
+  // registration is more reliable on small JPGs than large pngs.
+  const submittedUrl = toWsrvJpg(imageUrl);
+  const label = `ref-${String(avatarId ?? 'img').slice(0, 48)}`;
+  log('INFO', 'atlas asset: submitting', { label, submittedUrl: submittedUrl.slice(0, 160) });
   const res = await fetch(`${ATLAS_ASSET_BASE}/sd/assets`, {
     method: 'POST',
     headers: { Authorization: `Bearer ${ATLAS_KEY}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ url: imageUrl, name: `avatar-${String(avatarId ?? 'ref').slice(0, 48)}`, asset_type: 'Image' }),
+    body: JSON.stringify({ url: submittedUrl, name: label, asset_type: 'Image' }),
   });
   const text = await res.text();
   let parsed: any = {};
