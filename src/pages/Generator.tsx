@@ -26,6 +26,7 @@ export default function Generator() {
   const loadHistory = useGeneratorStore((s) => s.loadHistory);
   const loadVideoHistory = useVideoStore((s) => s.loadHistory);
   const mode = usePromptModeStore((s) => s.mode);
+  const videoSubMode = usePromptModeStore((s) => s.videoSubMode);
   const sidebarCollapsed = useCreateProjectsStore((s) => s.sidebarCollapsed);
   const projects = useCreateProjectsStore((s) => s.projects);
   const projectsLoaded = useCreateProjectsStore((s) => s.loaded);
@@ -122,8 +123,7 @@ export default function Generator() {
       );
     }
     if (mode === 'video') {
-      const sub = usePromptModeStore.getState().videoSubMode;
-      if (sub === 'seedance-2') return <SeedancePromptBar />;
+      if (videoSubMode === 'seedance-2') return <SeedancePromptBar />;
       return <VideoPromptBarInline />;
     }
     return <PromptBar />;
