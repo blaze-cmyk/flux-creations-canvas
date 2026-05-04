@@ -29,6 +29,7 @@ type ReferenceBundle = {
   referenceAudios: string[];
   hasAvatar: boolean;
   hasProduct: boolean;
+  assetRegistrationError?: string;
 };
 
 type SubmitOutcome = {
@@ -208,6 +209,13 @@ async function createAtlasPortraitAsset(imageUrl: string, avatarId?: string | nu
   return null;
 }
 
+async function createRequiredAtlasPortraitAsset(imageUrl: string | null | undefined, label: string): Promise<{ assetUrl?: string; error?: string }> {
+  if (!imageUrl) return {};
+  const assetUrl = await createAtlasPortraitAsset(imageUrl, label);
+  if (assetUrl?.startsWith('asset://')) return { assetUrl };
+  return { error: `AtlasCloud could not register the ${label} as a portrait asset. Retry after checking the source image.` };
+}
+
 async function gatherAudioSourceUrls(admin: any, opts: { avatarId?: string | null; format?: string | null }): Promise<string[]> {
   const out: string[] = [];
   if (opts.avatarId) {
@@ -260,7 +268,10 @@ async function buildReferenceBundle(admin: any, opts: {
 }): Promise<ReferenceBundle> {
   const productUrls = opts.productId ? await fetchProductImageUrls(admin, opts.productId, 7) : [];
   const avatarUrl = opts.avatarId ? await fetchAvatarImageUrl(admin, opts.avatarId) : null;
-  const atlasAvatarAsset = avatarUrl ? await createAtlasPortraitAsset(avatarUrl, opts.avatarId) : null;
+  const avatarAsset = opts.avatarId ? await createRequiredAtlasPortraitAsset(avatarUrl, `avatar-${String(opts.avatarId).slice(0, 48)}`) : {};
+  const keyframeAsset = opts.avatarId && opts.keyframeUrl
+    ? await createRequiredAtlasPortraitAsset(opts.keyframeUrl, `keyframe-${String(opts.avatarId).slice(0, 46)}`)
+    : {};
   const extraImageUrls = uniqueValidUrls(opts.extraImageUrls ?? [], 9).filter((url) => {
     if (url === opts.keyframeUrl) return false;
     if (!opts.avatarId) return true;
@@ -283,13 +294,21 @@ async function buildReferenceBundle(admin: any, opts: {
         ...extraImageUrls,
       ], 9);
 
+  const assetRegistrationError = avatarAsset.error ?? keyframeAsset.error;
+  const atlasReferenceImages = orderedRefs.map((url) => {
+    if (opts.keyframeUrl && url === opts.keyframeUrl && keyframeAsset.assetUrl) return keyframeAsset.assetUrl;
+    if (avatarUrl && url === avatarUrl && avatarAsset.assetUrl) return avatarAsset.assetUrl;
+    return url;
+  });
+
   return {
     mode: orderedRefs.length > 0 ? 'reference-to-video' : 'text-to-video',
     referenceImages: orderedRefs,
-    atlasReferenceImages: orderedRefs.map((url) => (avatarUrl && url === avatarUrl && atlasAvatarAsset ? atlasAvatarAsset : url)),
+    atlasReferenceImages,
     referenceAudios: uniqueValidUrls(opts.audioSourceUrls ?? [], 3),
     hasAvatar: !!opts.avatarId && !!avatarUrl,
     hasProduct: !!opts.productId && productUrls.length > 0,
+    assetRegistrationError,
   };
 }
 
