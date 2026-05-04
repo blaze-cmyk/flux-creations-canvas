@@ -98,6 +98,15 @@ function friendly(raw: string | undefined): string {
   if (/insufficient balance|402|top.?up|exhausted/i.test(raw)) {
     return 'AtlasCloud is out of credit. Add credits at console.atlascloud.ai then retry.';
   }
+  if (/output audio.*sensitive/i.test(raw)) {
+    return 'Seedance flagged the generated audio. Turn Sound OFF and retry.';
+  }
+  if (/input video.*sensitive/i.test(raw)) {
+    return 'Seedance flagged the input video as containing a real person. Try a shorter clip, a different framing, or remove the reference video.';
+  }
+  if (/input image.*sensitive|sensitive content/i.test(raw)) {
+    return 'Seedance flagged a reference image. Try a different photo or rephrase the prompt.';
+  }
   return raw;
 }
 
