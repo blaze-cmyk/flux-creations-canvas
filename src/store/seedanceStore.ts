@@ -155,7 +155,7 @@ export const useSeedanceStore = create<SeedanceState>((set, get) => ({
   resolution: '720p',
   ratio: 'adaptive',
   duration: '5',
-  generateAudio: false,
+  generateAudio: true,
   isSubmitting: false,
 
   setPrompt: (prompt) => set({ prompt }),
