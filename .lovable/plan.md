@@ -1,160 +1,196 @@
-# Bulletproof provider routing — full backend rewire
+# Marketing Studio: Keyframe-First Pipeline + Director's Constitution
 
-Goal: every option in the prompt nav bar (image, video Create/Edit/Motion, marketing) reaches the right provider, with verified endpoints, normalized payloads, deterministic polling, and a multi-tier fallback chain. No silent failures.
+Replace the current Claude → Seedance pipeline with:
+
+```text
+Claude (script, format-aware) → Nano Banana Pro (keyframe) → Seedance (video)
+```
+
+Plus harden the two one-time setup steps (product vision, avatar voice) so Claude and the keyframer have rich, grounded inputs.
+
+Stage flow becomes:
+```text
+queued → scripting → keyframing → keyframe_ready → videoing → done
+                          └──── (fallback) ────→ videoing (no keyframe)
+```
 
 ---
 
-## 1. Source-of-truth model registry
+## Part 1 — Storage bucket: `ms-keyframes`
 
-Create `supabase/functions/_shared/modelRegistry.ts` so the UI label, the provider routing, and the fallback chain live in **one** place (today they're split across `generatorStore.ts`, `videoStore.ts`, and the two edge functions, which is why slugs drift).
+Migration:
+- Create private bucket `ms-keyframes` (10MB cap, png/jpeg/webp).
+- RLS: read own keyframes only (foldername = auth.uid).
+- Confirm `ms-voice-samples` already exists (it does, public).
+
+## Part 2 — Product vision analysis upgrade
+File: `supabase/functions/marketing-analyze-product/index.ts`
+
+The function already extracts `visual_facts`. Extend the schema returned to also include:
+- `product_energy` enum (comfort | hype | premium | playful | functional | lifestyle)
+- `brief` (2–3 sentence photographer-style description)
+
+Add a "weak analysis" re-trigger inside `marketing-generate-script`: if `vision_analysis` is missing `distinctive_features` or `dominant_colors`, fire `EdgeRuntime.waitUntil(analyzeProduct(productId))` and proceed with what's available.
+
+## Part 3 — Avatar voice at creation
+File: `supabase/functions/marketing-generate-voice-sample/index.ts` (already exists)
+
+Already generates and stores `voice_sample_url`. Add:
+- A small Gemini call that looks at the avatar image and writes a one-sentence voice description (age/accent/energy/warmth) → store on `ms_avatars.description` if blank.
+- Map description + gender to one of 8 ElevenLabs voice IDs (warm/energetic/chill/professional × m/f).
+- Store `voice_id` (ElevenLabs ID) and `voice_description` on the avatar row.
+- One-shot seeder endpoint `?seed_builtins=1` to backfill all built-in avatars (already partially supported via batch mode — extend it).
+
+## Part 4 — Director's Constitution system prompt
+File: `supabase/functions/marketing-generate-script/index.ts`
+
+Replace `FORMAT_SYSTEM_PROMPTS` and the system-message builder with a 3-block layout sent to Claude as a single cached system message:
+
+- **BLOCK_1 — Director's Constitution**: voice rules, banned phrases, body-action lock, "show, don't say", duration/word math.
+- **BLOCK_2 — Format module** (selected by `format`): one of UGC, Tutorial, Unboxing, Hyper Motion, Product Review, TV Spot, Wild Card, UGC Virtual Try On, Pro Virtual Try On, Podcast. Each module is a self-contained creative brief in the Higgsfield reference style.
+- **BLOCK_3 — Reference anchors A–G**: 7 gold-standard inspiration mini-scripts. Taste anchors, never templates.
+
+Anthropic call:
+```ts
+system: [{ type: "text", text: BLOCK_1 + "\n\n" + FORMAT_MODULE[format] + "\n\n" + BLOCK_3,
+           cache_control: { type: "ephemeral" } }]
+```
+
+Claude MUST receive the literal `format` name in BOTH the system block (selected module) AND the user message header (`FORMAT: <name>`) so it can never drift to a different family.
+
+## Part 5 — User message builder + mode detection
+Same file. New `buildUserMessage()` returns multimodal content (images first, text last):
+
+1. Up to 3 product images (proxied through wsrv.nl, ≤4.5MB).
+2. Avatar image (if present).
+3. Up to 2 extra reference images.
+4. Text block containing:
+   - `FORMAT`, `DURATION`, `BEATS`, `BEAT_WINDOWS`, `MAX_SPOKEN_WORDS`, `ASPECT`
+   - `MODE` (AUTO / DIRECTED / DIRECTED_LOCKED / PASSTHROUGH) detected from `userPrompt`
+   - `PERSONA` (rolled only in AUTO from a 6-persona pool)
+   - `CREATIVE_ANGLE_HINT` (rolled only in AUTO from a 7-angle pool)
+   - `PRODUCT_NAME`, `PRODUCT_DESCRIPTION`, `PRODUCT_VISION_FACTS`
+   - `AVATAR_*` block (or `MODE: POV_HANDS` if no avatar)
+   - `EXTRA REFERENCE IMAGES` casting rules (person → Speaker B in Podcast, object → prop, competitor frame → camera language only)
+   - `USER_DIRECTION`
+   - "Look at images BEFORE reading text. Extract only what's literally visible."
+
+Helper functions: `detectMode`, `calculateBeats(duration)`, `calculateWindows(duration, beatCount)`, `proxyImageUrl`.
+
+Tool schema `video_prompt` with required `concrete_product_details[]`, `final_prompt`, `voiceover_script`, `scene_description`, plus optional `camera_notes`, `on_screen_beats[]`, `persona_used`. Force `tool_choice` to this tool.
+
+## Part 6 — Slop gate v2
+Same file. After Claude returns:
+
+- Banned-phrase scan (extended list).
+- `final_prompt.length >= 350`.
+- ≥2 of `concrete_product_details` must appear (substring) inside `final_prompt`.
+- `voiceover_script` word count ≤ `maxWords * 1.3`.
+- Format-scoped checks (Podcast → must contain "mic" + ≥3 quoted lines).
+- Beat/action coherence: if script > 30 words, must have ≥2 `on_screen_beats`.
+
+Flow: weak → retry once with `stricter: true, reason: <code>` → still weak → deterministic `buildFallbackPrompt()`.
+
+Important: keep the existing two-lane Unboxing logic intact; the new gates run in addition, family-scoped, not universal.
+
+## Part 7 — NEW edge function: `marketing-generate-keyframe`
+File: `supabase/functions/marketing-generate-keyframe/index.ts`
+
+Inputs: `generation_id`. Loads generation + product images + avatar.
+
+Builds a Nano Banana Pro request:
+- Images: avatar first (cropped via wsrv.nl), then up to 3 product images.
+- Prompt: composes ONE photoreal 9:16 still — avatar IN `scene_description`, holding/wearing the product, camera per `camera_notes`. Locks face from image 1, locks product from images 2..N. No collage / overlay / text.
+
+Provider order:
+1. Primary: `google/gemini-3-pro-image-preview` via Lovable AI Gateway (Nano Banana Pro).
+2. Fallback: `google/gemini-3.1-flash-image-preview` (Nano Banana 2) via Lovable AI Gateway.
+
+On success: download base64 → upload to `ms-keyframes/<gen_id>.png` → write `keyframe_url` (1h signed URL), `keyframe_path`, `stage = 'keyframe_ready'`.
+
+On total failure: log, set `keyframe_url = null`, advance `stage = 'videoing'` so video step still runs (graceful degrade).
+
+Add to `supabase/config.toml`:
+```toml
+[functions.marketing-generate-keyframe]
+verify_jwt = false
+```
+
+## Part 8 — Orchestrator stage transition
+File: `supabase/functions/marketing-orchestrate/index.ts`
+
+After Claude script is persisted (around line 443), instead of jumping straight to `videoing`:
+1. Set `stage = 'keyframing'`.
+2. `await invoke('marketing-generate-keyframe', { generation_id })`.
+3. Read updated row to get `keyframe_url` (may be null).
+4. Set `stage = 'videoing'`, then call `marketing-generate-video` with `keyframe_url` passed through.
+
+Failure inside keyframing must NOT fail the whole job — the keyframer already degrades gracefully.
+
+## Part 9 — Video function reference reorder
+File: `supabase/functions/marketing-generate-video/index.ts`
+
+New `buildReferenceBundle(generation, keyframeUrl)`:
+
+If `keyframeUrl` present:
+```text
+image_urls[0] = keyframe   ← "COMPOSED SCENE — animate this"
+image_urls[1] = avatar     ← "facial identity ONLY, ignore background/wardrobe"
+image_urls[2..] = products ← "preserve exact appearance"
+image_urls[N..] = extras
+```
+
+If null: keep current order (avatar first), so we can A/B and revert in one line.
+
+Prepend a `Reference map:\n…\nIDENTITY DIRECTIVE: …\nSCENE SEED: …\n\n<final_prompt>` to the Seedance prompt body.
+
+Atlas avatar registration constraint stays — keyframe is a generated image (not the avatar storage URL) so it does NOT need `asset://` registration; the avatar reference still does.
+
+## Part 10 — UI stage labels + progress
+Files: `src/hooks/useGenerationProgress.ts`, `src/pages/MarketingStudioProject.tsx`
+
+`MARKETING_EXPECTED_S` already includes `keyframing` and `keyframe_ready`. Add label config consumed by the overlay:
 
 ```ts
-export type ProviderId = 'fal' | 'runware' | 'evolink' | 'apiyi' | 'atlas';
-export type ImageEntry = {
-  id: string;                 // UI key e.g. "nano-banana-pro"
-  label: string;              // "Nano Banana Pro"
-  primary:   { provider: ProviderId; model: string; edit?: string };
-  fallbacks: { provider: ProviderId; model: string; edit?: string }[];
-  maxRefs: number;
-};
-export type VideoEntry = {
-  id: string;
-  label: string;
-  modes: ('text-to-video'|'image-to-video'|'motion-control'|'video-edit')[];
-  primary:   { provider: ProviderId; t2v?: string; i2v?: string; motion?: string; edit?: string; durationFormat: ... };
-  fallbacks: { ... }[];
-  startEndFrames?: boolean;
+const STAGE_CONFIG = {
+  queued:         { label: "Queued",           color: "gray" },
+  scripting:      { label: "Writing script…",  color: "blue" },
+  keyframing:     { label: "Composing scene…", color: "purple" },
+  keyframe_ready: { label: "Scene ready",      color: "purple" },
+  videoing:       { label: "Filming…",         color: "pink" },
+  done:           { label: "Done",             color: "green" },
+  failed:         { label: "Failed",           color: "red" },
 };
 ```
 
-Both edge functions and both Zustand stores import from this file via a thin `// @ts-ignore deno` re-export so the client gets the labels and the server gets the routing.
+Render the chip in the pending overlay on `MarketingStudioProject.tsx` keyed on `generation.stage`. Show keyframe thumbnail in the overlay once `keyframe_url` is set (gives visible "scene is real" feedback before the video lands).
+
+## Part 11 — Memory updates
+
+After implementation:
+- `mem://constraint/keyframe-first-pipeline`: keyframe IS the scene; avatar = face lock only; never let video reorder back without an A/B reason.
+- Update `mem://index.md` Core with: "Marketing Studio = Claude(script, format-aware, cached) → Nano Banana Pro(keyframe) → Seedance(video). Keyframe is the scene anchor; avatar reference is face-lock ONLY."
 
 ---
 
-## 2. Verified endpoint matrix (after re-reading docs)
+## Execution order (each step independently testable)
 
-### Images
-| UI label | Primary | Fallback 1 | Fallback 2 |
-|---|---|---|---|
-| Nano Banana Pro | apiyi `gemini-3-pro-image-preview` | fal `fal-ai/bytedance/seedream/v4/text-to-image` | runware `google:4@1` |
-| Nano Banana 2 | apiyi `gemini-3.1-flash-image-preview` | fal seedream-4 | runware `google:4@2` |
-| Seedream 4.0 | fal `fal-ai/bytedance/seedream/v4/text-to-image` (+ `/edit`) | runware `bytedance:seedream@4` | — |
-| Seedream 5.0 Lite | fal `fal-ai/bytedance/seedream/v5/lite/text-to-image` | fal seedream-4 | — |
-| Grok Imagine | fal `fal-ai/grok-imagine` | runware `xai:grok-imagine@image` | — |
-| Kling Image V3 | fal `fal-ai/kling/v2.1/standard/text-to-image` | runware `klingai:image@1` | — |
-| Flux 2 Pro | fal `fal-ai/flux-pro/v1.1-ultra` (+ `fal-ai/flux-pro/kontext` for edit) | runware `bfl:2@2` | — |
-| Wan 2.2 | fal `fal-ai/wan/v2.2-a14b/text-to-image` | runware `wan:2.2@a14b` | — |
+1. Migration: `ms-keyframes` bucket + RLS.
+2. Extend `marketing-analyze-product` schema (energy + brief).
+3. Voice description + voice_id storage in `marketing-generate-voice-sample`; backfill built-ins.
+4. Rewrite system prompt (Blocks 1+2+3) and `buildUserMessage` in `marketing-generate-script`. Add prompt caching.
+5. Add slop gate v2 + retry + deterministic fallback.
+6. Build `marketing-generate-keyframe` edge function + register in `config.toml`.
+7. Wire orchestrator: scripting → keyframing → videoing.
+8. Reorder references in `marketing-generate-video` (keyframe[0], avatar[1], products[2..]).
+9. UI: stage labels + keyframe preview in overlay.
+10. A/B 5 product+avatar combos (keyframe ON vs OFF). If avatar-in-scene fidelity is clearly better → keep. If not → flip orchestrator flag to skip keyframe (one-line revert).
 
-### Video — Create
-| Label | Primary | Fallback |
-|---|---|---|
-| Seedance 2.0 | runware `bytedance:seedance@1.5-pro` | fal `fal-ai/bytedance/seedance/v1/pro/text-to-video` |
-| Kling 3.0 | fal `fal-ai/kling-video/v3/pro/text-to-video` & `image-to-video` (+ `tail_image_url` for end frame) | runware `klingai:6@1` |
-| Google Veo 3.1 | fal `fal-ai/veo3.1` (drop `aspect_ratio` when image is provided) | runware `google:3@2` |
-| Veo 3.1 Fast | fal `fal-ai/veo3.1/fast` | runware `google:3@3` |
-| Veo 3.1 Lite | fal `fal-ai/veo3.1/lite` | — |
-| Sora 2 | runware `openai:3@1` | — |
-| Runway Gen-4.5 | runware `runwayml:gen@4.5` | — |
-| PixVerse V6 | fal `fal-ai/pixverse/v6/...` | — |
-| Hailuo (MiniMax) | fal `fal-ai/minimax/video-01-live/...` | — |
-| LTX-2 | fal `fal-ai/ltx-2-19b/...` | — |
-| Grok Imagine | runware `xai:grok-imagine@video` | — |
+## Technical notes
 
-### Video — Edit
-- Kling 3.0 Omni Edit → fal `fal-ai/kling-video/v1/pro/effects` (verified slug)
-- Kling O1 Video Edit → fal `fal-ai/kling-video/v1.6/pro/elements`
-- Grok Imagine Edit → runware `xai:grok-imagine@video`
-
-### Video — Motion Control
-- Default = ev-kling-v3-motion (Evolink) → fallback fal `fal-ai/kling-video/v3/pro/motion-control`
-- Kling 2.6 Motion Pro / Std → fal slugs as today
-- Seedance Motion → runware with `frameImages` + `referenceVideos`
-
----
-
-## 3. Edge function rewrite
-
-### `supabase/functions/generate-image/index.ts`
-- Accept `{prompt, refs, modelId, quality, aspectRatio}`.
-- Resolve `modelId` → registry entry → try `[primary, ...fallbacks]` in order.
-- Per-provider adapters: `callApiyi()`, `callFal()`, `callRunware()` — each returns `{url}` or throws a typed error (`ProviderError(kind: 'nsfw'|'rate'|'auth'|'badRequest'|'transient', message)`).
-- Only `nsfw` and explicit `auth` errors abort; `transient`/`badRequest` advance to next fallback.
-- Always return `{imageUrl}` (never base64) to avoid the 6 MB worker limit.
-
-### `supabase/functions/generate-video/index.ts`
-Major fixes:
-1. **Runware poll**: replace the broken re-submit loop with the documented poll task:
-   ```json
-   [{ "taskType": "getResponse", "taskUUID": "<id>" }]
-   ```
-   Read `data[0].videoURL` / `status`.
-2. **Runware motion-control**: handle `mode === 'motion-control'` for `rw-seedance-1.5-pro` — emit `frameImages: [{imageURL: characterImg}]` + `referenceVideos: [motionVideo]`.
-3. **Kling start+end frame**: switch end-frame field from `end_image_url` to `tail_image_url` for the Kling family. Veo/PixVerse keep `end_image_url`.
-4. **Veo image-to-video**: drop `aspect_ratio` when `image_url` set (Veo derives from image).
-5. **Edit endpoints**: replace stale Kling Omni/O1 edit slugs with verified `effects` / `elements`.
-6. **Submit fallback**: if primary submit returns 4xx/5xx, automatically try fallback provider before bubbling the error.
-7. **Background polling**: move polling out of the client into the edge function using `EdgeRuntime.waitUntil` + DB writes — client just subscribes via realtime on `video_generations`. This kills the 10-min client timeout problem and works at 1M users.
-8. **Realtime**: add `ALTER PUBLICATION supabase_realtime ADD TABLE public.video_generations;` so the grid updates without polling.
-
-### `supabase/functions/marketing-orchestrate/index.ts`
-- Keep AtlasCloud `asset://` registration for avatars (per memory rule).
-- Re-host product images from signed URLs to `ms-products` permanent path before submitting to fal Seedance (long signed URLs occasionally trip moderation).
-
----
-
-## 4. Client store changes
-
-`src/store/videoStore.ts`
-- Drop the in-store polling loop entirely — just insert the row and subscribe to `video_generations` realtime updates.
-- Remove the 120 × 5s timeout.
-- Keep the optimistic placeholder in the grid.
-
-`src/store/generatorStore.ts`
-- No structural change; just ensure model IDs match the new registry (no UI text change).
-
----
-
-## 5. Database migration
-
-```sql
-ALTER PUBLICATION supabase_realtime ADD TABLE public.video_generations;
-ALTER PUBLICATION supabase_realtime ADD TABLE public.generations;
-ALTER PUBLICATION supabase_realtime ADD TABLE public.ms_generations;
-ALTER TABLE public.video_generations REPLICA IDENTITY FULL;
-ALTER TABLE public.generations REPLICA IDENTITY FULL;
-ALTER TABLE public.ms_generations REPLICA IDENTITY FULL;
-
--- Track which provider actually served each request (for debugging fallbacks)
-ALTER TABLE public.generations        ADD COLUMN IF NOT EXISTS provider_used text;
-ALTER TABLE public.video_generations  ADD COLUMN IF NOT EXISTS provider_used text;
-ALTER TABLE public.video_generations  ADD COLUMN IF NOT EXISTS attempts jsonb DEFAULT '[]'::jsonb;
-```
-
----
-
-## 6. Smoke test (after deploy)
-
-I'll call each surface once via `supabase--curl_edge_functions` and report a checklist:
-- Image: nano-banana-pro, seedream-4, grok-imagine, flux, kling, wan
-- Video Create: kling-v3-pro (start+end), veo-3.1 (image), seedance (Runware), pixverse, ltx
-- Video Edit: kling-omni-edit
-- Motion: ev-kling-v3-motion, rw-seedance
-- Marketing: 1 Seedance UGC
-
-Each row gets ✅/❌ with the actual provider that served it (so you can see fallbacks firing).
-
----
-
-## Files touched
-- `supabase/functions/_shared/modelRegistry.ts` (new — single source of truth)
-- `supabase/functions/generate-image/index.ts` (rewrite via registry + fallback chain)
-- `supabase/functions/generate-video/index.ts` (registry + fixed Runware poll + background polling + correct Kling/Veo fields + edit slugs)
-- `supabase/functions/marketing-orchestrate/index.ts` (re-host product images)
-- `src/store/videoStore.ts` (drop client polling, use realtime)
-- `src/store/generatorStore.ts` (consume registry labels)
-- New SQL migration (realtime + provider_used + attempts log)
-
-## Out of scope (already correct or explicitly deferred)
-- Auth (skipped per your earlier choice)
-- Per-project `/create/:slug` rendering (already wired)
-- Reference-image strip / @-mentions
+- Anthropic prompt caching (`cache_control: ephemeral`) on the system block — already enabled today, must remain on the new combined block. First call full price, ~10% thereafter.
+- All product/avatar images going to Claude AND Nano Banana Pro must route through wsrv.nl (1280w, q82) to stay under 4.5MB Anthropic / Gemini image limits — pattern already used elsewhere.
+- Format selection: BLOCK_2 module + `FORMAT:` line in user text — both required; never rely on only one.
+- Atlas avatar registration constraint (mem://constraint/atlas-avatar-asset-registration) is unaffected: Seedance still needs `asset://` ID for the avatar reference; keyframe is a fresh generated image and goes in as a normal URL.
+- Keyframe failure must never fail the generation — graceful degrade to old reference order is mandatory.
+- Cost: keyframe adds ~$0.04/gen (Nano Banana Pro). Voice samples are one-time per avatar (~$0.05). Vision analysis is one-time per product.
