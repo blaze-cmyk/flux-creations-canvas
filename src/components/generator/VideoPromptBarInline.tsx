@@ -146,6 +146,59 @@ export function VideoPromptBarInline() {
   const SubIcon = SUB_MODES.find(s => s.id === videoSubMode)!.Icon;
   const subLabel = SUB_MODES.find(s => s.id === videoSubMode)!.label;
 
+  // ---------- @-tag system ----------
+  // Assign a stable tag id + human label to each frame slot based on the
+  // current sub-mode and model, so users can reference uploads in the prompt.
+  const slotMeta: { id: string; label: string }[] = useMemo(() => {
+    if (isCreate) {
+      if (createLayout === 'start-end') {
+        return [
+          { id: 'start', label: 'Start frame' },
+          { id: 'end',   label: 'End frame' },
+        ];
+      }
+      if (createLayout === 'single-required' || createLayout === 'single-optional') {
+        return [{ id: 'image_1', label: 'Image 1' }];
+      }
+      return [];
+    }
+    if (isVideoEdit) {
+      if (editSupportsImageRefs) {
+        return [
+          { id: 'source_video', label: 'Source video' },
+          { id: 'image_1', label: 'Image 1' },
+          { id: 'image_2', label: 'Image 2' },
+          { id: 'image_3', label: 'Image 3' },
+          { id: 'image_4', label: 'Image 4' },
+        ];
+      }
+      return [{ id: 'source_video', label: 'Source video' }];
+    }
+    if (isMotion) {
+      return [
+        { id: 'motion',    label: 'Motion reference' },
+        { id: 'character', label: 'Character' },
+      ];
+    }
+    return [{ id: 'image_1', label: 'Image 1' }];
+  }, [isCreate, createLayout, isVideoEdit, editSupportsImageRefs, isMotion]);
+
+  const mentionItems: MentionItem[] = useMemo(
+    () => slotMeta
+      .map((s, i) => {
+        const url = referenceImages[i];
+        if (!url) return null;
+        const isVideo = url.startsWith('data:video') || /\.(mp4|mov|webm)(\?|$)/i.test(url);
+        return { id: s.id, label: s.label, thumbUrl: url, kind: isVideo ? 'video' as const : 'image' as const };
+      })
+      .filter((x): x is MentionItem => !!x),
+    [slotMeta, referenceImages],
+  );
+
+  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+  const mention = useMentionAutocomplete(textareaRef, setPrompt);
+
+
   return (
     <LayoutGroup>
     <motion.div layout className="relative w-full max-w-[1100px] mx-auto">
