@@ -48,7 +48,7 @@ export function VideoPromptBarInline() {
   } = useVideoStore();
   const { videoSubMode, setVideoSubMode } = usePromptModeStore();
   const setStoreMode = useVideoStore(s => s.setMode);
-  useEffect(() => { setStoreMode(videoSubMode); }, [videoSubMode, setStoreMode]);
+  useEffect(() => { if (videoSubMode !== 'seedance-2') setStoreMode(videoSubMode); }, [videoSubMode, setStoreMode]);
   const [sceneControlOn, setSceneControlOn] = useState(true);
 
   const modelDurations = useMemo(() => getDurationsForModel(model), [model]);
