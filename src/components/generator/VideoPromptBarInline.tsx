@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { AnimatePresence, motion, LayoutGroup } from 'framer-motion';
 import { useVideoStore, VIDEO_MODELS, VIDEO_CATALOG, VIDEO_ASPECT_RATIOS, VIDEO_DURATIONS, getDurationsForModel, getResolutionsForModel, type VideoCatalogEntry } from '@/store/videoStore';
 import { usePromptModeStore, type VideoSubMode } from '@/store/promptModeStore';
@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 import { VideoModelIcon } from './VideoModelIcons';
 import { GenerateButton } from './GenerateButton';
+import { MentionDropdown, useMentionAutocomplete, type MentionItem } from './MentionAutocomplete';
 
 const SUB_MODES: { id: VideoSubMode; label: string; Icon: any; desc: string }[] = [
   { id: 'text-to-video', label: 'Create Video', Icon: Film, desc: 'Generate video from prompt' },
@@ -145,6 +146,59 @@ export function VideoPromptBarInline() {
   const SubIcon = SUB_MODES.find(s => s.id === videoSubMode)!.Icon;
   const subLabel = SUB_MODES.find(s => s.id === videoSubMode)!.label;
 
+  // ---------- @-tag system ----------
+  // Assign a stable tag id + human label to each frame slot based on the
+  // current sub-mode and model, so users can reference uploads in the prompt.
+  const slotMeta: { id: string; label: string }[] = useMemo(() => {
+    if (isCreate) {
+      if (createLayout === 'start-end') {
+        return [
+          { id: 'start', label: 'Start frame' },
+          { id: 'end',   label: 'End frame' },
+        ];
+      }
+      if (createLayout === 'single-required' || createLayout === 'single-optional') {
+        return [{ id: 'image_1', label: 'Image 1' }];
+      }
+      return [];
+    }
+    if (isVideoEdit) {
+      if (editSupportsImageRefs) {
+        return [
+          { id: 'source_video', label: 'Source video' },
+          { id: 'image_1', label: 'Image 1' },
+          { id: 'image_2', label: 'Image 2' },
+          { id: 'image_3', label: 'Image 3' },
+          { id: 'image_4', label: 'Image 4' },
+        ];
+      }
+      return [{ id: 'source_video', label: 'Source video' }];
+    }
+    if (isMotion) {
+      return [
+        { id: 'motion',    label: 'Motion reference' },
+        { id: 'character', label: 'Character' },
+      ];
+    }
+    return [{ id: 'image_1', label: 'Image 1' }];
+  }, [isCreate, createLayout, isVideoEdit, editSupportsImageRefs, isMotion]);
+
+  const mentionItems: MentionItem[] = useMemo(
+    () => slotMeta
+      .map((s, i): MentionItem | null => {
+        const url = referenceImages[i];
+        if (!url) return null;
+        const isVideo = url.startsWith('data:video') || /\.(mp4|mov|webm)(\?|$)/i.test(url);
+        return { id: s.id, label: s.label, thumbUrl: url, kind: isVideo ? 'video' : 'image' };
+      })
+      .filter((x): x is MentionItem => !!x),
+    [slotMeta, referenceImages],
+  );
+
+  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+  const mention = useMentionAutocomplete(textareaRef, setPrompt);
+
+
   return (
     <LayoutGroup>
     <motion.div layout className="relative w-full max-w-[1100px] mx-auto">
@@ -174,6 +228,7 @@ export function VideoPromptBarInline() {
                         <FrameSlot
                           key={label}
                           label={label}
+                          tag={slotMeta[idx]?.id}
                           optional={idx === 1}
                           portrait
                           url={referenceImages[idx]}
@@ -187,6 +242,7 @@ export function VideoPromptBarInline() {
                       return (
                         <SingleUploadTile
                           optional={createLayout === 'single-optional'}
+                          tag={slotMeta[0]?.id}
                           url={referenceImages[0]}
                           onUpload={() => onUploadAt(0)}
                           onRemove={() => removeReferenceImage(0)}
@@ -206,6 +262,7 @@ export function VideoPromptBarInline() {
                       <FrameSlot
                         key={label}
                         label={label}
+                        tag={slotMeta[idx]?.id}
                         optional={idx > 0}
                         url={referenceImages[idx]}
                         onUpload={() => onUploadAt(idx)}
@@ -221,6 +278,7 @@ export function VideoPromptBarInline() {
                         <MotionSlot
                           kind="video"
                           title="Add motion to copy"
+                          tag={slotMeta[0]?.id}
                           subtitle={<>Video duration:<br/>3–30 seconds</>}
                           url={referenceImages[0]}
                           onUpload={() => onUploadAt(0)}
@@ -230,6 +288,7 @@ export function VideoPromptBarInline() {
                         <MotionSlot
                           kind="character"
                           title="Add your character"
+                          tag={slotMeta[1]?.id}
                           subtitle={<>Image with visible<br/>face and body</>}
                           url={referenceImages[1]}
                           onUpload={() => onUploadAt(1)}
@@ -248,6 +307,7 @@ export function VideoPromptBarInline() {
                   return (
                     <FrameSlot
                       label="Image"
+                      tag={slotMeta[0]?.id}
                       url={referenceImages[0]}
                       onUpload={() => onUploadAt(0)}
                       onRemove={() => removeReferenceImage(0)}
@@ -264,33 +324,47 @@ export function VideoPromptBarInline() {
         {/* Prompt + CTA */}
         <div className="flex items-start gap-2">
           <div className="flex-1 min-w-0 flex flex-col gap-1.5 py-1 pr-1 pl-3">
-            <textarea
-              ref={(el) => {
-                if (!el) return;
-                el.style.height = 'auto';
-                el.style.height = Math.min(el.scrollHeight, 220) + 'px';
-              }}
-              value={prompt}
-              onChange={(e) => {
-                setPrompt(e.target.value);
-                e.currentTarget.style.height = 'auto';
-                e.currentTarget.style.height = Math.min(e.currentTarget.scrollHeight, 220) + 'px';
-              }}
-              placeholder={isMotion
-                ? 'Describe additional motion guidance (optional)…'
-                : isVideoEdit
-                  ? 'Describe how to edit the video…'
-                  : 'Describe your video, like "A woman walking through a neon-lit city"'}
-              rows={3}
-              className="w-full bg-transparent border-0 text-sm leading-[1.6] text-foreground placeholder:text-muted-foreground/70 focus:outline-none resize-none ms-prompt-scroll min-h-[72px] max-h-[220px] overflow-y-auto"
-              style={{ fontFamily: 'Montserrat, system-ui, sans-serif' }}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' && !e.shiftKey) {
-                  e.preventDefault();
-                  handleSubmit();
-                }
-              }}
-            />
+            <div className="relative">
+              <textarea
+                ref={(el) => {
+                  textareaRef.current = el;
+                  if (!el) return;
+                  el.style.height = 'auto';
+                  el.style.height = Math.min(el.scrollHeight, 220) + 'px';
+                }}
+                value={prompt}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setPrompt(val);
+                  e.currentTarget.style.height = 'auto';
+                  e.currentTarget.style.height = Math.min(e.currentTarget.scrollHeight, 220) + 'px';
+                  const caret = e.currentTarget.selectionStart ?? val.length;
+                  if (mentionItems.length > 0) mention.detect({ value: val, caret });
+                  else mention.close();
+                }}
+                placeholder={isMotion
+                  ? 'Describe additional motion guidance (optional)… type @ to reference an upload'
+                  : isVideoEdit
+                    ? 'Describe how to edit the video… type @ to reference an upload'
+                    : 'Describe your video. Type @ to reference an upload (e.g. @start, @end).'}
+                rows={3}
+                className="w-full bg-transparent border-0 text-sm leading-[1.6] text-foreground placeholder:text-muted-foreground/70 focus:outline-none resize-none ms-prompt-scroll min-h-[72px] max-h-[220px] overflow-y-auto"
+                style={{ fontFamily: 'Montserrat, system-ui, sans-serif' }}
+                onKeyDown={(e) => {
+                  if (mention.open && e.key === 'Escape') { mention.close(); return; }
+                  if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    handleSubmit();
+                  }
+                }}
+              />
+              <MentionDropdown
+                open={mention.open}
+                query={mention.query}
+                items={mentionItems}
+                onPick={(item) => mention.insert(item, prompt)}
+              />
+            </div>
             {!isMotion && (
               <div className="flex items-center gap-2">
                 <button
@@ -534,8 +608,8 @@ export function VideoPromptBarInline() {
 }
 
 function FrameSlot({
-  label, optional, url, onUpload, onRemove, onDropFile, portrait,
-}: { label: string; optional?: boolean; url?: string; onUpload: () => void; onRemove: () => void; onDropFile?: (f: File) => void; portrait?: boolean }) {
+  label, optional, url, onUpload, onRemove, onDropFile, portrait, tag,
+}: { label: string; optional?: boolean; url?: string; onUpload: () => void; onRemove: () => void; onDropFile?: (f: File) => void; portrait?: boolean; tag?: string }) {
   const [over, setOver] = useState(false);
   const dropProps = {
     onDragOver: (e: React.DragEvent) => { e.preventDefault(); setOver(true); },
@@ -561,6 +635,11 @@ function FrameSlot({
         >
           <X className="w-3.5 h-3.5" />
         </button>
+        {tag && (
+          <span className="absolute top-1.5 left-1.5 px-1.5 py-0.5 rounded-md bg-[#9C3FED] text-white text-[10px] font-bold font-mono">
+            @{tag}
+          </span>
+        )}
         <div className="absolute bottom-2 left-2.5 text-[12px] font-semibold text-white drop-shadow">{label}</div>
       </div>
     );
@@ -578,12 +657,15 @@ function FrameSlot({
         <ImagePlus className={portrait ? 'w-5 h-5' : 'w-4 h-4'} />
       </div>
       <span className={`${portrait ? 'text-[13px] font-semibold text-foreground' : 'text-[11px]'}`}>{label}</span>
+      {tag && (
+        <span className="text-[10px] text-muted-foreground/70 font-mono">@{tag}</span>
+      )}
     </button>
   );
 }
 
 function MotionSlot({
-  kind, title, subtitle, url, onUpload, onRemove, onDropFile,
+  kind, title, subtitle, url, onUpload, onRemove, onDropFile, tag,
 }: {
   kind: 'video' | 'character';
   title: string;
@@ -592,6 +674,7 @@ function MotionSlot({
   onUpload: () => void;
   onRemove: () => void;
   onDropFile?: (f: File) => void;
+  tag?: string;
 }) {
   const [over, setOver] = useState(false);
   const isVideo = !!url && (url.startsWith('data:video') || /\.(mp4|mov|webm)(\?|$)/i.test(url));
@@ -618,6 +701,11 @@ function MotionSlot({
         >
           <X className="w-3 h-3" />
         </button>
+        {tag && (
+          <span className="absolute top-1 left-1 px-1.5 py-0.5 rounded-md bg-[#9C3FED] text-white text-[10px] font-bold font-mono">
+            @{tag}
+          </span>
+        )}
       </div>
     );
   }
@@ -633,6 +721,9 @@ function MotionSlot({
       </div>
       <span className="text-[12px] font-semibold text-foreground text-center leading-tight">{title}</span>
       <span className="text-[10px] text-muted-foreground/70 text-center leading-tight">{subtitle}</span>
+      {tag && (
+        <span className="text-[10px] text-muted-foreground/70 font-mono mt-0.5">@{tag}</span>
+      )}
     </button>
   );
 }
@@ -696,8 +787,8 @@ function AspectIcon({ ratio, className = '' }: { ratio: string; className?: stri
 // Single wide upload tile (Veo 3.1 Lite, Grok Imagine, Sora 2…)
 // =============================================================
 function SingleUploadTile({
-  optional, url, onUpload, onRemove, onDropFile,
-}: { optional?: boolean; url?: string; onUpload: () => void; onRemove: () => void; onDropFile?: (f: File) => void }) {
+  optional, url, onUpload, onRemove, onDropFile, tag,
+}: { optional?: boolean; url?: string; onUpload: () => void; onRemove: () => void; onDropFile?: (f: File) => void; tag?: string }) {
   const [over, setOver] = useState(false);
   const dropProps = {
     onDragOver: (e: React.DragEvent) => { e.preventDefault(); setOver(true); },
@@ -718,6 +809,11 @@ function SingleUploadTile({
         >
           <X className="w-3.5 h-3.5" />
         </button>
+        {tag && (
+          <span className="absolute top-2 left-2 px-1.5 py-0.5 rounded-md bg-[#9C3FED] text-white text-[10px] font-bold font-mono">
+            @{tag}
+          </span>
+        )}
       </div>
     );
   }
@@ -737,6 +833,7 @@ function SingleUploadTile({
         Upload image or <span className="text-white underline underline-offset-2">generate it</span>
       </div>
       <div className="text-[9px] text-muted-foreground/70 text-center">PNG, JPG or paste</div>
+      {tag && <div className="text-[10px] text-muted-foreground/70 font-mono">@{tag}</div>}
     </button>
   );
 }

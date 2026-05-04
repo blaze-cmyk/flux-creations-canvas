@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useRef } from 'react';
 import { motion, LayoutGroup } from 'framer-motion';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import { ChevronDownIcon } from '@/components/marketingstudio/FormatIcons';
 import { GenerateButton } from './GenerateButton';
+import { MentionDropdown, useMentionAutocomplete, type MentionItem } from './MentionAutocomplete';
 import {
   useSeedanceStore, MAX_IMAGES, MAX_VIDEOS, MAX_AUDIOS, MAX_MEDIA_SECONDS,
   SEEDANCE_RESOLUTIONS, SEEDANCE_RATIOS,
@@ -89,7 +90,16 @@ export function SeedancePromptBar() {
 
 
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const pendingKindRef = useRef<SeedanceAssetKind>('image');
+
+  // @-mention autocomplete (typing "@" filters all uploaded assets)
+  const mention = useMentionAutocomplete(textareaRef, setPrompt);
+  const mentionItems: MentionItem[] = [
+    ...images.map((a) => ({ id: a.id, label: a.name || a.id, thumbUrl: a.url, kind: 'image' as const })),
+    ...videos.map((a) => ({ id: a.id, label: a.name || a.id, thumbUrl: a.url, kind: 'video' as const })),
+    ...audios.map((a) => ({ id: a.id, label: a.name || a.id, kind: 'audio' as const })),
+  ];
 
   const triggerUpload = (kind: SeedanceAssetKind) => {
     pendingKindRef.current = kind;
@@ -185,29 +195,43 @@ export function SeedancePromptBar() {
                onDragOver={(e) => e.preventDefault()}
                onDrop={onPromptDrop}>
             <div className="flex-1 min-w-0 flex flex-col gap-1.5 py-1 pr-1 pl-3">
-              <textarea
-                ref={(el) => {
-                  if (!el) return;
-                  el.style.height = 'auto';
-                  el.style.height = Math.min(el.scrollHeight, 220) + 'px';
-                }}
-                value={prompt}
-                onChange={(e) => {
-                  setPrompt(e.target.value);
-                  e.currentTarget.style.height = 'auto';
-                  e.currentTarget.style.height = Math.min(e.currentTarget.scrollHeight, 220) + 'px';
-                }}
-                placeholder='Describe the shot. Reference uploads as @image_1, @video_1, @audio_1…'
-                rows={3}
-                className="w-full bg-transparent border-0 text-sm leading-[1.6] text-foreground placeholder:text-muted-foreground/70 focus:outline-none resize-none ms-prompt-scroll min-h-[72px] max-h-[220px] overflow-y-auto"
-                style={{ fontFamily: 'Montserrat, system-ui, sans-serif' }}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' && !e.shiftKey) {
-                    e.preventDefault();
-                    if (canSubmit) generate();
-                  }
-                }}
-              />
+              <div className="relative">
+                <textarea
+                  ref={(el) => {
+                    textareaRef.current = el;
+                    if (!el) return;
+                    el.style.height = 'auto';
+                    el.style.height = Math.min(el.scrollHeight, 220) + 'px';
+                  }}
+                  value={prompt}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setPrompt(val);
+                    e.currentTarget.style.height = 'auto';
+                    e.currentTarget.style.height = Math.min(e.currentTarget.scrollHeight, 220) + 'px';
+                    const caret = e.currentTarget.selectionStart ?? val.length;
+                    if (mentionItems.length > 0) mention.detect({ value: val, caret });
+                    else mention.close();
+                  }}
+                  placeholder='Describe the shot. Type @ to reference an upload.'
+                  rows={3}
+                  className="w-full bg-transparent border-0 text-sm leading-[1.6] text-foreground placeholder:text-muted-foreground/70 focus:outline-none resize-none ms-prompt-scroll min-h-[72px] max-h-[220px] overflow-y-auto"
+                  style={{ fontFamily: 'Montserrat, system-ui, sans-serif' }}
+                  onKeyDown={(e) => {
+                    if (mention.open && e.key === 'Escape') { mention.close(); return; }
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                      e.preventDefault();
+                      if (canSubmit) generate();
+                    }
+                  }}
+                />
+                <MentionDropdown
+                  open={mention.open}
+                  query={mention.query}
+                  items={mentionItems}
+                  onPick={(item) => mention.insert(item, prompt)}
+                />
+              </div>
               <div className="flex items-center gap-2 flex-wrap">
                 <button
                   onClick={() => setGenerateAudio(!generateAudio)}
