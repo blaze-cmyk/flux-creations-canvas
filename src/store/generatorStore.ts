@@ -43,6 +43,8 @@ type GeneratorState = {
   deleteImage: (id: string) => void;
   useAsReference: (imageUrl: string) => void;
   loadHistory: (projectId?: string | null) => Promise<void>;
+  upsertFromRealtime: (row: any) => void;
+  removeById: (id: string) => void;
   moveImageToProject: (id: string, projectId: string | null) => Promise<void>;
   toggleLike: (id: string) => void;
 };
