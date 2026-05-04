@@ -12,6 +12,7 @@ type State = {
 };
 
 let pollTimer: ReturnType<typeof setInterval> | null = null;
+let realtimeChannel: ReturnType<typeof supabase.channel> | null = null;
 let activeProject: string | null = null;
 
 const mapRow = (row: any): MSGeneration => ({
@@ -40,11 +41,24 @@ export const useMarketingFeedStore = create<State>((set, get) => ({
   loading: false,
 
   startPolling: (createProjectId: string) => {
-    if (activeProject === createProjectId && pollTimer) return;
+    if (activeProject === createProjectId && (pollTimer || realtimeChannel)) return;
     if (pollTimer) clearInterval(pollTimer);
+    if (realtimeChannel) supabase.removeChannel(realtimeChannel);
     activeProject = createProjectId;
 
-    const sync = async () => {
+    const upsertOne = (row: any) => {
+      const item = mapRow(row);
+      set((s) => {
+        const list = s.byProject[createProjectId] || [];
+        const idx = list.findIndex((g) => g.id === item.id);
+        const next = idx >= 0
+          ? list.map((g) => (g.id === item.id ? { ...g, ...item } : g))
+          : [item, ...list];
+        return { byProject: { ...s.byProject, [createProjectId]: next } };
+      });
+    };
+
+    const initialLoad = async () => {
       const { data, error } = await (supabase
         .from('ms_generations' as any)
         .select(
@@ -56,27 +70,65 @@ export const useMarketingFeedStore = create<State>((set, get) => ({
       if (error || !data) return;
       const items = (data as any[]).map(mapRow);
       set((s) => ({ byProject: { ...s.byProject, [createProjectId]: items } }));
+    };
 
-      // Trigger provider polling for any in-flight jobs — the edge function
-      // checks Atlas/fal and writes the final video_url back to the DB.
-      const inflight = (data as any[]).filter(
-        (r) => r.fal_request_id && (r.status === 'queued' || r.status === 'processing'),
+    const kickProviderPoll = async () => {
+      const list = get().byProject[createProjectId] || [];
+      const inflight = list.filter(
+        (g) => g.falRequestId && (g.status === 'queued' || (g.status as string) === 'processing' || g.status === 'running'),
       );
       await Promise.all(
-        inflight.map((r) =>
+        inflight.map((g) =>
           supabase.functions
-            .invoke('marketing-generate-video', { body: { poll: r.id } })
+            .invoke('marketing-generate-video', { body: { poll: g.id } })
             .catch(() => {}),
         ),
       );
     };
-    sync();
-    pollTimer = setInterval(sync, 4000);
+
+    initialLoad().then(() => kickProviderPoll());
+
+    // Realtime: instant UI updates when ms_generations rows change.
+    // We can't filter by an OR across two columns, so subscribe broadly and
+    // filter client-side to rows tied to this create/legacy project.
+    realtimeChannel = supabase
+      .channel(`ms_feed:${createProjectId}`)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'ms_generations' },
+        (payload) => {
+          const row = (payload.new ?? payload.old) as any;
+          if (!row?.id) return;
+          if (
+            row.create_project_id !== createProjectId &&
+            row.project_id !== createProjectId
+          )
+            return;
+          if (payload.eventType === 'DELETE') {
+            set((s) => ({
+              byProject: {
+                ...s.byProject,
+                [createProjectId]: (s.byProject[createProjectId] || []).filter((g) => g.id !== row.id),
+              },
+            }));
+            return;
+          }
+          upsertOne(row);
+        },
+      )
+      .subscribe();
+
+    // Provider-side polling (fal/Atlas are pull-only). Realtime handles UI;
+    // this loop just nudges the edge function to check the provider. Slowed
+    // from 4s → 15s now that the UI no longer depends on it for freshness.
+    pollTimer = setInterval(kickProviderPoll, 15000);
   },
 
   stopPolling: () => {
     if (pollTimer) clearInterval(pollTimer);
+    if (realtimeChannel) supabase.removeChannel(realtimeChannel);
     pollTimer = null;
+    realtimeChannel = null;
     activeProject = null;
   },
 
