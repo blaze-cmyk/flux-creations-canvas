@@ -157,7 +157,13 @@ async function uploadAtlasMedia(rawUrl: string, label: string): Promise<string |
   const text = await res.text();
   let parsed: any = {};
   try { parsed = JSON.parse(text); } catch { /* keep text */ }
-  const mediaUrl = parsed?.url ?? parsed?.data?.url ?? parsed?.data?.file_url ?? parsed?.file_url;
+  const mediaUrl =
+    parsed?.data?.download_url ??
+    parsed?.data?.url ??
+    parsed?.data?.file_url ??
+    parsed?.download_url ??
+    parsed?.url ??
+    parsed?.file_url;
   if (!res.ok || !isHttpUrl(mediaUrl)) {
     log('WARN', 'media upload failed', { label, status: res.status, body: text.slice(0, 240) });
     return null;
