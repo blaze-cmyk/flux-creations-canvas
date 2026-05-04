@@ -348,8 +348,21 @@ function withReferenceMap(prompt: string, bundle: ReferenceBundle) {
   return `${lines.join('\n')}\n\n${prompt}`;
 }
 
+function assertNoRawHumanReferences(bundle: ReferenceBundle): string | null {
+  if (!bundle.hasAvatar) return null;
+  if (bundle.assetRegistrationError) return bundle.assetRegistrationError;
+  const rawHumanRef = bundle.atlasReferenceImages?.find((url) => !String(url).startsWith('asset://') && (
+    /ms-avatars/i.test(String(url)) || /ms-keyframes/i.test(String(url)) || String(url).includes('wsrv.nl')
+  ));
+  return rawHumanRef
+    ? 'AtlasCloud portrait asset registration did not complete, so the avatar/keyframe was not submitted as a raw image. Retry shortly or re-upload the avatar.'
+    : null;
+}
+
 async function atlasSubmit(opts: { prompt: string; bundle: ReferenceBundle; duration: number; resolution: string; ratio: string; generateAudio: boolean }): Promise<SubmitOutcome> {
   if (!ATLAS_KEY) return { ok: false, error: 'ATLASCLOUD_API_KEY not configured' };
+  const humanRefError = assertNoRawHumanReferences(opts.bundle);
+  if (humanRefError) return { ok: false, error: humanRefError };
   const endpoint = opts.bundle.mode === 'reference-to-video' ? SEEDANCE_REF : SEEDANCE_TEXT;
   const body: Record<string, unknown> = {
     model: endpoint,
