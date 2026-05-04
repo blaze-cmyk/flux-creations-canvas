@@ -1,4 +1,4 @@
-// Non-billing health probe for Marketing Studio providers.
+// Non-billing health probe for Marketing Studio video provider (AtlasCloud only).
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -7,7 +7,6 @@ const corsHeaders = {
 };
 
 const ATLAS_KEY = Deno.env.get('ATLASCLOUD_API_KEY') ?? '';
-const FAL_KEY = Deno.env.get('FAL_KEY') ?? '';
 
 type ProviderStatus = 'ok' | 'balance_error' | 'down' | 'unconfigured';
 interface ProbeResult { status: ProviderStatus; message: string; latencyMs: number; }
@@ -38,26 +37,12 @@ async function probeAtlas(): Promise<ProbeResult> {
   }
 }
 
-async function probeFal(): Promise<ProbeResult> {
-  if (!FAL_KEY) return { status: 'unconfigured', message: 'FAL_KEY not set', latencyMs: 0 };
-  const started = Date.now();
-  try {
-    const res = await fetch('https://queue.fal.run/bytedance/seedance-2.0/reference-to-video/requests/health-check/status', {
-      headers: { Authorization: `Key ${FAL_KEY}`, Accept: 'application/json' },
-    });
-    const text = await res.text();
-    const latencyMs = Date.now() - started;
-    if (res.status === 401 || res.status === 403) return { status: 'down', message: 'auth rejected', latencyMs };
-    if (isBalanceError(res.status, text)) return { status: 'balance_error', message: 'balance/auth issue', latencyMs };
-    return { status: 'ok', message: 'configured', latencyMs };
-  } catch (e) {
-    return { status: 'down', message: e instanceof Error ? e.message : 'network error', latencyMs: Date.now() - started };
-  }
-}
-
 async function runProbes(): Promise<CachedHealth> {
-  const [atlas, fal] = await Promise.all([probeAtlas(), probeFal()]);
-  return { checkedAt: Date.now(), atlas, fal, blockGeneration: atlas.status !== 'ok' && fal.status !== 'ok' };
+  const atlas = await probeAtlas();
+  // fal is no longer used by the Marketing Studio video pipeline. Keep the
+  // shape so the UI doesn't break, but mark it as unconfigured/not used.
+  const fal: ProbeResult = { status: 'unconfigured', message: 'not used (AtlasCloud-only pipeline)', latencyMs: 0 };
+  return { checkedAt: Date.now(), atlas, fal, blockGeneration: atlas.status !== 'ok' };
 }
 
 Deno.serve(async (req) => {
