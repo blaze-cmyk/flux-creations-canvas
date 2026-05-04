@@ -556,7 +556,10 @@ export const useVideoStore = create<VideoState>()((set, get) => ({
   loadHistory: async (projectId?: string | null) => {
     const key = projectId ?? '__all__';
     const loaded = (get() as any)._loadedProjects as Set<string> | undefined;
-    if (loaded?.has(key)) return;
+    const hasPendingForKey = get().videos.some((v) =>
+      v.status === 'generating' && (!projectId || v.projectId === projectId),
+    );
+    if (loaded?.has(key) && !hasPendingForKey) return;
     try {
       let q = (supabase as any)
         .from('video_generations')
