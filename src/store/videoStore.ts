@@ -193,6 +193,8 @@ type VideoState = {
   deleteVideo: (id: string) => void;
   toggleLike: (id: string) => void;
   loadHistory: (projectId?: string | null) => Promise<void>;
+  upsertFromRealtime: (row: any) => void;
+  removeById: (id: string) => void;
   _historyLoaded: boolean;
   _loadedProjects?: Set<string>;
 };
