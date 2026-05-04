@@ -115,13 +115,17 @@ function toWsrvJpg(rawUrl: string, w = 1024, h = 1024): string {
 // Register an image as a portrait asset on AtlasCloud. Returns asset:// URI
 // or null on failure. We register every reference image so identity-bearing
 // shots (faces) reliably pass Seedance's "real person" moderator.
-async function createAtlasAsset(imageUrl: string, label: string): Promise<string | null> {
-  if (!ATLAS_KEY || !imageUrl) return null;
-  const submittedUrl = toWsrvJpg(imageUrl);
+async function createAtlasAsset(
+  rawUrl: string,
+  label: string,
+  assetType: 'Image' | 'Video' = 'Image',
+): Promise<string | null> {
+  if (!ATLAS_KEY || !rawUrl) return null;
+  const submittedUrl = assetType === 'Image' ? toWsrvJpg(rawUrl) : rawUrl;
   const res = await fetch(`${ATLAS_ASSET_BASE}/sd/assets`, {
     method: 'POST',
     headers: { Authorization: `Bearer ${ATLAS_KEY}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ url: submittedUrl, name: label, asset_type: 'Image' }),
+    body: JSON.stringify({ url: submittedUrl, name: label, asset_type: assetType }),
   });
   const text = await res.text();
   let parsed: any = {};
