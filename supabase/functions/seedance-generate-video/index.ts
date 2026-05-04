@@ -502,6 +502,7 @@ Deno.serve(async (req) => {
 
     let submission = await atlasSubmit({ ...baseSubmit, generateAudio: effectiveGenerateAudio });
     let audioFallbackUsed = false;
+    let videoFallbackUsed = false;
 
     // Auto-retry visual-only on ANY audio-moderation failure, not just when the
     // user explicitly enabled audio. AtlasCloud sometimes flags generated audio
@@ -511,10 +512,30 @@ Deno.serve(async (req) => {
       submission = await atlasSubmit({ ...baseSubmit, generateAudio: false });
     }
 
+    // Seedance moderation often flags reference videos that contain a clearly
+    // identifiable real person. We can't override that — but if the user also
+    // gave us a reference image, fall back to image-to-video so they still get
+    // a usable generation. Otherwise surface the error verbatim.
+    const isRealPersonModeration = (e?: string) => /input video.*sensitive|real person/i.test(e ?? '');
+    if (!submission.ok && isRealPersonModeration(submission.error) && assetImages.length > 0) {
+      videoFallbackUsed = true;
+      log('WARN', 'video flagged as real person — retrying without reference video', { images: assetImages.length });
+      const fallbackVariant = normVariant('bytedance/seedance-2.0/reference-to-video', true);
+      submission = await atlasSubmit({
+        ...baseSubmit,
+        videoUrls: [],
+        variant: fallbackVariant,
+        generateAudio: false,
+      });
+    }
+
     if (!submission.ok) {
-      log('WARN', 'submit failed', { err: submission.error });
-      if (videoId) await updateRow(admin, videoId, { status: 'failed', stage: 'failed', error: submission.error });
-      return json({ status: 'failed', stage: 'failed', error: submission.error });
+      const enrichedError = isRealPersonModeration(submission.error)
+        ? `${submission.error} (Tip: try a 2–3s clip, side angle, or partial-face framing — Seedance moderation rejects clearly identifiable faces.)`
+        : submission.error;
+      log('WARN', 'submit failed', { err: enrichedError });
+      if (videoId) await updateRow(admin, videoId, { status: 'failed', stage: 'failed', error: enrichedError });
+      return json({ status: 'failed', stage: 'failed', error: enrichedError });
     }
 
     if (videoId) {
