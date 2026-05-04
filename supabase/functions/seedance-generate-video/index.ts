@@ -323,7 +323,7 @@ Deno.serve(async (req) => {
     const submission = await atlasSubmit({
       prompt: promptText || 'The character in image 1 dances gracefully to the music',
       imageUrls: assetImages,
-      videoUrls: videos,
+      videoUrls: assetVideos,
       audioUrls: audios,
       duration: clampDuration(duration),
       resolution: normRes(resolution),
