@@ -363,6 +363,11 @@ export const useSeedanceStore = create<SeedanceState>((set, get) => ({
         description: 'Seedance moderation rejected the audio track — retried as visual-only.',
       });
     }
+    if (data?.videoFallbackUsed) {
+      toast.message('Reference video skipped', {
+        description: 'Seedance flagged the clip as a real person. Generating from the reference image(s) only.',
+      });
+    }
 
     // Reset UI for next prompt; polling continues in background.
     set({ isSubmitting: false });
