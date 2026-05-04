@@ -1,14 +1,16 @@
 import { useState, useRef } from 'react';
 import { motion, LayoutGroup } from 'framer-motion';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { Slider } from '@/components/ui/slider';
 import {
-  ImagePlus, Film, Music, X, Plus, Tag, Clock, Check, Volume2, VolumeX,
+  ImagePlus, Film, Music, X, Plus, Clock, Volume2, VolumeX, Gem,
 } from 'lucide-react';
 import { ChevronDownIcon } from '@/components/marketingstudio/FormatIcons';
 import { GenerateButton } from './GenerateButton';
 import {
   useSeedanceStore, MAX_IMAGES, MAX_VIDEOS, MAX_AUDIOS, MAX_MEDIA_SECONDS,
-  SEEDANCE_RESOLUTIONS, SEEDANCE_RATIOS, SEEDANCE_DURATIONS,
+  SEEDANCE_RESOLUTIONS, SEEDANCE_RATIOS,
   type SeedanceAsset, type SeedanceAssetKind,
 } from '@/store/seedanceStore';
 
