@@ -392,18 +392,17 @@ function ImageCard({ image }: {
 
   const aspectClass = getAspectClass(image.aspectRatio);
 
-  // Tick every second while generating so elapsed/progress updates live.
-  const [, forceTick] = useState(0);
-  useEffect(() => {
-    if (image.status !== 'generating') return;
-    const t = setInterval(() => forceTick((n) => n + 1), 1000);
-    return () => clearInterval(t);
-  }, [image.status]);
+  // Live, model-aware progress (asymptotic, snaps to 100% on complete).
+  const { pct: imgPct, elapsed: imgElapsed } = useGenerationProgress({
+    kind: 'image',
+    startedAt: image.createdAt,
+    isComplete: image.status === 'complete',
+    isFailed: image.status === 'failed' || image.status === 'nsfw',
+    hint: image.model,
+  });
 
   // Generating state — Marketing Studio style queue card with shimmer + progress
   if (image.status === 'generating') {
-    const elapsed = Math.floor((Date.now() - image.createdAt) / 1000);
-    const pct = Math.min(95, Math.floor((elapsed / 60) * 100));
     return (
       <div className="relative w-full h-full overflow-hidden bg-ms-surface-2 ring-1 ring-ms-border">
         <div className="absolute inset-0 ms-shimmer opacity-40" />
@@ -412,10 +411,15 @@ function ImageCard({ image }: {
           <div className="text-[11px] font-medium tracking-wide uppercase text-center">
             Generating…
           </div>
-          <div className="w-3/4 h-1 rounded-full bg-white/10 overflow-hidden">
-            <div className="h-full bg-foreground/80 transition-all" style={{ width: `${pct}%` }} />
+          <div className="w-3/4 h-1.5 rounded-full bg-white/10 overflow-hidden">
+            <div
+              className="h-full bg-foreground/90 transition-[width] duration-700 ease-out"
+              style={{ width: `${imgPct}%` }}
+            />
           </div>
-          <div className="text-[10px] text-muted-foreground">{elapsed}s</div>
+          <div className="text-[10px] tabular-nums text-muted-foreground">
+            {Math.round(imgPct)}% · {imgElapsed}s
+          </div>
         </div>
       </div>
     );
