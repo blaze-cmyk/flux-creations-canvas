@@ -503,17 +503,7 @@ Deno.serve(async (req) => {
     const extraImageUrls = Array.isArray(image_urls) ? uniqueValidUrls(image_urls, 9) : [];
     const audioSourceUrls = await gatherAudioSourceUrls(admin, { avatarId, format });
 
-    let keyframeUrl: string | null = (body.keyframe_url as string | null) ?? null;
-    if (!keyframeUrl && reuseGenerationId) {
-      const { data: existingRow } = await admin
-        .from('ms_generations')
-        .select('keyframe_url, keyframe_path')
-        .eq('id', reuseGenerationId)
-        .maybeSingle();
-      if (existingRow?.keyframe_url) keyframeUrl = existingRow.keyframe_url as string;
-    }
-
-    const bundle = await buildReferenceBundle(admin, { productId, avatarId, extraImageUrls, audioSourceUrls, keyframeUrl });
+    const bundle = await buildReferenceBundle(admin, { productId, avatarId, extraImageUrls, audioSourceUrls });
 
     log('INFO', 'submit: bundle built', {
       mode: bundle.mode,
@@ -521,7 +511,6 @@ Deno.serve(async (req) => {
       refAudios: bundle.referenceAudios.length,
       hasAvatar: bundle.hasAvatar,
       hasProduct: bundle.hasProduct,
-      hasKeyframe: !!keyframeUrl,
       provider: 'atlascloud',
     });
 
@@ -542,9 +531,6 @@ Deno.serve(async (req) => {
       duration_seconds: duration,
       resolution: normalizeAtlasResolution(resolution),
     };
-    if (keyframeUrl) {
-      rowPayload.keyframe_url = keyframeUrl;
-    }
 
     if (reuseGenerationId) {
       const { data: updated, error } = await admin.from('ms_generations').update(rowPayload).eq('id', reuseGenerationId).select().single();
