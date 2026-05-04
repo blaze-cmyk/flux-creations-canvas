@@ -368,8 +368,6 @@ export default function MarketingStudioProject() {
             {items.map((g) => {
               const isPending = isGenerationPending(g);
               const isFailed = g.status === 'failed';
-              const elapsed = Math.floor((Date.now() - (g.submittedAt || g.createdAt)) / 1000);
-              const pct = Math.min(95, Math.floor((elapsed / 120) * 100)); // fake progress to 95% over 2min
               return (
                 <button
                   key={g.id}
