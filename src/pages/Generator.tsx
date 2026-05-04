@@ -31,6 +31,9 @@ export default function Generator() {
   const projects = useCreateProjectsStore((s) => s.projects);
   const projectsLoaded = useCreateProjectsStore((s) => s.loaded);
   const activeProjectId = useCreateProjectsStore((s) => s.activeProjectId);
+  const hasActiveGeneratingVideo = useVideoStore((s) =>
+    s.videos.some((v) => v.status === 'generating' && (!activeProjectId || v.projectId === activeProjectId)),
+  );
   const setActiveProject = useCreateProjectsStore((s) => s.setActiveProject);
   const loadProjects = useCreateProjectsStore((s) => s.loadProjects);
   const createProject = useCreateProjectsStore((s) => s.createProject);
@@ -48,6 +51,14 @@ export default function Generator() {
     loadHistory(activeProjectId);
     loadVideoHistory(activeProjectId);
   }, [activeProjectId, loadHistory, loadVideoHistory]);
+
+  // Safety reconcile: if realtime misses a final complete/failed update, pull
+  // the latest backend state while a video is visibly pending.
+  useEffect(() => {
+    if (!activeProjectId || !hasActiveGeneratingVideo) return;
+    const interval = window.setInterval(() => loadVideoHistory(activeProjectId), 10000);
+    return () => window.clearInterval(interval);
+  }, [activeProjectId, hasActiveGeneratingVideo, loadVideoHistory]);
 
   // Realtime: instant queued → complete updates for images & videos in the
   // active /create project. Auto-reconnects on socket errors / tab refocus.

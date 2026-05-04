@@ -556,7 +556,10 @@ export const useVideoStore = create<VideoState>()((set, get) => ({
   loadHistory: async (projectId?: string | null) => {
     const key = projectId ?? '__all__';
     const loaded = (get() as any)._loadedProjects as Set<string> | undefined;
-    if (loaded?.has(key)) return;
+    const hasPendingForKey = get().videos.some((v) =>
+      v.status === 'generating' && (!projectId || v.projectId === projectId),
+    );
+    if (loaded?.has(key) && !hasPendingForKey) return;
     try {
       let q = (supabase as any)
         .from('video_generations')
@@ -583,11 +586,19 @@ export const useVideoStore = create<VideoState>()((set, get) => ({
         liked: !!row.liked,
         projectId: row.create_project_id ?? row.project_id ?? null,
       }));
-      const existingIds = new Set(get().videos.map(v => v.id));
-      const newOnes = rows.filter(v => !existingIds.has(v.id));
+      const byId = new Map(get().videos.map(v => [v.id, v]));
+      for (const row of rows) {
+        byId.set(row.id, { ...(byId.get(row.id) ?? {}), ...row });
+      }
+      const serverIds = new Set(rows.map(v => v.id));
+      const staleScoped = (v: GeneratedVideo) => projectId && v.projectId === projectId && serverIds.has(v.id);
+      const mergedVideos = [
+        ...rows.map(row => byId.get(row.id)!),
+        ...get().videos.filter(v => !serverIds.has(v.id) && !staleScoped(v)),
+      ];
       const nextLoaded = new Set(loaded ?? []);
       nextLoaded.add(key);
-      set({ videos: [...get().videos, ...newOnes], _historyLoaded: true, _loadedProjects: nextLoaded } as any);
+      set({ videos: mergedVideos, _historyLoaded: true, _loadedProjects: nextLoaded } as any);
       (data || []).forEach((row: any) => {
         if (row.model === 'seedance-2.0' && row.status === 'processing' && row.task_id) {
           pollSeedanceVideo(row.id, row.task_id, get, set);
