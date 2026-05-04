@@ -110,6 +110,11 @@ export function FailedGenerationPanel({ generation, open, onClose, onRetry }: Pr
             <div className="text-foreground/90 break-words whitespace-pre-wrap">
               {generation.error || 'No error message captured.'}
             </div>
+            {/insufficient balance|out of credit|402/i.test(generation.error || '') && (
+              <div className="mt-2 text-[11px] text-amber-300">
+                AtlasCloud is out of credit. Top up at console.atlascloud.ai then retry.
+              </div>
+            )}
             <div className="mt-2 flex flex-wrap gap-2 text-[11px] text-muted-foreground">
               <Badge variant="outline" className="border-ms-border">stage: {detail?.stage || generation.stage || 'unknown'}</Badge>
               {detail?.provider && <Badge variant="outline" className="border-ms-border">provider: {detail.provider}</Badge>}
@@ -161,11 +166,11 @@ export function FailedGenerationPanel({ generation, open, onClose, onRetry }: Pr
             {!health && <div className="text-xs text-muted-foreground">Loading…</div>}
             {health && (
               <div className="space-y-1.5">
-                {(['atlas', 'fal'] as const).map((p) => {
+                {(['atlas'] as const).map((p) => {
                   const probe = health[p];
                   return (
                     <div key={p} className="flex items-center gap-2 text-xs">
-                      <span className="w-12 text-muted-foreground">{p === 'atlas' ? 'Atlas' : 'fal'}</span>
+                      <span className="w-12 text-muted-foreground">AtlasCloud</span>
                       <span className={`px-2 py-0.5 rounded-full border text-[10px] uppercase tracking-wide ${statusTone(probe.status)}`}>
                         {probe.status}
                       </span>
@@ -176,7 +181,7 @@ export function FailedGenerationPanel({ generation, open, onClose, onRetry }: Pr
                 })}
                 {health.blockGeneration && (
                   <div className="mt-2 text-[11px] text-amber-300">
-                    Both providers are unhealthy. New generations are blocked until at least one recovers.
+                    AtlasCloud is unhealthy. New generations are blocked until it recovers.
                   </div>
                 )}
               </div>

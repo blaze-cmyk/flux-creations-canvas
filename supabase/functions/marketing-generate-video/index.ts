@@ -1,7 +1,8 @@
-// Marketing Studio video generation — clean AtlasCloud + fal Seedance pipeline.
-// Keeps the creative/script pipeline intact, but uses provider-native Seedance
-// reference-to-video with direct product/avatar references. No generated keyframe
-// or Nano Banana step is used here.
+// Marketing Studio video generation — AtlasCloud-only Seedance 2.0 pipeline.
+// fal.ai was removed because its Seedance endpoint enforces ByteDance's
+// "real person" moderation and rejects every avatar-based job
+// (partner_validation_failed). AtlasCloud accepts avatars when we
+// pre-register them via /sd/assets and pass `asset://` IDs.
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0';
 
 const corsHeaders = {
@@ -11,17 +12,14 @@ const corsHeaders = {
 };
 
 const ATLAS_KEY = Deno.env.get('ATLASCLOUD_API_KEY') ?? '';
-const FAL_KEY = Deno.env.get('FAL_KEY') ?? '';
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 
 const ATLAS_BASE = 'https://api.atlascloud.ai/api/v1/model';
 const ATLAS_ASSET_BASE = 'https://console.atlascloud.ai/api/v1';
-const FAL_QUEUE = 'https://queue.fal.run';
 const SEEDANCE_REF = 'bytedance/seedance-2.0/reference-to-video';
 const SEEDANCE_TEXT = 'bytedance/seedance-2.0/text-to-video';
 
-type Provider = 'atlascloud' | 'fal';
 type VideoMode = 'text-to-video' | 'reference-to-video';
 
 type ReferenceBundle = {
@@ -35,10 +33,8 @@ type ReferenceBundle = {
 
 type SubmitOutcome = {
   ok: boolean;
-  provider?: Provider;
   endpoint?: string;
   requestId?: string;
-  usedFallback?: boolean;
   error?: string;
   raw?: unknown;
 };
@@ -97,26 +93,11 @@ function normalizeAtlasResolution(r: unknown): string {
   return allowed.has(v) ? v : '720p';
 }
 
-function normalizeFalResolution(r: unknown): string {
-  return String(r ?? '').toLowerCase() === '480p' ? '480p' : '720p';
-}
-
 function normalizeAtlasRatio(a: unknown): string {
   const allowed = new Set(['16:9', '4:3', '1:1', '3:4', '9:16', '21:9', 'adaptive']);
   const v = String(a ?? 'adaptive');
   if (!v || v === 'Auto' || v === 'auto') return 'adaptive';
   return allowed.has(v) ? v : 'adaptive';
-}
-
-function normalizeFalAspect(a: unknown): string {
-  const allowed = new Set(['21:9', '16:9', '4:3', '1:1', '3:4', '9:16', 'auto']);
-  const v = String(a ?? 'auto');
-  if (!v || v === 'Auto' || v === 'adaptive') return 'auto';
-  return allowed.has(v) ? v : 'auto';
-}
-
-function falDuration(d: number): string {
-  return d === -1 ? 'auto' : String(Math.max(4, Math.min(15, d)));
 }
 
 function timeoutForDuration(d: unknown): number {
@@ -130,20 +111,12 @@ function isBalanceError(status: number, body: string) {
   return /balance|exhausted|locked|insufficient|top.?up/i.test(body);
 }
 
-function isModerationError(err: string | undefined) {
-  return !!err && /real person|may contain real|moderation|nsfw|content policy|safety/i.test(err);
-}
-
-function providerOrder(_bundle: ReferenceBundle, forced?: Provider): Provider[] {
-  if (forced) return [forced];
-  // Atlas first regardless of avatar — the wsrv-cropped headshot now passes
-  // moderation, and fal.ai is currently in balance-locked state.
-  const order: Provider[] = ['atlascloud', 'fal'];
-  return order.filter((p) => (p === 'fal' ? !!FAL_KEY : !!ATLAS_KEY));
-}
-
-function providerLabel(p: Provider) {
-  return p === 'atlascloud' ? 'AtlasCloud' : 'fal.ai';
+function friendlyAtlasError(raw: string | undefined): string {
+  if (!raw) return 'AtlasCloud returned an unknown error.';
+  if (/insufficient balance|402|top.?up|exhausted/i.test(raw)) {
+    return 'AtlasCloud is out of credit. Add credits at console.atlascloud.ai then retry.';
+  }
+  return raw;
 }
 
 function isAvatarStorageUrl(url: string) {
@@ -193,8 +166,7 @@ async function fetchAvatarImageUrl(admin: any, avatarId: string): Promise<string
   else if ((avatar as any).storage_path) raw = await signedStorageUrl(admin, 'ms-avatars', (avatar as any).storage_path);
   if (!raw) return null;
   // Route avatar through wsrv.nl: 640x640 face-crop JPG. Smaller, tighter
-  // headshots reliably pass Seedance's "real person" moderator on Atlas, and
-  // this is the exact shape that worked before the recent rewrite.
+  // headshots reliably pass Seedance's "real person" moderator on Atlas.
   return `https://wsrv.nl/?url=${encodeURIComponent(raw)}&w=640&h=640&fit=cover&a=top&output=jpg`;
 }
 
@@ -290,21 +262,14 @@ async function buildReferenceBundle(admin: any, opts: {
   const avatarUrl = opts.avatarId ? await fetchAvatarImageUrl(admin, opts.avatarId) : null;
   const atlasAvatarAsset = avatarUrl ? await createAtlasPortraitAsset(avatarUrl, opts.avatarId) : null;
   const extraImageUrls = uniqueValidUrls(opts.extraImageUrls ?? [], 9).filter((url) => {
-    if (url === opts.keyframeUrl) return false; // keyframe is placed explicitly below
+    if (url === opts.keyframeUrl) return false;
     if (!opts.avatarId) return true;
-    // Never pass the original avatar upload as an extra reference. The working
-    // pipeline only sent the wsrv-cropped avatar headshot; the raw signed avatar
-    // URL trips Atlas/Seedance real-person moderation during polling.
     if (url === avatarUrl) return false;
     if (url.includes('wsrv.nl') && url.includes('ms-avatars')) return false;
     if (isSelectedProductStorageUrl(url, opts.productId)) return false;
     return !isAvatarStorageUrl(url);
   });
 
-  // KEYFRAME-FIRST ORDERING: when a composed keyframe is present, it goes at
-  // index 0 — that's the "scene to animate". Avatar (face lock only) and
-  // products (appearance lock) follow. When no keyframe, fall back to the
-  // legacy product-first / avatar-last order so we preserve old behavior.
   const orderedRefs = opts.keyframeUrl
     ? uniqueValidUrls([
         opts.keyframeUrl,
@@ -331,7 +296,6 @@ async function buildReferenceBundle(admin: any, opts: {
 function withReferenceMap(prompt: string, bundle: ReferenceBundle) {
   if (bundle.mode !== 'reference-to-video' || bundle.referenceImages.length === 0) return prompt;
   const lines: string[] = [];
-  // Detect a composed keyframe at index 0 (ms-keyframes bucket signed URL).
   const firstUrl = bundle.referenceImages[0] || '';
   const hasKeyframe = firstUrl.includes('ms-keyframes');
 
@@ -366,7 +330,7 @@ function withReferenceMap(prompt: string, bundle: ReferenceBundle) {
 }
 
 async function atlasSubmit(opts: { prompt: string; bundle: ReferenceBundle; duration: number; resolution: string; ratio: string; generateAudio: boolean }): Promise<SubmitOutcome> {
-  if (!ATLAS_KEY) return { ok: false, provider: 'atlascloud', error: 'ATLASCLOUD_API_KEY not configured' };
+  if (!ATLAS_KEY) return { ok: false, error: 'ATLASCLOUD_API_KEY not configured' };
   const endpoint = opts.bundle.mode === 'reference-to-video' ? SEEDANCE_REF : SEEDANCE_TEXT;
   const body: Record<string, unknown> = {
     model: endpoint,
@@ -395,78 +359,14 @@ async function atlasSubmit(opts: { prompt: string; bundle: ReferenceBundle; dura
   const predictionId = parsed?.data?.id ?? parsed?.id;
   if (!res.ok || !predictionId) {
     const code = parsed?.code ?? res.status;
-    const msg = (parsed?.message ?? parsed?.msg ?? parsed?.data?.error ?? text) || `http ${res.status}`;
-    return { ok: false, provider: 'atlascloud', endpoint, error: `AtlasCloud ${code}: ${msg}`, raw: parsed || text };
+    const rawMsg = (parsed?.message ?? parsed?.msg ?? parsed?.data?.error ?? text) || `http ${res.status}`;
+    const balance = isBalanceError(res.status, text);
+    const error = balance
+      ? 'AtlasCloud is out of credit. Add credits at console.atlascloud.ai then retry.'
+      : `AtlasCloud ${code}: ${rawMsg}`;
+    return { ok: false, endpoint, error, raw: parsed || text };
   }
-  return { ok: true, provider: 'atlascloud', endpoint, requestId: String(predictionId), raw: parsed };
-}
-
-async function falSubmit(opts: { prompt: string; bundle: ReferenceBundle; duration: number; resolution: string; ratio: string; generateAudio: boolean }): Promise<SubmitOutcome> {
-  if (!FAL_KEY) return { ok: false, provider: 'fal', error: 'FAL_KEY not configured' };
-  const endpoint = opts.bundle.mode === 'reference-to-video' ? SEEDANCE_REF : SEEDANCE_TEXT;
-  const body: Record<string, unknown> = {
-    prompt: opts.prompt,
-    resolution: normalizeFalResolution(opts.resolution),
-    duration: falDuration(opts.duration),
-    aspect_ratio: normalizeFalAspect(opts.ratio),
-    generate_audio: opts.generateAudio,
-  };
-  if (opts.bundle.mode === 'reference-to-video') {
-    body.image_urls = opts.bundle.referenceImages;
-    if (opts.bundle.referenceAudios.length) body.audio_urls = opts.bundle.referenceAudios;
-  }
-
-  const res = await fetch(`${FAL_QUEUE}/${endpoint}`, {
-    method: 'POST',
-    headers: { Authorization: `Key ${FAL_KEY}`, 'Content-Type': 'application/json', Accept: 'application/json' },
-    body: JSON.stringify(body),
-  });
-  const text = await res.text();
-  let parsed: any = {};
-  try { parsed = JSON.parse(text); } catch { /* keep text */ }
-  const immediateVideo = extractFalVideoUrl(parsed);
-  if (res.ok && immediateVideo) {
-    return { ok: true, provider: 'fal', endpoint, requestId: `immediate:${immediateVideo}`, raw: parsed };
-  }
-  const requestId = parsed?.request_id ?? parsed?.requestId;
-  if (!res.ok || !requestId) {
-    const msg = (parsed?.detail ?? parsed?.message ?? parsed?.error ?? text) || `http ${res.status}`;
-    const prefix = isBalanceError(res.status, text) ? 'fal.ai balance/auth' : 'fal.ai';
-    return { ok: false, provider: 'fal', endpoint, error: `${prefix}: ${msg}`, raw: parsed || text };
-  }
-  return {
-    ok: true,
-    provider: 'fal',
-    endpoint,
-    requestId: String(requestId),
-    raw: parsed,
-  };
-}
-
-async function submitAcrossProviders(opts: {
-  prompt: string;
-  bundle: ReferenceBundle;
-  duration: number;
-  resolution: string;
-  ratio: string;
-  generateAudio: boolean;
-  forceProvider?: Provider;
-}): Promise<SubmitOutcome> {
-  const prompt = withReferenceMap(opts.prompt, opts.bundle);
-  const order = providerOrder(opts.bundle, opts.forceProvider);
-  if (order.length === 0) return { ok: false, error: 'No video provider configured. Need ATLASCLOUD_API_KEY or FAL_KEY.' };
-
-  const errors: string[] = [];
-  for (let i = 0; i < order.length; i++) {
-    const provider = order[i];
-    const result = provider === 'atlascloud'
-      ? await atlasSubmit({ ...opts, prompt })
-      : await falSubmit({ ...opts, prompt });
-    if (result.ok) return { ...result, usedFallback: i > 0 };
-    errors.push(`${providerLabel(provider)}: ${result.error ?? 'submit failed'}`);
-    log('WARN', 'provider submit failed', { provider, error: result.error, moderation: isModerationError(result.error) });
-  }
-  return { ok: false, error: errors.join(' | ') };
+  return { ok: true, endpoint, requestId: String(predictionId), raw: parsed };
 }
 
 async function atlasPoll(requestId: string): Promise<PollOutcome> {
@@ -478,7 +378,7 @@ async function atlasPoll(requestId: string): Promise<PollOutcome> {
   try { parsed = JSON.parse(text); } catch { /* keep text */ }
   const data = parsed?.data ?? parsed;
   if (!res.ok) {
-    return { status: 'failed', error: (data?.error ?? parsed?.message ?? parsed?.msg ?? text) || `AtlasCloud poll http ${res.status}` };
+    return { status: 'failed', error: friendlyAtlasError((data?.error ?? parsed?.message ?? parsed?.msg ?? text) || `AtlasCloud poll http ${res.status}`) };
   }
   const status = String(data?.status ?? '').toLowerCase();
   if (status === 'completed' || status === 'succeeded') {
@@ -487,103 +387,9 @@ async function atlasPoll(requestId: string): Promise<PollOutcome> {
     return videoUrl ? { status: 'done', videoUrl: String(videoUrl) } : { status: 'failed', error: 'AtlasCloud completed without a video URL' };
   }
   if (status === 'failed' || status === 'timeout') {
-    return { status: 'failed', error: data?.error ?? parsed?.message ?? `AtlasCloud reported ${status}` };
+    return { status: 'failed', error: friendlyAtlasError(data?.error ?? parsed?.message ?? `AtlasCloud reported ${status}`) };
   }
   return { status: 'processing' };
-}
-
-function extractFalVideoUrl(payload: any): string | null {
-  const data = payload?.data ?? payload?.payload ?? payload;
-  const video = data?.video ?? data?.output?.video ?? data?.result?.video;
-  if (typeof video === 'string') return video;
-  if (isValidHttpUrl(video?.url)) return String(video.url);
-  if (Array.isArray(data?.videos) && data.videos[0]) {
-    const first = data.videos[0];
-    if (typeof first === 'string') return first;
-    if (isValidHttpUrl(first?.url)) return String(first.url);
-  }
-  return null;
-}
-
-function falQueueEndpoint(endpoint: string): string {
-  // fal Seedance 2.0 submit endpoint is mode-specific, but the returned
-  // queue status/result URLs use the parent endpoint: /bytedance/seedance-2.0/requests/{id}
-  if (endpoint.startsWith('bytedance/seedance-2.0/')) return 'bytedance/seedance-2.0';
-  return endpoint;
-}
-
-async function falPoll(endpoint: string, requestId: string): Promise<PollOutcome> {
-  if (requestId.startsWith('immediate:')) return { status: 'done', videoUrl: requestId.slice('immediate:'.length) };
-  const queueEndpoint = falQueueEndpoint(endpoint);
-  const headers = { Authorization: `Key ${FAL_KEY}`, Accept: 'application/json' };
-  const statusRes = await fetch(`${FAL_QUEUE}/${queueEndpoint}/requests/${requestId}/status`, { headers });
-  const statusText = await statusRes.text();
-  let statusJson: any = {};
-  try { statusJson = JSON.parse(statusText); } catch { /* keep text */ }
-  if (statusRes.ok) {
-    const status = String(statusJson?.status ?? '').toUpperCase();
-    if (status === 'FAILED') {
-      return { status: 'failed', error: statusJson?.error ?? statusJson?.detail ?? 'fal.ai reported failure' };
-    }
-    if (status !== 'COMPLETED') return { status: 'processing' };
-  } else if (statusRes.status !== 202 && statusRes.status !== 404 && statusRes.status !== 405) {
-    return { status: 'failed', error: (statusJson?.detail ?? statusJson?.message ?? statusText) || `fal.ai status http ${statusRes.status}` };
-  }
-
-  let resultRes = await fetch(`${FAL_QUEUE}/${queueEndpoint}/requests/${requestId}`, { headers });
-  if (resultRes.status === 405 || resultRes.status === 404) {
-    resultRes = await fetch(`${FAL_QUEUE}/${queueEndpoint}/requests/${requestId}/response`, { headers });
-  }
-  if (resultRes.status === 202 || resultRes.status === 404) return { status: 'processing' };
-  const resultText = await resultRes.text();
-  let resultJson: any = {};
-  try { resultJson = JSON.parse(resultText); } catch { /* keep text */ }
-  if (!resultRes.ok) {
-    const msg = (resultJson?.detail ?? resultJson?.message ?? resultJson?.error ?? resultText) || `fal.ai result http ${resultRes.status}`;
-    if (/in progress|not completed|still processing/i.test(msg)) return { status: 'processing' };
-    return { status: 'failed', error: msg };
-  }
-  const videoUrl = extractFalVideoUrl(resultJson);
-  return videoUrl ? { status: 'done', videoUrl } : { status: 'processing' };
-}
-
-async function submitFallbackFromRow(admin: any, row: any, provider: Provider): Promise<any | null> {
-  const existingRefs = Array.isArray(row.reference_paths) ? row.reference_paths : [];
-  const audioSourceUrls = await gatherAudioSourceUrls(admin, { avatarId: row.avatar_id, format: row.format });
-  const bundle = await buildReferenceBundle(admin, {
-    productId: row.product_id,
-    avatarId: row.avatar_id,
-    extraImageUrls: existingRefs,
-    audioSourceUrls,
-  });
-  const submission = await submitAcrossProviders({
-    prompt: row.prompt,
-    bundle,
-    duration: clampDuration(row.duration_seconds ?? 8),
-    resolution: row.resolution ?? '720p',
-    ratio: row.aspect ?? '9:16',
-    generateAudio: true,
-    forceProvider: provider,
-  });
-  if (!submission.ok) return null;
-  const { data: updated } = await admin
-    .from('ms_generations')
-    .update({
-      status: 'queued',
-      stage: 'videoing',
-      provider: submission.provider,
-      provider_endpoint: submission.endpoint,
-      fal_request_id: submission.requestId,
-      fallback_attempted: true,
-      error: null,
-      video_url: null,
-      reference_paths: bundle.referenceImages,
-    })
-    .eq('id', row.id)
-    .select()
-    .single();
-  log('INFO', 'poll fallback submitted', { jobId: row.id, provider: submission.provider, endpoint: submission.endpoint });
-  return updated;
 }
 
 Deno.serve(async (req) => {
@@ -596,12 +402,10 @@ Deno.serve(async (req) => {
       const { data: row } = await admin.from('ms_generations').select('*').eq('id', body.poll).maybeSingle();
       if (!row) return json({ status: 'queued_pending_persist' });
       if (row.status === 'done') return json(row);
-      if (row.status === 'failed' && row.fallback_attempted) return json(row);
+      if (row.status === 'failed') return json(row);
       if (!row.fal_request_id || !row.provider_endpoint) return json({ ...row, status: 'queued_pending_persist' });
 
-      const poll = row.provider === 'fal'
-        ? await falPoll(row.provider_endpoint, row.fal_request_id)
-        : await atlasPoll(row.fal_request_id);
+      const poll = await atlasPoll(row.fal_request_id);
 
       if (poll.status === 'done') {
         const { data: updated } = await admin.from('ms_generations').update({ status: 'done', stage: 'done', video_url: poll.videoUrl, error: null }).eq('id', row.id).select().single();
@@ -609,24 +413,13 @@ Deno.serve(async (req) => {
       }
 
       if (poll.status === 'failed') {
-        const fallbackProvider: Provider = row.provider === 'fal' ? 'atlascloud' : 'fal';
-        const shouldFallback = !row.fallback_attempted && (fallbackProvider === 'fal' ? FAL_KEY : ATLAS_KEY);
-        if (shouldFallback) {
-          const fallback = await submitFallbackFromRow(admin, row, fallbackProvider);
-          if (fallback) return json(fallback);
-        }
-        const { data: updated } = await admin.from('ms_generations').update({ status: 'failed', stage: 'failed', error: poll.error ?? `${providerLabel(row.provider)} reported failure` }).eq('id', row.id).select().single();
+        const { data: updated } = await admin.from('ms_generations').update({ status: 'failed', stage: 'failed', error: poll.error ?? 'AtlasCloud reported failure' }).eq('id', row.id).select().single();
         return json(updated);
       }
 
       const startedAt = Date.parse(row.updated_at || row.created_at || '') || Date.now();
       const timeoutMs = timeoutForDuration(row.duration_seconds);
       if (Date.now() - startedAt > timeoutMs) {
-        const fallbackProvider: Provider = row.provider === 'fal' ? 'atlascloud' : 'fal';
-        if (!row.fallback_attempted && (fallbackProvider === 'fal' ? FAL_KEY : ATLAS_KEY)) {
-          const fallback = await submitFallbackFromRow(admin, row, fallbackProvider);
-          if (fallback) return json(fallback);
-        }
         const msg = `Timed out after ${Math.round(timeoutMs / 60000)} minutes while rendering. Retry will submit a fresh job.`;
         const { data: updated } = await admin.from('ms_generations').update({ status: 'failed', stage: 'failed', error: msg }).eq('id', row.id).select().single();
         return json(updated);
@@ -668,15 +461,13 @@ Deno.serve(async (req) => {
     } = body;
 
     if (!prompt || typeof prompt !== 'string') return json({ error: 'prompt required' }, 400);
-    if (!ATLAS_KEY && !FAL_KEY) return json({ error: 'No video provider configured. Need ATLASCLOUD_API_KEY or FAL_KEY.' }, 500);
+    if (!ATLAS_KEY) return json({ error: 'AtlasCloud is not configured. Add ATLASCLOUD_API_KEY to enable video generation.' }, 500);
 
     const duration = clampDuration(duration_seconds);
     const atlasRatio = normalizeAtlasRatio(aspect);
     const extraImageUrls = Array.isArray(image_urls) ? uniqueValidUrls(image_urls, 9) : [];
     const audioSourceUrls = await gatherAudioSourceUrls(admin, { avatarId, format });
 
-    // Resolve the keyframe URL: prefer explicit body param (from orchestrator),
-    // fall back to the value already stored on the row (retry path).
     let keyframeUrl: string | null = (body.keyframe_url as string | null) ?? null;
     if (!keyframeUrl && reuseGenerationId) {
       const { data: existingRow } = await admin
@@ -696,7 +487,7 @@ Deno.serve(async (req) => {
       hasAvatar: bundle.hasAvatar,
       hasProduct: bundle.hasProduct,
       hasKeyframe: !!keyframeUrl,
-      providerOrder: providerOrder(bundle),
+      provider: 'atlascloud',
     });
 
     let row: any;
@@ -716,8 +507,6 @@ Deno.serve(async (req) => {
       duration_seconds: duration,
       resolution: normalizeAtlasResolution(resolution),
     };
-    // Only overwrite keyframe fields if we explicitly received one — never
-    // wipe a successfully composed keyframe on retry / re-submit.
     if (keyframeUrl) {
       rowPayload.keyframe_url = keyframeUrl;
     }
@@ -740,8 +529,9 @@ Deno.serve(async (req) => {
       row = inserted;
     }
 
-    const submission = await submitAcrossProviders({
-      prompt,
+    const prompted = withReferenceMap(prompt, bundle);
+    const submission = await atlasSubmit({
+      prompt: prompted,
       bundle,
       duration,
       resolution,
@@ -750,22 +540,23 @@ Deno.serve(async (req) => {
     });
 
     if (!submission.ok) {
-      await admin.from('ms_generations').update({ status: 'failed', stage: 'failed', error: submission.error ?? 'All video providers rejected submit' }).eq('id', row.id);
+      log('WARN', 'atlas submit failed', { error: submission.error });
+      await admin.from('ms_generations').update({ status: 'failed', stage: 'failed', error: submission.error ?? 'AtlasCloud rejected submit' }).eq('id', row.id);
       return json({ id: row.id, status: 'failed', error: submission.error, details: submission.raw });
     }
 
     const { data: updated } = await admin.from('ms_generations').update({
-      provider: submission.provider,
+      provider: 'atlascloud',
       provider_endpoint: submission.endpoint,
       fal_request_id: submission.requestId,
       fallback_attempted: false,
     }).eq('id', row.id).select().single();
 
-    log('INFO', 'submit: done', { jobId: row.id, provider: submission.provider, endpoint: submission.endpoint, requestId: submission.requestId });
+    log('INFO', 'submit: done', { jobId: row.id, provider: 'atlascloud', endpoint: submission.endpoint, requestId: submission.requestId });
 
     return json({
       id: updated.id,
-      provider: submission.provider,
+      provider: 'atlascloud',
       endpoint: submission.endpoint,
       fal_request_id: submission.requestId,
       status: 'queued',
