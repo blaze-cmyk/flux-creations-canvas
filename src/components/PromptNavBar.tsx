@@ -2,6 +2,24 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { Image as ImageIcon, Film, Megaphone, Move3d } from 'lucide-react';
 import { usePromptModeStore } from '@/store/promptModeStore';
 
+function SeedanceIcon({ className = 'w-4 h-4' }: { className?: string }) {
+  return (
+    <svg className={className} width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+      <g clipPath="url(#clip0_seedance_nav)">
+        <path d="M3.1544 12.1539L0.533203 12.8092V1.19824L3.1544 1.85354V12.1539Z" fill="currentColor" />
+        <path d="M15.8225 12.8333L13.1963 13.4886V0.518555L15.8225 1.169V12.8333Z" fill="currentColor" />
+        <path d="M7.31261 12.5083L4.69141 13.1636V6.32422L7.31261 6.97947V12.5083Z" fill="currentColor" />
+        <path d="M9.02539 5.3096L11.6516 4.6543V11.4937L9.02539 10.8384V5.3096Z" fill="currentColor" />
+      </g>
+      <defs>
+        <clipPath id="clip0_seedance_nav">
+          <rect width="16" height="14" fill="currentColor" />
+        </clipPath>
+      </defs>
+    </svg>
+  );
+}
+
 export function PromptNavBar() {
   const { pathname } = useLocation();
   const navigate = useNavigate();
