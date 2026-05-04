@@ -1,38 +1,28 @@
-## Goal
+# Fix Seedance sd/assets base URL
 
-Strip out the Nano Banana keyframe composition step entirely. Go back to the simpler pipeline: script → submit to Seedance with avatar + product images as references. The keyframe wasn't preserving the avatar's face anyway, and the user wants the previous, working setup back.
+## Problem
 
-## Pipeline before vs after
+The Seedance edge function calls `sd/assets` on the wrong host (`api.atlascloud.ai`), which returns 404 and breaks every image registration. Per AtlasCloud docs, the portrait asset endpoint lives on `console.atlascloud.ai`. The marketing edge function already uses the correct host (`ATLAS_ASSET_BASE = 'https://console.atlascloud.ai/api/v1'`), so only Seedance needs the fix.
 
-```text
-BEFORE: script → keyframing (Nano Banana Pro/Flash) → videoing (keyframe[0] + avatar[1] + products[2+])
-AFTER:  script → videoing (avatar[0] + products[1+])
-```
+Videos and audio in the Seedance function already skip `sd/assets` entirely (uploadMedia → raw URL into `reference_videos` / `reference_audios`), so no further routing changes are needed there.
 
-## Changes
+## Change
 
-### 1. `supabase/functions/marketing-orchestrate/index.ts` (lines ~443-505)
-- Remove the `stage: 'keyframing'` update; go straight from `scripting` → `videoing`.
-- Delete the `invokeFn('marketing-generate-keyframe', ...)` block and the row-refresh that reads `keyframe_url` back.
-- Submit to `marketing-generate-video` with `image_urls: refs` (no keyframe prepend) and drop the `keyframe_url` field from the body.
+**File:** `supabase/functions/seedance-generate-video/index.ts`
 
-### 2. `supabase/functions/marketing-generate-video/index.ts`
-- In `buildReferenceBundle` (around lines 290-330): remove the `keyframeUrl` parameter, the `createRequiredAtlasPortraitAsset` call for the keyframe, and the `orderedRefs` swap logic. Final order becomes: `asset://<avatar>` first, product URLs after.
-- In `withReferenceMap` (around line 346): drop `hasKeyframe` branch; the prompt prefix becomes just "Image 1 is the avatar identity lock; Images 2+ are product references."
-- In the request handler (around lines 525-565): stop reading `keyframe_url` from the body and from the existing row; remove `rowPayload.keyframe_url` write.
-- Update the `assetRegistrationError` message to drop "/keyframe" wording.
+- Line 24: `ATLAS_ASSETS_BASE` → `https://console.atlascloud.ai/api/v1` (was `https://api.atlascloud.ai/api/v1`).
+- Update the header comment on line 8 from `https://api.atlascloud.ai/api/v1/model/sd/assets` → `https://console.atlascloud.ai/api/v1/sd/assets` so future readers don't repeat the mistake.
 
-### 3. `supabase/functions/marketing-generate-keyframe/index.ts`
-- Delete the file. It is only invoked by the orchestrator, which no longer calls it.
+`ATLAS_BASE` (uploadMedia, generateVideo, prediction) stays on `api.atlascloud.ai/api/v1/model` — that host is correct for those endpoints.
 
-### 4. Storage bucket `ms-keyframes`
-- Leave the bucket and existing rows' `keyframe_url` / `keyframe_path` columns alone — no migration. They will simply stop being populated. (Removing the columns is unnecessary risk for zero benefit; the types file regenerates fine with unused columns.)
+## Marketing function
 
-### 5. Deploy
-- Deploy `marketing-orchestrate` and `marketing-generate-video`.
-- Delete the `marketing-generate-keyframe` function from the project.
+Already correct — `ATLAS_ASSET_BASE = 'https://console.atlascloud.ai/api/v1'` on line 19. No change needed, no redeploy needed.
 
-## Out of scope
-- Atlas asset registration for the avatar stays in place — that's the moderation-bypass fix and is unrelated to the keyframe step.
-- Script generator, persona logic, energy directive, voice sample, and provider health are untouched.
-- AtlasCloud-only routing (no fal fallback) stays as-is.
+## Deploy
+
+Redeploy `seedance-generate-video` only.
+
+## Test
+
+Generate one video with one image reference containing a face + one reference video. Expected: sd/assets returns 200, an `asset://` token comes back, and the video URL is passed raw in `reference_videos`.

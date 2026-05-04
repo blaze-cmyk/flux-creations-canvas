@@ -5,7 +5,7 @@
 // Endpoints used:
 //   POST  https://api.atlascloud.ai/api/v1/model/generateVideo
 //   GET   https://api.atlascloud.ai/api/v1/model/prediction/{id}
-//   POST  https://api.atlascloud.ai/api/v1/model/sd/assets   (reference asset registration)
+//   POST  https://console.atlascloud.ai/api/v1/sd/assets   (reference asset registration)
 //
 // Reference: https://www.atlascloud.ai/models/bytedance/seedance-2.0/reference-to-video
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0';
@@ -21,7 +21,7 @@ const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 
 const ATLAS_BASE = 'https://api.atlascloud.ai/api/v1/model';
-const ATLAS_ASSETS_BASE = 'https://api.atlascloud.ai/api/v1';
+const ATLAS_ASSETS_BASE = 'https://console.atlascloud.ai/api/v1';
 
 const SEEDANCE_REF = 'bytedance/seedance-2.0/reference-to-video';
 const SEEDANCE_TEXT = 'bytedance/seedance-2.0/text-to-video';
