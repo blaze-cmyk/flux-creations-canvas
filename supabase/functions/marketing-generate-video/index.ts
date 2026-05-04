@@ -404,6 +404,13 @@ async function atlasSubmit(opts: { prompt: string; bundle: ReferenceBundle; dura
     if (opts.bundle.referenceAudios.length) body.reference_audios = opts.bundle.referenceAudios;
   }
 
+  const refsForLog = (body.reference_images as string[] | undefined) ?? [];
+  log('INFO', 'atlas submit: body', {
+    endpoint,
+    referenceImagesCount: refsForLog.length,
+    referenceImages: refsForLog.map((u) => String(u).startsWith('asset://') ? u : `RAW:${String(u).slice(0, 120)}`),
+  });
+
   const res = await fetch(`${ATLAS_BASE}/generateVideo`, {
     method: 'POST',
     headers: { Authorization: `Bearer ${ATLAS_KEY}`, 'Content-Type': 'application/json' },
