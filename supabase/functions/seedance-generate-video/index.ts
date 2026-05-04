@@ -105,6 +105,7 @@ function resolvePromptTags(prompt: string, counts: { images: number; videos: num
     (_m, _det, ord, kind) => `the ${ord} reference ${kind}`);
   out = out.replace(/\bto\s+this\s+the\s+reference\s+(video|audio)\b/gi, 'to the reference $1');
   return out.trim();
+}
 
 function normRes(r: unknown): string {
   const v = String(r ?? '720p');
