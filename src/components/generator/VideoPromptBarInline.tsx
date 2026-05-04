@@ -665,7 +665,7 @@ function FrameSlot({
 }
 
 function MotionSlot({
-  kind, title, subtitle, url, onUpload, onRemove, onDropFile,
+  kind, title, subtitle, url, onUpload, onRemove, onDropFile, tag,
 }: {
   kind: 'video' | 'character';
   title: string;
@@ -674,6 +674,7 @@ function MotionSlot({
   onUpload: () => void;
   onRemove: () => void;
   onDropFile?: (f: File) => void;
+  tag?: string;
 }) {
   const [over, setOver] = useState(false);
   const isVideo = !!url && (url.startsWith('data:video') || /\.(mp4|mov|webm)(\?|$)/i.test(url));
@@ -700,6 +701,11 @@ function MotionSlot({
         >
           <X className="w-3 h-3" />
         </button>
+        {tag && (
+          <span className="absolute top-1 left-1 px-1.5 py-0.5 rounded-md bg-[#9C3FED] text-white text-[10px] font-bold font-mono">
+            @{tag}
+          </span>
+        )}
       </div>
     );
   }
@@ -715,6 +721,9 @@ function MotionSlot({
       </div>
       <span className="text-[12px] font-semibold text-foreground text-center leading-tight">{title}</span>
       <span className="text-[10px] text-muted-foreground/70 text-center leading-tight">{subtitle}</span>
+      {tag && (
+        <span className="text-[10px] text-muted-foreground/70 font-mono mt-0.5">@{tag}</span>
+      )}
     </button>
   );
 }
