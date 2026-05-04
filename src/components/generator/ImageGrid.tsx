@@ -14,6 +14,7 @@ import { useState, useRef, useEffect, useLayoutEffect, useMemo } from 'react';
 import { create } from 'zustand';
 import { VideoDetailModal } from '@/components/marketingstudio/VideoDetailModal';
 import { supabase } from '@/integrations/supabase/client';
+import { useGenerationProgress } from '@/hooks/useGenerationProgress';
 import {
   DropdownMenu,
   DropdownMenuContent,
