@@ -398,23 +398,15 @@ Deno.serve(async (req) => {
     } = body ?? {};
 
     const promptText = String(prompt ?? '').trim();
-    // Split mixed inputs by extension — clients sometimes drop video/audio files
-    // into imageUrls. Route them to the correct bucket so we don't try to
-    // register a video as an Image asset (which fails sd/assets moderation).
-    const rawImages = uniqueUrls(imageUrls, 12);
-    const rawVideos = uniqueUrls(videoUrls, 6);
-    const rawAudios = uniqueUrls(audioUrls, 6);
-    const images: string[] = [];
-    const videosFromImages: string[] = [];
-    const audiosFromImages: string[] = [];
-    for (const u of rawImages) {
-      if (looksLikeVideo(u)) videosFromImages.push(u);
-      else if (looksLikeAudio(u)) audiosFromImages.push(u);
-      else images.push(u);
-    }
-    const videos = uniqueUrls([...rawVideos, ...videosFromImages], 3);
-    const audios = uniqueUrls([...rawAudios, ...audiosFromImages], 3);
-    images.length = Math.min(images.length, 9);
+    // Split every provided ref by file extension. Retry flows store all refs in
+    // `reference_images`, so without this videos were silently re-submitted as
+    // image assets and Seedance behaved differently from the successful submit.
+    const fromImages = splitRefsByType(imageUrls);
+    const fromVideos = splitRefsByType(videoUrls);
+    const fromAudios = splitRefsByType(audioUrls);
+    const images = uniqueUrls([...fromImages.imageUrls, ...fromVideos.imageUrls, ...fromAudios.imageUrls], 9);
+    const videos = uniqueUrls([...fromImages.videoUrls, ...fromVideos.videoUrls, ...fromAudios.videoUrls], 3);
+    const audios = uniqueUrls([...fromImages.audioUrls, ...fromVideos.audioUrls, ...fromAudios.audioUrls], 3);
 
     if (!promptText && images.length === 0 && videos.length === 0) {
       return json({ error: 'Provide a prompt or at least one reference image/video.' }, 400);
@@ -457,12 +449,16 @@ Deno.serve(async (req) => {
     // Keep multimodal reference jobs visual-first unless the user supplied audio.
     const effectiveGenerateAudio = audios.length > 0 ? !!generateAudio : false;
 
+    const requestedDuration = clampDuration(duration);
+    const maxSafeDuration = videos.length > 0 ? 12 : 15;
+    const safeDuration = requestedDuration === -1 ? -1 : Math.min(requestedDuration, maxSafeDuration);
+
     const baseSubmit = {
       prompt: promptText || 'The character in image 1 dances gracefully to the music',
       imageUrls: assetImages,
       videoUrls: assetVideos,
       audioUrls: assetAudios,
-      duration: clampDuration(duration),
+      duration: safeDuration,
       resolution: normRes(resolution),
       ratio: normRatio(ratio),
       variant: chosenVariant,
