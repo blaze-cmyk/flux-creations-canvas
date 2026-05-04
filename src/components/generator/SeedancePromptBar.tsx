@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useRef } from 'react';
 import { motion, LayoutGroup } from 'framer-motion';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import { ChevronDownIcon } from '@/components/marketingstudio/FormatIcons';
 import { GenerateButton } from './GenerateButton';
+import { MentionDropdown, useMentionAutocomplete, type MentionItem } from './MentionAutocomplete';
 import {
   useSeedanceStore, MAX_IMAGES, MAX_VIDEOS, MAX_AUDIOS, MAX_MEDIA_SECONDS,
   SEEDANCE_RESOLUTIONS, SEEDANCE_RATIOS,
