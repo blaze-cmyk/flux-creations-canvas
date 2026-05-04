@@ -42,10 +42,10 @@ export function PromptNavBar() {
       key: 'video',
       label: 'Video',
       Icon: Film,
-      active: ((onImageRoute && mode === 'video') || pathname.startsWith('/video')) && videoSubMode !== 'motion-control',
+      active: ((onImageRoute && mode === 'video') || pathname.startsWith('/video')) && videoSubMode !== 'motion-control' && videoSubMode !== 'seedance-2',
       onClick: () => {
         setMode('video');
-        if (videoSubMode === 'motion-control') setVideoSubMode('text-to-video');
+        if (videoSubMode === 'motion-control' || videoSubMode === 'seedance-2') setVideoSubMode('text-to-video');
         if (!onImageRoute && !pathname.startsWith('/video')) navigate('/create');
       },
     },
