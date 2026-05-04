@@ -569,6 +569,7 @@ export const useVideoStore = create<VideoState>()((set, get) => ({
         duration: row.duration,
         resolution: row.resolution || undefined,
         status: row.status === 'processing' ? 'generating' : row.status as GeneratedVideo['status'],
+        stage: (row.stage as VideoStage | null) ?? undefined,
         videoUrl: row.video_url || undefined,
         thumbnailUrl: row.thumbnail_url || undefined,
         createdAt: new Date(row.created_at).getTime(),
