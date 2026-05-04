@@ -353,7 +353,7 @@ Deno.serve(async (req) => {
       duration = 5,
       resolution = '720p',
       ratio = 'adaptive',
-      generateAudio = false,
+      generateAudio = true,
       variant,
       videoId,            // existing video_generations row id (created client-side)
       projectId,
@@ -396,12 +396,22 @@ Deno.serve(async (req) => {
       }
       assetVideos.push(result.assetUrl!);
     }
+    const assetAudios: string[] = [];
+    for (let i = 0; i < audios.length; i++) {
+      const label = `seedance-aud-${i}-${(videoId ?? 'anon').slice(0, 24)}`;
+      const result = await createRequiredAtlasAsset(audios[i], label, 'Audio');
+      if (result.error) {
+        if (videoId) await updateRow(admin, videoId, { status: 'failed', error: result.error });
+        return json({ status: 'failed', error: result.error }, 400);
+      }
+      assetAudios.push(result.assetUrl!);
+    }
 
     const submission = await atlasSubmit({
       prompt: promptText || 'The character in image 1 dances gracefully to the music',
       imageUrls: assetImages,
       videoUrls: assetVideos,
-      audioUrls: audios,
+      audioUrls: assetAudios,
       duration: clampDuration(duration),
       resolution: normRes(resolution),
       ratio: normRatio(ratio),
