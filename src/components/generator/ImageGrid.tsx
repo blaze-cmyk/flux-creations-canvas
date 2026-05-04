@@ -686,19 +686,32 @@ function VideoCard({ video }: { video: GeneratedVideo & { kind: 'video' } }) {
   };
 
   // Pending state (Marketing Studio parity)
+  const { pct: vidPct, elapsed: vidElapsed } = useGenerationProgress({
+    kind: 'video',
+    startedAt: video.createdAt,
+    isComplete: video.status === 'complete',
+    isFailed: video.status === 'failed' || video.status === 'nsfw',
+    hint: video.model,
+    durationSeconds: parseInt(video.duration || '6', 10) || 6,
+  });
   if (video.status === 'generating') {
-    const elapsed = Math.floor((Date.now() - video.createdAt) / 1000);
-    const pct = video.progress ?? Math.min(95, Math.floor((elapsed / 120) * 100));
+    // Provider-supplied progress wins when available, else use the curve.
+    const pct = typeof video.progress === 'number' ? Math.max(vidPct, video.progress) : vidPct;
     return (
       <div className="relative w-full h-full overflow-hidden bg-ms-surface-2 ring-1 ring-ms-border">
         <div className="absolute inset-0 ms-shimmer opacity-40" />
         <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 text-foreground/90 px-3">
           <Loader2 className="w-6 h-6 animate-spin" />
           <div className="text-[11px] font-medium tracking-wide uppercase text-center">Rendering video…</div>
-          <div className="w-3/4 h-1 rounded-full bg-white/10 overflow-hidden">
-            <div className="h-full bg-foreground/80 transition-all" style={{ width: `${pct}%` }} />
+          <div className="w-3/4 h-1.5 rounded-full bg-white/10 overflow-hidden">
+            <div
+              className="h-full bg-foreground/90 transition-[width] duration-700 ease-out"
+              style={{ width: `${pct}%` }}
+            />
           </div>
-          <div className="text-[10px] text-muted-foreground">{elapsed}s</div>
+          <div className="text-[10px] tabular-nums text-muted-foreground">
+            {Math.round(pct)}% · {vidElapsed}s
+          </div>
         </div>
       </div>
     );
