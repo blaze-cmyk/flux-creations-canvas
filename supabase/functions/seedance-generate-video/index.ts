@@ -305,12 +305,19 @@ Deno.serve(async (req) => {
     const hasRefs = images.length > 0 || videos.length > 0 || audios.length > 0;
     const chosenVariant = normVariant(variant, hasRefs);
 
-    // Register every image as an asset for reliable face moderation.
+    // Register every image AND video as an asset for reliable moderation
+    // (sending raw storage URLs causes Seedance to flag real people).
     const assetImages: string[] = [];
     for (let i = 0; i < images.length; i++) {
       const label = `seedance-img-${i}-${(videoId ?? 'anon').slice(0, 24)}`;
-      const asset = await createAtlasAsset(images[i], label);
+      const asset = await createAtlasAsset(images[i], label, 'Image');
       assetImages.push(asset ?? images[i]);
+    }
+    const assetVideos: string[] = [];
+    for (let i = 0; i < videos.length; i++) {
+      const label = `seedance-vid-${i}-${(videoId ?? 'anon').slice(0, 24)}`;
+      const asset = await createAtlasAsset(videos[i], label, 'Video');
+      assetVideos.push(asset ?? videos[i]);
     }
 
     const submission = await atlasSubmit({
