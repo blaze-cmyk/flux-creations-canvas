@@ -220,7 +220,10 @@ async function createAtlasPortraitAsset(imageUrl: string, avatarId?: string | nu
     const asset = pollJson?.data ?? pollJson;
     const status = String(asset?.status ?? '').toLowerCase();
     const assetId = asset?.atlas_asset_id ?? asset?.ark_asset_id ?? immediateAsset;
-    if (status === 'active' && assetId) return `asset://${assetId}`;
+    if (status === 'active' && assetId) {
+      log('INFO', 'atlas asset: active (polled)', { label, assetId, attempts: i + 1 });
+      return `asset://${assetId}`;
+    }
     if (status === 'failed') {
       log('WARN', 'atlas asset failed', { id, error: asset?.error_message ?? asset?.error_code ?? pollText.slice(0, 240) });
       return null;
