@@ -110,6 +110,11 @@ export function FailedGenerationPanel({ generation, open, onClose, onRetry }: Pr
             <div className="text-foreground/90 break-words whitespace-pre-wrap">
               {generation.error || 'No error message captured.'}
             </div>
+            {/insufficient balance|out of credit|402/i.test(generation.error || '') && (
+              <div className="mt-2 text-[11px] text-amber-300">
+                AtlasCloud is out of credit. Top up at console.atlascloud.ai then retry.
+              </div>
+            )}
             <div className="mt-2 flex flex-wrap gap-2 text-[11px] text-muted-foreground">
               <Badge variant="outline" className="border-ms-border">stage: {detail?.stage || generation.stage || 'unknown'}</Badge>
               {detail?.provider && <Badge variant="outline" className="border-ms-border">provider: {detail.provider}</Badge>}
