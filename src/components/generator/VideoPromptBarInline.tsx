@@ -608,8 +608,8 @@ export function VideoPromptBarInline() {
 }
 
 function FrameSlot({
-  label, optional, url, onUpload, onRemove, onDropFile, portrait,
-}: { label: string; optional?: boolean; url?: string; onUpload: () => void; onRemove: () => void; onDropFile?: (f: File) => void; portrait?: boolean }) {
+  label, optional, url, onUpload, onRemove, onDropFile, portrait, tag,
+}: { label: string; optional?: boolean; url?: string; onUpload: () => void; onRemove: () => void; onDropFile?: (f: File) => void; portrait?: boolean; tag?: string }) {
   const [over, setOver] = useState(false);
   const dropProps = {
     onDragOver: (e: React.DragEvent) => { e.preventDefault(); setOver(true); },
@@ -635,6 +635,11 @@ function FrameSlot({
         >
           <X className="w-3.5 h-3.5" />
         </button>
+        {tag && (
+          <span className="absolute top-1.5 left-1.5 px-1.5 py-0.5 rounded-md bg-[#9C3FED] text-white text-[10px] font-bold font-mono">
+            @{tag}
+          </span>
+        )}
         <div className="absolute bottom-2 left-2.5 text-[12px] font-semibold text-white drop-shadow">{label}</div>
       </div>
     );
@@ -652,6 +657,9 @@ function FrameSlot({
         <ImagePlus className={portrait ? 'w-5 h-5' : 'w-4 h-4'} />
       </div>
       <span className={`${portrait ? 'text-[13px] font-semibold text-foreground' : 'text-[11px]'}`}>{label}</span>
+      {tag && (
+        <span className="text-[10px] text-muted-foreground/70 font-mono">@{tag}</span>
+      )}
     </button>
   );
 }
