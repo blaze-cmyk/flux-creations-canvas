@@ -365,9 +365,23 @@ Deno.serve(async (req) => {
     } = body ?? {};
 
     const promptText = String(prompt ?? '').trim();
-    const images = uniqueUrls(imageUrls, 9);
-    const videos = uniqueUrls(videoUrls, 3);
-    const audios = uniqueUrls(audioUrls, 3);
+    // Split mixed inputs by extension — clients sometimes drop video/audio files
+    // into imageUrls. Route them to the correct bucket so we don't try to
+    // register a video as an Image asset (which fails sd/assets moderation).
+    const rawImages = uniqueUrls(imageUrls, 12);
+    const rawVideos = uniqueUrls(videoUrls, 6);
+    const rawAudios = uniqueUrls(audioUrls, 6);
+    const images: string[] = [];
+    const videosFromImages: string[] = [];
+    const audiosFromImages: string[] = [];
+    for (const u of rawImages) {
+      if (looksLikeVideo(u)) videosFromImages.push(u);
+      else if (looksLikeAudio(u)) audiosFromImages.push(u);
+      else images.push(u);
+    }
+    const videos = uniqueUrls([...rawVideos, ...videosFromImages], 3);
+    const audios = uniqueUrls([...rawAudios, ...audiosFromImages], 3);
+    images.length = Math.min(images.length, 9);
 
     if (!promptText && images.length === 0 && videos.length === 0) {
       return json({ error: 'Provide a prompt or at least one reference image/video.' }, 400);
