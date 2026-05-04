@@ -23,9 +23,9 @@ const CLAUDE_MODEL_ANTHROPIC = 'claude-sonnet-4-5';
 const CLAUDE_MODEL_OPENROUTER = 'anthropic/claude-sonnet-4.5';
 const EMERGENCY_GEMINI_MODEL = 'google/gemini-2.5-pro';
 
-// Creatify skill (full doc at supabase/functions/_skills/creatify-video-ad.md) is NOT
-// inlined anymore — it diluted the prompt and produced checkbox-y scripts. We keep
-// only a distilled cheat sheet (CREATIFY_DISTILLED below) as a passive reference.
+// System prompt = 3-block Director's Constitution (BLOCK_1 hard rules + BLOCK_2
+// format module + BLOCK_3 reference anchors). Replaces the old firewall +
+// per-format prompts + few-shot architecture. See DIRECTORS_CONSTITUTION below.
 
 // ---------- Creator personas (rolled per call) ----------
 type Persona = {
