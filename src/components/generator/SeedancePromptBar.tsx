@@ -197,19 +197,14 @@ export function SeedancePromptBar() {
             <div className="flex-1 min-w-0 flex flex-col gap-1.5 py-1 pr-1 pl-3">
               <div className="relative">
                 <textarea
-                  ref={(el) => {
-                    textareaRef.current = el;
-                    if (!el) return;
-                    el.style.height = 'auto';
-                    el.style.height = Math.min(el.scrollHeight, 220) + 'px';
-                  }}
+                  ref={textareaRef}
                   value={prompt}
                   onChange={(e) => {
                     const val = e.target.value;
+                    const caret = e.target.selectionStart ?? val.length;
                     setPrompt(val);
-                    e.currentTarget.style.height = 'auto';
-                    e.currentTarget.style.height = Math.min(e.currentTarget.scrollHeight, 220) + 'px';
-                    const caret = e.currentTarget.selectionStart ?? val.length;
+                    e.target.style.height = 'auto';
+                    e.target.style.height = Math.min(e.target.scrollHeight, 220) + 'px';
                     if (mentionItems.length > 0) mention.detect({ value: val, caret });
                     else mention.close();
                   }}
@@ -218,6 +213,10 @@ export function SeedancePromptBar() {
                   className="w-full bg-transparent border-0 text-sm leading-[1.6] text-foreground placeholder:text-muted-foreground/70 focus:outline-none resize-none ms-prompt-scroll min-h-[72px] max-h-[220px] overflow-y-auto"
                   style={{ fontFamily: 'Montserrat, system-ui, sans-serif' }}
                   onKeyDown={(e) => {
+                    // Allow native copy/paste/cut/select-all
+                    if ((e.metaKey || e.ctrlKey) && ['c','v','x','a','z','y'].includes(e.key.toLowerCase())) {
+                      return;
+                    }
                     if (mention.open && e.key === 'Escape') { mention.close(); return; }
                     if (e.key === 'Enter' && !e.shiftKey) {
                       e.preventDefault();
