@@ -326,7 +326,7 @@ export const useSeedanceStore = create<SeedanceState>((set, get) => ({
         action: 'submit',
         videoId,
         projectId,
-        prompt: promptText,
+        prompt: resolvedPrompt,
         imageUrls,
         videoUrls,
         audioUrls,
