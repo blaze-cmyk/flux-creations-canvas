@@ -487,3 +487,35 @@ export default function MarketingStudioProject() {
     </MarketingStudioLayout>
   );
 }
+
+/** Realtime, model-aware progress bar for queued/running marketing generations. */
+function PendingOverlay({ g }: { g: MSGeneration }) {
+  const { pct, elapsed } = useGenerationProgress({
+    kind: 'marketing',
+    startedAt: g.submittedAt || g.createdAt,
+    isComplete: g.status === 'done' || (!!g.videoUrl && g.status !== 'failed'),
+    isFailed: g.status === 'failed',
+    hint: g.stage,
+    durationSeconds: parseInt((g.duration || '8s').replace(/[^0-9]/g, ''), 10) || 8,
+  });
+  return (
+    <>
+      <div className="absolute inset-0 ms-shimmer opacity-40" />
+      <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 text-foreground/90 px-3">
+        <Loader2 className="w-6 h-6 animate-spin" />
+        <div className="text-[11px] font-medium tracking-wide uppercase text-center">
+          {stageLabel(g)}
+        </div>
+        <div className="w-3/4 h-1.5 rounded-full bg-white/10 overflow-hidden">
+          <div
+            className="h-full bg-foreground/90 transition-[width] duration-700 ease-out"
+            style={{ width: `${pct}%` }}
+          />
+        </div>
+        <div className="text-[10px] tabular-nums text-muted-foreground">
+          {Math.round(pct)}% · {elapsed}s
+        </div>
+      </div>
+    </>
+  );
+}
