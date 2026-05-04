@@ -90,7 +90,16 @@ export function SeedancePromptBar() {
 
 
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const pendingKindRef = useRef<SeedanceAssetKind>('image');
+
+  // @-mention autocomplete (typing "@" filters all uploaded assets)
+  const mention = useMentionAutocomplete(textareaRef, setPrompt);
+  const mentionItems: MentionItem[] = [
+    ...images.map((a) => ({ id: a.id, label: a.name || a.id, thumbUrl: a.url, kind: 'image' as const })),
+    ...videos.map((a) => ({ id: a.id, label: a.name || a.id, thumbUrl: a.url, kind: 'video' as const })),
+    ...audios.map((a) => ({ id: a.id, label: a.name || a.id, kind: 'audio' as const })),
+  ];
 
   const triggerUpload = (kind: SeedanceAssetKind) => {
     pendingKindRef.current = kind;
