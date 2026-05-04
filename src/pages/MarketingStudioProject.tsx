@@ -8,6 +8,7 @@ import { VideoDetailModal } from '@/components/marketingstudio/VideoDetailModal'
 import { FailedGenerationPanel } from '@/components/marketingstudio/FailedGenerationPanel';
 import { supabase } from '@/integrations/supabase/client';
 import { useRealtimeTable } from '@/hooks/useRealtimeTable';
+import { useGenerationProgress } from '@/hooks/useGenerationProgress';
 import { toast } from '@/hooks/use-toast';
 
 const minProviderTimeoutMs = (duration?: string) => {
