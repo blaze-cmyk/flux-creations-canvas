@@ -318,33 +318,47 @@ export function VideoPromptBarInline() {
         {/* Prompt + CTA */}
         <div className="flex items-start gap-2">
           <div className="flex-1 min-w-0 flex flex-col gap-1.5 py-1 pr-1 pl-3">
-            <textarea
-              ref={(el) => {
-                if (!el) return;
-                el.style.height = 'auto';
-                el.style.height = Math.min(el.scrollHeight, 220) + 'px';
-              }}
-              value={prompt}
-              onChange={(e) => {
-                setPrompt(e.target.value);
-                e.currentTarget.style.height = 'auto';
-                e.currentTarget.style.height = Math.min(e.currentTarget.scrollHeight, 220) + 'px';
-              }}
-              placeholder={isMotion
-                ? 'Describe additional motion guidance (optional)…'
-                : isVideoEdit
-                  ? 'Describe how to edit the video…'
-                  : 'Describe your video, like "A woman walking through a neon-lit city"'}
-              rows={3}
-              className="w-full bg-transparent border-0 text-sm leading-[1.6] text-foreground placeholder:text-muted-foreground/70 focus:outline-none resize-none ms-prompt-scroll min-h-[72px] max-h-[220px] overflow-y-auto"
-              style={{ fontFamily: 'Montserrat, system-ui, sans-serif' }}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' && !e.shiftKey) {
-                  e.preventDefault();
-                  handleSubmit();
-                }
-              }}
-            />
+            <div className="relative">
+              <textarea
+                ref={(el) => {
+                  textareaRef.current = el;
+                  if (!el) return;
+                  el.style.height = 'auto';
+                  el.style.height = Math.min(el.scrollHeight, 220) + 'px';
+                }}
+                value={prompt}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setPrompt(val);
+                  e.currentTarget.style.height = 'auto';
+                  e.currentTarget.style.height = Math.min(e.currentTarget.scrollHeight, 220) + 'px';
+                  const caret = e.currentTarget.selectionStart ?? val.length;
+                  if (mentionItems.length > 0) mention.detect({ value: val, caret });
+                  else mention.close();
+                }}
+                placeholder={isMotion
+                  ? 'Describe additional motion guidance (optional)… type @ to reference an upload'
+                  : isVideoEdit
+                    ? 'Describe how to edit the video… type @ to reference an upload'
+                    : 'Describe your video. Type @ to reference an upload (e.g. @start, @end).'}
+                rows={3}
+                className="w-full bg-transparent border-0 text-sm leading-[1.6] text-foreground placeholder:text-muted-foreground/70 focus:outline-none resize-none ms-prompt-scroll min-h-[72px] max-h-[220px] overflow-y-auto"
+                style={{ fontFamily: 'Montserrat, system-ui, sans-serif' }}
+                onKeyDown={(e) => {
+                  if (mention.open && e.key === 'Escape') { mention.close(); return; }
+                  if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    handleSubmit();
+                  }
+                }}
+              />
+              <MentionDropdown
+                open={mention.open}
+                query={mention.query}
+                items={mentionItems}
+                onPick={(item) => mention.insert(item, prompt)}
+              />
+            </div>
             {!isMotion && (
               <div className="flex items-center gap-2">
                 <button
