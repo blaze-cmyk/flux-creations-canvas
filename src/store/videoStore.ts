@@ -9,6 +9,14 @@ function formatBytes(bytes: number) {
   return `${(bytes / 1048576).toFixed(1)} MB`;
 }
 
+export type VideoStage =
+  | 'submitted'
+  | 'uploading_refs'
+  | 'queued'
+  | 'processing'
+  | 'complete'
+  | 'failed';
+
 export type GeneratedVideo = {
   id: string;
   prompt: string;
@@ -19,6 +27,7 @@ export type GeneratedVideo = {
   duration: string;
   resolution?: string;
   status: 'generating' | 'complete' | 'failed' | 'nsfw';
+  stage?: VideoStage;
   videoUrl?: string;
   thumbnailUrl?: string;
   createdAt: number;
@@ -244,12 +253,18 @@ async function pollSeedanceVideo(videoId: string, taskId: string, get: () => Vid
         body: { action: 'poll', predictionId: taskId, videoId },
       });
       if (poll?.status === 'complete' && poll.videoUrl) {
-        updateVideoAndSave(videoId, { status: 'complete', videoUrl: poll.videoUrl, progress: 100 }, get, set);
+        updateVideoAndSave(videoId, { status: 'complete', stage: 'complete', videoUrl: poll.videoUrl, progress: 100 }, get, set);
         return;
       }
       if (poll?.status === 'failed') {
-        updateVideoAndSave(videoId, { status: 'failed', error: poll.error || 'Seedance generation failed' }, get, set);
+        updateVideoAndSave(videoId, { status: 'failed', stage: 'failed', error: poll.error || 'Seedance generation failed' }, get, set);
         return;
+      }
+      if (poll?.stage) {
+        const cur = get().videos.find(v => v.id === videoId);
+        if (cur && cur.stage !== poll.stage) {
+          updateVideoAndSave(videoId, { stage: poll.stage as VideoStage }, get, set);
+        }
       }
     }
   } catch (e) {
@@ -545,7 +560,7 @@ export const useVideoStore = create<VideoState>()((set, get) => ({
     try {
       let q = (supabase as any)
         .from('video_generations')
-        .select('id,prompt,model,mode,aspect_ratio,duration,resolution,status,video_url,thumbnail_url,reference_images,error,created_at,liked,project_id,create_project_id,task_id')
+        .select('id,prompt,model,mode,aspect_ratio,duration,resolution,status,stage,video_url,thumbnail_url,reference_images,error,created_at,liked,project_id,create_project_id,task_id')
         .order('created_at', { ascending: false })
         .limit(100);
       if (projectId) q = q.or(`create_project_id.eq.${projectId},project_id.eq.${projectId}`);
@@ -560,6 +575,7 @@ export const useVideoStore = create<VideoState>()((set, get) => ({
         duration: row.duration,
         resolution: row.resolution || undefined,
         status: row.status === 'processing' ? 'generating' : row.status as GeneratedVideo['status'],
+        stage: (row.stage as VideoStage | null) ?? undefined,
         videoUrl: row.video_url || undefined,
         thumbnailUrl: row.thumbnail_url || undefined,
         createdAt: new Date(row.created_at).getTime(),
@@ -594,6 +610,7 @@ export const useVideoStore = create<VideoState>()((set, get) => ({
       duration: row.duration,
       resolution: row.resolution || undefined,
       status: row.status === 'processing' ? 'generating' : (row.status as GeneratedVideo['status']),
+      stage: (row.stage as VideoStage | null) ?? undefined,
       videoUrl: row.video_url || undefined,
       thumbnailUrl: row.thumbnail_url || undefined,
       createdAt: new Date(row.created_at).getTime(),

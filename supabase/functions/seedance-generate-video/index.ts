@@ -353,14 +353,14 @@ Deno.serve(async (req) => {
 
       const out = await atlasPoll(predictionId);
       if (out.status === 'done') {
-        if (videoId) await updateRow(admin, videoId, { status: 'complete', video_url: out.videoUrl, error: null });
-        return json({ status: 'complete', videoUrl: out.videoUrl });
+        if (videoId) await updateRow(admin, videoId, { status: 'complete', stage: 'complete', video_url: out.videoUrl, error: null });
+        return json({ status: 'complete', stage: 'complete', videoUrl: out.videoUrl });
       }
       if (out.status === 'failed') {
-        if (videoId) await updateRow(admin, videoId, { status: 'failed', error: out.error });
-        return json({ status: 'failed', error: out.error });
+        if (videoId) await updateRow(admin, videoId, { status: 'failed', stage: 'failed', error: out.error });
+        return json({ status: 'failed', stage: 'failed', error: out.error });
       }
-      return json({ status: 'processing' });
+      return json({ status: 'processing', stage: 'processing' });
     }
 
     // ----- SUBMIT -----
@@ -407,44 +407,38 @@ Deno.serve(async (req) => {
     const hasRefs = images.length > 0 || videos.length > 0 || audios.length > 0;
     const chosenVariant = normVariant(variant, hasRefs);
 
-    // Register images as portrait assets; upload video/audio bytes to AtlasCloud
-    // first, matching the Seedance 2.0 reference-to-video docs.
-    const assetImages: string[] = [];
-    for (let i = 0; i < images.length; i++) {
-      const label = `seedance-img-${i}-${(videoId ?? 'anon').slice(0, 24)}`;
-      const result = await createRequiredAtlasAsset(images[i], label, 'Image');
-      if (result.error) {
-        if (videoId) await updateRow(admin, videoId, { status: 'failed', error: result.error });
-        return json({ status: 'failed', error: result.error }, 400);
-      }
-      assetImages.push(result.assetUrl!);
+    // Mark the row as uploading references so the UI can show "Uploading refs…".
+    if (videoId) await updateRow(admin, videoId, { stage: 'uploading_refs', status: 'processing', error: null });
+
+    // Register all references in parallel — image registration polling can take 30s+
+    // each, so serial uploads were the main reason jobs felt "stuck".
+    const tag = (videoId ?? 'anon').slice(0, 24);
+    const [imgResults, vidResults, audResults] = await Promise.all([
+      Promise.all(images.map((u, i) => createRequiredAtlasAsset(u, `seedance-img-${i}-${tag}`, 'Image'))),
+      Promise.all(videos.map((u, i) => createRequiredAtlasAsset(u, `seedance-vid-${i}-${tag}`, 'Video'))),
+      Promise.all(audios.map((u, i) => createRequiredAtlasAsset(u, `seedance-aud-${i}-${tag}`, 'Audio'))),
+    ]);
+
+    const refError =
+      imgResults.find((r) => r.error)?.error ??
+      vidResults.find((r) => r.error)?.error ??
+      audResults.find((r) => r.error)?.error;
+    if (refError) {
+      if (videoId) await updateRow(admin, videoId, { status: 'failed', stage: 'failed', error: refError });
+      return json({ status: 'failed', stage: 'failed', error: refError }, 400);
     }
-    const assetVideos: string[] = [];
-    for (let i = 0; i < videos.length; i++) {
-      const label = `seedance-vid-${i}-${(videoId ?? 'anon').slice(0, 24)}`;
-      const result = await createRequiredAtlasAsset(videos[i], label, 'Video');
-      if (result.error) {
-        if (videoId) await updateRow(admin, videoId, { status: 'failed', error: result.error });
-        return json({ status: 'failed', error: result.error }, 400);
-      }
-      assetVideos.push(result.assetUrl!);
-    }
-    const assetAudios: string[] = [];
-    for (let i = 0; i < audios.length; i++) {
-      const label = `seedance-aud-${i}-${(videoId ?? 'anon').slice(0, 24)}`;
-      const result = await createRequiredAtlasAsset(audios[i], label, 'Audio');
-      if (result.error) {
-        if (videoId) await updateRow(admin, videoId, { status: 'failed', error: result.error });
-        return json({ status: 'failed', error: result.error }, 400);
-      }
-      assetAudios.push(result.assetUrl!);
-    }
+
+    const assetImages = imgResults.map((r) => r.assetUrl!);
+    const assetVideos = vidResults.map((r) => r.assetUrl!);
+    const assetAudios = audResults.map((r) => r.assetUrl!);
+
+    if (videoId) await updateRow(admin, videoId, { stage: 'queued' });
 
     // Generated audio has been the latest hard failure for image+video jobs.
     // Keep multimodal reference jobs visual-first unless the user supplied audio.
     const effectiveGenerateAudio = audios.length > 0 ? !!generateAudio : false;
 
-    let submission = await atlasSubmit({
+    const baseSubmit = {
       prompt: promptText || 'The character in image 1 dances gracefully to the music',
       imageUrls: assetImages,
       videoUrls: assetVideos,
@@ -452,28 +446,24 @@ Deno.serve(async (req) => {
       duration: clampDuration(duration),
       resolution: normRes(resolution),
       ratio: normRatio(ratio),
-      generateAudio: effectiveGenerateAudio,
       variant: chosenVariant,
-    });
+    };
 
-    if (!submission.ok && isGeneratedAudioModeration(submission.error) && effectiveGenerateAudio) {
-      submission = await atlasSubmit({
-        prompt: promptText || 'The character in image 1 dances gracefully to the music',
-        imageUrls: assetImages,
-        videoUrls: assetVideos,
-        audioUrls: assetAudios,
-        duration: clampDuration(duration),
-        resolution: normRes(resolution),
-        ratio: normRatio(ratio),
-        generateAudio: false,
-        variant: chosenVariant,
-      });
+    let submission = await atlasSubmit({ ...baseSubmit, generateAudio: effectiveGenerateAudio });
+    let audioFallbackUsed = false;
+
+    // Auto-retry visual-only on ANY audio-moderation failure, not just when the
+    // user explicitly enabled audio. AtlasCloud sometimes flags generated audio
+    // even when the request had generate_audio=false, so we retry once.
+    if (!submission.ok && isGeneratedAudioModeration(submission.error)) {
+      audioFallbackUsed = true;
+      submission = await atlasSubmit({ ...baseSubmit, generateAudio: false });
     }
 
     if (!submission.ok) {
       log('WARN', 'submit failed', { err: submission.error });
-      if (videoId) await updateRow(admin, videoId, { status: 'failed', error: submission.error });
-      return json({ status: 'failed', error: submission.error });
+      if (videoId) await updateRow(admin, videoId, { status: 'failed', stage: 'failed', error: submission.error });
+      return json({ status: 'failed', stage: 'failed', error: submission.error });
     }
 
     if (videoId) {
@@ -481,11 +471,12 @@ Deno.serve(async (req) => {
         provider: 'atlascloud',
         task_id: submission.predictionId,
         status: 'processing',
+        stage: 'processing',
         error: null,
       });
     }
 
-    log('INFO', 'submit ok', { predictionId: submission.predictionId, endpoint: submission.endpoint });
+    log('INFO', 'submit ok', { predictionId: submission.predictionId, endpoint: submission.endpoint, audioFallbackUsed });
 
     return json({
       submitted: true,
@@ -493,6 +484,8 @@ Deno.serve(async (req) => {
       taskId: submission.predictionId,
       endpoint: submission.endpoint,
       status: 'processing',
+      stage: 'processing',
+      audioFallbackUsed,
     });
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);

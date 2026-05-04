@@ -105,11 +105,17 @@ function VideoCard({ video }: { video: GeneratedVideo }) {
 
   // Generating
   if (video.status === 'generating') {
+    const stageLabel =
+      video.stage === 'submitted' ? 'Submitted' :
+      video.stage === 'uploading_refs' ? 'Uploading refs…' :
+      video.stage === 'queued' ? 'Queued' :
+      video.stage === 'processing' ? 'Rendering' :
+      video.progress ? `Rendering ${video.progress}%` : 'Rendering';
     return (
       <div className="flex border border-border rounded-xl overflow-hidden bg-card h-[180px]">
         <div className="w-[280px] shrink-0 bg-background flex items-center justify-center relative">
           <span className="absolute top-2 left-2 flex items-center gap-1.5 text-[11px] font-semibold px-2.5 py-0.5 rounded-full" style={{ backgroundColor: 'hsl(var(--primary))', color: 'hsl(var(--primary-foreground))' }}>
-            <Loader2 className="w-3 h-3 animate-spin" /> Generating{video.progress ? ` ${video.progress}%` : ''}
+            <Loader2 className="w-3 h-3 animate-spin" /> {stageLabel}
           </span>
         </div>
         <div className="flex-1 border-l border-border shrink-0">
