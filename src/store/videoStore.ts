@@ -442,11 +442,44 @@ export const useVideoStore = create<VideoState>()((set, get) => ({
     }, newVideo.id, get, set);
   },
 
-  retryVideo: (id) => {
+  retryVideo: async (id) => {
     const video = get().videos.find(v => v.id === id);
     if (!video) return;
 
     set({ videos: get().videos.map(v => v.id === id ? { ...v, status: 'generating', error: undefined } : v) });
+
+    // Seedance 2.0 lives on its own edge function (asset registration etc).
+    // Route retries there instead of the generic generate-video router.
+    if (video.model === 'seedance-2.0') {
+      try {
+        const refs = video.referenceImages || [];
+        const { data, error } = await supabase.functions.invoke('seedance-generate-video', {
+          body: {
+            action: 'submit',
+            videoId: video.id,
+            projectId: video.projectId ?? null,
+            prompt: video.prompt,
+            imageUrls: refs,
+            videoUrls: [],
+            audioUrls: [],
+            duration: Number(video.duration),
+            resolution: video.resolution ?? '720p',
+            ratio: video.aspectRatio,
+            generateAudio: false,
+            variant: refs.length > 0
+              ? 'bytedance/seedance-2.0/reference-to-video'
+              : 'bytedance/seedance-2.0/text-to-video',
+          },
+        });
+        if (error || data?.error) {
+          updateVideoAndSave(id, { status: 'failed', error: (data?.error || error?.message) ?? 'Seedance retry failed' }, get, set);
+        }
+      } catch (e: any) {
+        updateVideoAndSave(id, { status: 'failed', error: e?.message ?? 'Seedance retry failed' }, get, set);
+      }
+      return;
+    }
+
     callGenerate({
       prompt: video.prompt,
       referenceImages: [...video.referenceImages],
