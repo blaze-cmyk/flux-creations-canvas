@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { AnimatePresence, motion, LayoutGroup } from 'framer-motion';
 import { useVideoStore, VIDEO_MODELS, VIDEO_CATALOG, VIDEO_ASPECT_RATIOS, VIDEO_DURATIONS, getDurationsForModel, getResolutionsForModel, type VideoCatalogEntry } from '@/store/videoStore';
 import { usePromptModeStore, type VideoSubMode } from '@/store/promptModeStore';
@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 import { VideoModelIcon } from './VideoModelIcons';
 import { GenerateButton } from './GenerateButton';
+import { MentionDropdown, useMentionAutocomplete, type MentionItem } from './MentionAutocomplete';
 
 const SUB_MODES: { id: VideoSubMode; label: string; Icon: any; desc: string }[] = [
   { id: 'text-to-video', label: 'Create Video', Icon: Film, desc: 'Generate video from prompt' },
