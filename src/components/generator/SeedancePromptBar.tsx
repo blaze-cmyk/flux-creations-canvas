@@ -329,3 +329,110 @@ function AssetThumb({ asset, onRemove, onTag }: { asset: SeedanceAsset; onRemove
     </div>
   );
 }
+
+// =====================================================================
+// Marketing-Studio-style chips (visual parity)
+// =====================================================================
+function SeedanceChip({
+  icon, value, options, onChange,
+}: {
+  icon: React.ReactNode;
+  value: string;
+  options: readonly string[];
+  onChange: (v: string) => void;
+}) {
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <button className="ms-chip-glass flex items-center gap-1.5 px-3.5 h-9 rounded-full text-xs text-foreground transition-all">
+          <span className="text-muted-foreground">{icon}</span>
+          {value}
+          <ChevronDownIcon className="size-3.5 text-muted-foreground/70" />
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent className="bg-ms-surface-2 border-ms-border">
+        {options.map((o) => (
+          <DropdownMenuItem key={o} onClick={() => onChange(o)} className="text-sm">
+            {o}
+          </DropdownMenuItem>
+        ))}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
+function SeedanceAspectChip({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  const display = value === 'adaptive' ? 'Auto' : value;
+  return (
+    <Popover>
+      <PopoverTrigger asChild>
+        <button className="ms-chip-glass flex items-center gap-1.5 px-3.5 h-9 rounded-full text-xs text-foreground transition-all">
+          <span className="text-muted-foreground">{aspectIcon(value, 'size-3.5')}</span>
+          {display}
+          <ChevronDownIcon className="size-3.5 text-muted-foreground/70" />
+        </button>
+      </PopoverTrigger>
+      <PopoverContent
+        align="start"
+        sideOffset={10}
+        className="w-[280px] p-3 rounded-2xl border border-white/10 bg-[hsl(0_0%_8%)]/95 backdrop-blur-xl shadow-[0_24px_60px_-20px_rgba(0,0,0,0.7)]"
+      >
+        <div className="text-[11px] font-semibold tracking-[0.18em] text-white/50 uppercase px-2 pt-1 pb-2">
+          Aspect Ratio
+        </div>
+        <div className="grid grid-cols-2 gap-1">
+          {SEEDANCE_RATIOS.map((a) => {
+            const active = value === a;
+            const label = a === 'adaptive' ? 'Auto' : a;
+            return (
+              <button
+                key={a}
+                onClick={() => onChange(a)}
+                className={`flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm transition-colors ${
+                  active ? 'bg-white/10 text-white' : 'text-white/85 hover:bg-white/5'
+                }`}
+              >
+                <span className="text-white/80 shrink-0">{aspectIcon(a)}</span>
+                <span className="font-medium">{label}</span>
+              </button>
+            );
+          })}
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
+function SeedanceDurationChip({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  // Seedance accepts 4–15s.
+  const num = Math.min(15, Math.max(4, parseInt(value) || 5));
+  return (
+    <Popover>
+      <PopoverTrigger asChild>
+        <button className="ms-chip-glass flex items-center gap-1.5 px-3.5 h-9 rounded-full text-xs text-foreground transition-all">
+          <Clock className="w-3.5 h-3.5 text-muted-foreground" />
+          {num}s
+          <ChevronDownIcon className="size-3.5 text-muted-foreground/70" />
+        </button>
+      </PopoverTrigger>
+      <PopoverContent
+        align="start"
+        sideOffset={10}
+        className="w-[320px] p-4 rounded-2xl border border-white/10 bg-[hsl(0_0%_8%)]/95 backdrop-blur-xl shadow-[0_24px_60px_-20px_rgba(0,0,0,0.7)]"
+      >
+        <div className="text-xs font-medium text-white/60 mb-2.5 px-0.5">Duration</div>
+        <div className="rounded-xl bg-white/[0.04] border border-white/10 px-4 py-3 flex items-center gap-3">
+          <div className="text-base font-semibold text-white tabular-nums w-12 shrink-0">{num}s</div>
+          <Slider
+            value={[num]}
+            min={4}
+            max={15}
+            step={1}
+            onValueChange={(v) => onChange(String(v[0]))}
+            className="flex-1"
+          />
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
+}
