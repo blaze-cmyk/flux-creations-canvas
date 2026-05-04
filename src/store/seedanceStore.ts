@@ -162,15 +162,6 @@ export const useSeedanceStore = create<SeedanceState>((set, get) => ({
         });
         return;
       }
-      if (kind === 'video' && media.width && media.height) {
-        const shortEdge = Math.min(media.width, media.height);
-        if (![480, 720].includes(shortEdge)) {
-          toast.error('Unsupported video resolution', {
-            description: `Seedance reference videos must be 480p or 720p MP4/MOV — got ${media.width}×${media.height}.`,
-          });
-          return;
-        }
-      }
       const url = await readFileToDataUrl(file);
       const asset: SeedanceAsset = {
         id: nextTagId(list, kind), kind, name: file.name, url, durationSec: dur,
