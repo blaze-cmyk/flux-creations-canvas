@@ -17,11 +17,18 @@ const corsHeaders = {
 };
 
 const ATLAS_KEY = Deno.env.get('ATLASCLOUD_API_KEY') ?? '';
+const BYTEPLUS_KEY = Deno.env.get('BYTEPLUS_ARK_API_KEY') ?? '';
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 
 const ATLAS_BASE = 'https://api.atlascloud.ai/api/v1/model';
 const ATLAS_ASSETS_BASE = 'https://console.atlascloud.ai/api/v1';
+
+// BytePlus ModelArk (direct ByteDance) — fallback when AtlasCloud fails.
+// Docs: https://docs.byteplus.com/en/docs/ModelArk/1520757
+const BYTEPLUS_BASE = 'https://ark.ap-southeast.bytepluses.com/api/v3/contents/generations/tasks';
+const BYTEPLUS_MODEL = 'dreamina-seedance-2-0-260128';
+const BYTEPLUS_MODEL_FAST = 'dreamina-seedance-2-0-fast-260128';
 
 const SEEDANCE_REF = 'bytedance/seedance-2.0/reference-to-video';
 const SEEDANCE_TEXT = 'bytedance/seedance-2.0/text-to-video';
