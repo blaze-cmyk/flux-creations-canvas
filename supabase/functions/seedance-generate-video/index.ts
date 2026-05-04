@@ -540,7 +540,7 @@ Deno.serve(async (req) => {
     if (videoId) await updateRow(admin, videoId, { stage: 'uploading_refs', status: 'processing', error: null });
 
     const safeDuration = clampDuration(duration);
-    const effectiveGenerateAudio = audios.length > 0 ? !!generateAudio : false;
+    const effectiveGenerateAudio = !!generateAudio;
 
     // ===== Attempt 1: AtlasCloud (primary) =====
     // Requires asset registration for images so face-moderation works. If any
