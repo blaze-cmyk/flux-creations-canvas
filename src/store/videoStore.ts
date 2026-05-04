@@ -193,6 +193,8 @@ type VideoState = {
   deleteVideo: (id: string) => void;
   toggleLike: (id: string) => void;
   loadHistory: (projectId?: string | null) => Promise<void>;
+  upsertFromRealtime: (row: any) => void;
+  removeById: (id: string) => void;
   _historyLoaded: boolean;
   _loadedProjects?: Set<string>;
 };
@@ -508,5 +510,43 @@ export const useVideoStore = create<VideoState>()((set, get) => ({
     } catch (e) {
       console.error('Failed to load video history:', e);
     }
+  },
+
+  upsertFromRealtime: (row) => {
+    if (!row?.id) return;
+    const mapped: GeneratedVideo = {
+      id: row.id,
+      prompt: row.prompt ?? '',
+      referenceImages: row.reference_images || [],
+      model: row.model,
+      mode: row.mode as GeneratedVideo['mode'],
+      aspectRatio: row.aspect_ratio,
+      duration: row.duration,
+      resolution: row.resolution || undefined,
+      status: row.status === 'processing' ? 'generating' : (row.status as GeneratedVideo['status']),
+      videoUrl: row.video_url || undefined,
+      thumbnailUrl: row.thumbnail_url || undefined,
+      createdAt: new Date(row.created_at).getTime(),
+      error: row.error || undefined,
+      liked: !!row.liked,
+      projectId: row.create_project_id ?? row.project_id ?? null,
+    };
+    const list = get().videos;
+    const idx = list.findIndex((v) => v.id === mapped.id);
+    if (idx >= 0) {
+      const merged = { ...list[idx], ...mapped };
+      const next = [...list];
+      next[idx] = merged;
+      set({ videos: next });
+    } else {
+      set({ videos: [mapped, ...list] });
+    }
+  },
+
+  removeById: (id) => {
+    set({
+      videos: get().videos.filter((v) => v.id !== id),
+      selectedVideoId: get().selectedVideoId === id ? null : get().selectedVideoId,
+    });
   },
 }));

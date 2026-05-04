@@ -88,35 +88,53 @@ export const useMarketingFeedStore = create<State>((set, get) => ({
 
     initialLoad().then(() => kickProviderPoll());
 
-    // Realtime: instant UI updates when ms_generations rows change.
+    // Realtime: instant UI updates with auto-reconnect on socket errors.
     // We can't filter by an OR across two columns, so subscribe broadly and
     // filter client-side to rows tied to this create/legacy project.
-    realtimeChannel = supabase
-      .channel(`ms_feed:${createProjectId}`)
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'ms_generations' },
-        (payload) => {
-          const row = (payload.new ?? payload.old) as any;
-          if (!row?.id) return;
-          if (
-            row.create_project_id !== createProjectId &&
-            row.project_id !== createProjectId
-          )
-            return;
-          if (payload.eventType === 'DELETE') {
-            set((s) => ({
-              byProject: {
-                ...s.byProject,
-                [createProjectId]: (s.byProject[createProjectId] || []).filter((g) => g.id !== row.id),
-              },
-            }));
-            return;
+    let attempts = 0;
+    let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+
+    const subscribe = () => {
+      if (realtimeChannel) supabase.removeChannel(realtimeChannel);
+      realtimeChannel = supabase
+        .channel(`ms_feed:${createProjectId}`)
+        .on(
+          // @ts-ignore — runtime supports this event
+          'postgres_changes',
+          { event: '*', schema: 'public', table: 'ms_generations' },
+          (payload: any) => {
+            const row = (payload.new ?? payload.old) as any;
+            if (!row?.id) return;
+            if (
+              row.create_project_id !== createProjectId &&
+              row.project_id !== createProjectId
+            )
+              return;
+            if (payload.eventType === 'DELETE') {
+              set((s) => ({
+                byProject: {
+                  ...s.byProject,
+                  [createProjectId]: (s.byProject[createProjectId] || []).filter((g) => g.id !== row.id),
+                },
+              }));
+              return;
+            }
+            upsertOne(row);
+          },
+        )
+        .subscribe((status) => {
+          if (status === 'SUBSCRIBED') {
+            attempts = 0;
+          } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
+            if (activeProject !== createProjectId) return; // stopped
+            const delay = Math.min(15000, 1000 * Math.pow(2, Math.min(attempts, 4)));
+            attempts += 1;
+            if (reconnectTimer) clearTimeout(reconnectTimer);
+            reconnectTimer = setTimeout(subscribe, delay);
           }
-          upsertOne(row);
-        },
-      )
-      .subscribe();
+        });
+    };
+    subscribe();
 
     // Provider-side polling (fal/Atlas are pull-only). Realtime handles UI;
     // this loop just nudges the edge function to check the provider. Slowed

@@ -43,6 +43,8 @@ type GeneratorState = {
   deleteImage: (id: string) => void;
   useAsReference: (imageUrl: string) => void;
   loadHistory: (projectId?: string | null) => Promise<void>;
+  upsertFromRealtime: (row: any) => void;
+  removeById: (id: string) => void;
   moveImageToProject: (id: string, projectId: string | null) => Promise<void>;
   toggleLike: (id: string) => void;
 };
@@ -469,6 +471,41 @@ export const useGeneratorStore = create<GeneratorState>()((set, get) => ({
     set({ images: get().images.map((i) => (i.id === id ? { ...i, liked: next } : i)) });
     supabase.from('generations').update({ liked: next } as any).eq('id', id).then(({ error }) => {
       if (error) console.error('Toggle like error:', error);
+    });
+  },
+
+  upsertFromRealtime: (row) => {
+    if (!row?.id) return;
+    const mapped: GeneratedImage = {
+      id: row.id,
+      prompt: row.prompt ?? '',
+      referenceImages: [],
+      model: row.model,
+      quality: row.quality,
+      aspectRatio: row.aspect_ratio,
+      status: row.status as GeneratedImage['status'],
+      imageUrl: row.image_url ?? undefined,
+      createdAt: new Date(row.created_at).getTime(),
+      error: row.error ?? undefined,
+      projectId: row.create_project_id ?? row.project_id ?? null,
+      liked: !!row.liked,
+    };
+    const list = get().images;
+    const idx = list.findIndex((i) => i.id === mapped.id);
+    if (idx >= 0) {
+      const merged = { ...list[idx], ...mapped, referenceImages: list[idx].referenceImages };
+      const next = [...list];
+      next[idx] = merged;
+      set({ images: next });
+    } else {
+      set({ images: [mapped, ...list] });
+    }
+  },
+
+  removeById: (id) => {
+    set({
+      images: get().images.filter((i) => i.id !== id),
+      selectedImageId: get().selectedImageId === id ? null : get().selectedImageId,
     });
   },
 }));

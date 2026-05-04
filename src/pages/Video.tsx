@@ -6,13 +6,22 @@ import { VideoGrid } from '@/components/video/VideoGrid';
 import { VideoDetailModal } from '@/components/video/VideoDetailModal';
 import { PromptNavBar } from '@/components/PromptNavBar';
 import { useVideoStore } from '@/store/videoStore';
+import { useRealtimeTable } from '@/hooks/useRealtimeTable';
 
 export default function Video() {
   const selectedVideoId = useVideoStore(s => s.selectedVideoId);
   const loadHistory = useVideoStore(s => s.loadHistory);
+  const upsertVideo = useVideoStore(s => s.upsertFromRealtime);
+  const removeVideo = useVideoStore(s => s.removeById);
   const [layout, setLayout] = useState<'sidebar' | 'bottom'>('sidebar');
 
   useEffect(() => { loadHistory(); }, [loadHistory]);
+
+  // Realtime: instant generating → complete updates with auto-reconnect.
+  useRealtimeTable(
+    { table: 'video_generations', channelKey: 'video-page-all' },
+    { onUpsert: upsertVideo, onDelete: (row) => removeVideo(row.id) },
+  );
   return (
     <div className="h-[calc(100vh-3.5rem)] w-full bg-background flex flex-col overflow-hidden">
       {/* Layout toggle floating */}
