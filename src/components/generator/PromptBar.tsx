@@ -494,19 +494,21 @@ export function PromptBar() {
       {/* Image preview overlay */}
       {previewImg && (
         <div
-          className="fixed inset-0 z-[100] bg-black/85 backdrop-blur-sm flex items-center justify-center p-6 animate-in fade-in"
+          className="fixed inset-0 z-[100] bg-black/90 backdrop-blur-sm flex items-center justify-center p-3 sm:p-6 animate-in fade-in"
           onClick={() => setPreviewImg(null)}
+          role="dialog"
+          aria-modal="true"
         >
           <img
             src={previewImg}
             alt="Preview"
-            className="max-h-[92vh] max-w-[92vw] object-contain"
+            className="max-h-[88vh] max-w-[96vw] sm:max-h-[92vh] sm:max-w-[92vw] object-contain rounded-lg shadow-2xl"
             onClick={(e) => e.stopPropagation()}
           />
           <button
             onClick={() => setPreviewImg(null)}
-            aria-label="Close"
-            className="absolute top-5 right-5 grid place-items-center w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 text-white transition-colors"
+            aria-label="Close preview"
+            className="absolute top-3 right-3 sm:top-5 sm:right-5 grid place-items-center w-11 h-11 sm:w-10 sm:h-10 rounded-full bg-white/10 hover:bg-white/20 active:bg-white/25 text-white transition-colors backdrop-blur-md ring-1 ring-white/20"
           >
             <X className="w-5 h-5" />
           </button>
