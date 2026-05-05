@@ -207,6 +207,7 @@ serve(async (req) => {
       const FAL_KEY = Deno.env.get("FAL_KEY");
       const EVOLINK_API_KEY = Deno.env.get("EVOLINK_API_KEY");
       const ATLASCLOUD_API_KEY = Deno.env.get("ATLASCLOUD_API_KEY");
+      const APIYI_API_KEY = Deno.env.get("APIYI_API_KEY");
 
       const hasRefs = referenceImages.length > 0;
       const evolinkAr = ["1:1","1:4","4:1","1:8","8:1","2:3","3:2","3:4","4:3","4:5","5:4","9:16","16:9","21:9"].includes(ar) ? ar : "auto";
