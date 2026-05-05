@@ -404,6 +404,7 @@ serve(async (req) => {
       };
 
       const providers: Array<{ name: string; fn: () => Promise<ProviderResult> }> = [
+        { name: "APIYI", fn: callApiyi },
         { name: "fal.ai", fn: callFal },
         { name: "EvoLink", fn: callEvolink },
         { name: "AtlasCloud", fn: callAtlas },
