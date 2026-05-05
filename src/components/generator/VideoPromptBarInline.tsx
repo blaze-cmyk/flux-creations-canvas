@@ -132,6 +132,20 @@ export function VideoPromptBarInline() {
     setReferenceImageAt(idx, url);
   };
 
+  // Ingest dropped/pasted files — fill the next empty slot, then overflow into subsequent slots.
+  const ingestFiles = async (files: File[] | FileList) => {
+    const arr = Array.from(files).filter(f => f.type.startsWith('image/') || f.type.startsWith('video/'));
+    if (!arr.length) return;
+    let cursor = 0;
+    // find first empty slot (max 5)
+    while (cursor < 5 && referenceImages[cursor]) cursor++;
+    for (const f of arr) {
+      if (cursor >= 5) break;
+      await handleFileForIdx(cursor, f);
+      cursor++;
+    }
+  };
+
   const onUploadAt = (idx: number) => {
     const input = document.createElement('input');
     input.type = 'file';
