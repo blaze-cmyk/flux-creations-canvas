@@ -10,6 +10,7 @@ const FAL_BASE = "https://fal.run";
 const RUNWARE_BASE = "https://api.runware.ai/v1";
 const EVOLINK_BASE = "https://api.evolink.ai";
 const ATLAS_BASE = "https://api.atlascloud.ai/api/v1/model";
+const APIYI_BASE = "https://api.apiyi.com";
 
 type ModelConfig = {
   type: "nano" | "fal" | "runware";
@@ -19,6 +20,7 @@ type ModelConfig = {
   evolinkModel?: string;      // EvoLink model id (e.g. gemini-3-pro-image-preview)
   atlasModel?: string;        // AtlasCloud model id (e.g. google/nano-banana-pro/text-to-image)
   atlasEditModel?: string;    // AtlasCloud edit model id (image-to-image)
+  apiyiModel?: string;        // APIYI gemini model id (e.g. gemini-3-pro-image-preview)
   apiModel?: string;
   runwareModel?: string;
   supportsImageInput?: boolean;
