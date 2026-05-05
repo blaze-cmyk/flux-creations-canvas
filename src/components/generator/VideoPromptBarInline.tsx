@@ -220,6 +220,8 @@ export function VideoPromptBarInline() {
         layout
         transition={{ layout: { duration: 0.42, ease: [0.32, 0.72, 0, 1] } }}
         className="relative rounded-[22px] ms-glass p-2.5 flex flex-col gap-2.5"
+        onDragOver={(e) => { e.preventDefault(); }}
+        onDrop={(e) => { e.preventDefault(); if (e.dataTransfer.files?.length) ingestFiles(e.dataTransfer.files); }}
       >
         {/* Frame uploaders */}
         <AnimatePresence initial={false}>
