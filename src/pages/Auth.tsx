@@ -39,9 +39,9 @@ const SLIDES: Slide[] = [
   {
     src: "/auth/v6.mp4",
     type: "video",
-    badge: "Avatar",
-    title: "PODCAST & TALKING HEAD",
-    subtitle: "Lifelike avatars that talk, react, and host like a real creator.",
+    badge: "Try-On",
+    title: "UGC VIRTUAL TRY-ON",
+    subtitle: "Put your product on any avatar in any setting — instantly.",
   },
   {
     src: "/auth/v1.mp4",
@@ -60,9 +60,9 @@ const SLIDES: Slide[] = [
   {
     src: "/auth/v5.mp4",
     type: "video",
-    badge: "Try-On",
-    title: "UGC VIRTUAL TRY-ON",
-    subtitle: "Put your product on any avatar in any setting — instantly.",
+    badge: "Avatar",
+    title: "PODCAST & TALKING HEAD",
+    subtitle: "Lifelike avatars that talk, react, and host like a real creator.",
   },
 ];
 
