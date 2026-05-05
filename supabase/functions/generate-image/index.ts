@@ -379,8 +379,8 @@ serve(async (req) => {
           const predictionId = submitData?.data?.id ?? submitData?.id;
           if (!predictionId) return { ok: false, reason: "atlas: no prediction id" };
 
-          // Poll up to ~90s
-          for (let i = 0; i < 45; i++) {
+          // Poll up to ~40s (cascade must fit within 150s edge timeout)
+          for (let i = 0; i < 20; i++) {
             await new Promise((r) => setTimeout(r, 2000));
             const poll = await fetch(`${ATLAS_BASE}/prediction/${predictionId}`, {
               headers: { Authorization: `Bearer ${ATLASCLOUD_API_KEY}` },
