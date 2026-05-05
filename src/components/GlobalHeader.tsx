@@ -1,11 +1,27 @@
 import { NavLink, Link, useLocation, useNavigate } from 'react-router-dom';
 import { GenerateButton } from '@/components/generator/GenerateButton';
 import { useState } from 'react';
-import { Menu, X, Bell, Gem, User, ArrowLeft } from 'lucide-react';
+import { Menu, X, Bell, Gem, User, ArrowLeft, ChevronDown, Pencil, Trash2 } from 'lucide-react';
 import logoWhite from '@/assets/korsola-logo-white.png';
 import logoPink from '@/assets/korsola-logo-pink.png';
 import { useLayoutStore } from '@/store/layoutStore';
 import { useCreateProjectsStore } from '@/store/createProjectsStore';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 
 // TODO: replace with real auth state
 const isLoggedIn = false;
