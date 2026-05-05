@@ -220,6 +220,54 @@ serve(async (req) => {
         | { ok: false; reason: string }
         | CheckedFiltered;
 
+      // ---------- Provider 0: APIYI (Gemini direct, fastest) ----------
+      const callApiyi = async (): Promise<ProviderResult> => {
+        if (!APIYI_API_KEY) return { ok: false, reason: "APIYI_API_KEY not configured" };
+        if (!modelConfig.apiyiModel) return { ok: false, reason: "no apiyi model id" };
+        try {
+          const parts: any[] = [];
+          for (const refImg of referenceImages.slice(0, 14)) {
+            const dataUri = await fetchImageAsDataUri(refImg);
+            if (!dataUri) continue;
+            const m = dataUri.match(/^data:(image\/\w+);base64,(.+)$/);
+            if (!m) continue;
+            parts.push({ inlineData: { mimeType: m[1], data: m[2] } });
+          }
+          parts.push({ text: prompt });
+          const imageSize = QUALITY_MAP[quality] || "2K";
+          const endpoint = `${APIYI_BASE}/v1beta/models/${modelConfig.apiyiModel}:generateContent`;
+          console.log(`[nano cascade] APIYI → ${modelConfig.apiyiModel}, ar=${ar}, size=${imageSize}, refs=${referenceImages.length}`);
+          const ctrl = new AbortController();
+          const timer = setTimeout(() => ctrl.abort(), 60_000);
+          const resp = await fetch(endpoint, {
+            method: "POST",
+            headers: { Authorization: `Bearer ${APIYI_API_KEY}`, "Content-Type": "application/json" },
+            body: JSON.stringify({
+              contents: [{ parts }],
+              generationConfig: { responseModalities: ["IMAGE"], imageConfig: { aspectRatio: ar, imageSize } },
+            }),
+            signal: ctrl.signal,
+          }).finally(() => clearTimeout(timer));
+          if (!resp.ok) {
+            const t = await resp.text();
+            console.error(`[nano cascade] APIYI failed ${resp.status}: ${t.slice(0, 300)}`);
+            return { ok: false, reason: `apiyi ${resp.status}` };
+          }
+          const data = await resp.json();
+          const candidate = data?.candidates?.[0];
+          const resParts = candidate?.content?.parts ?? [];
+          const imgPart = resParts.find((p: any) => p.inlineData?.data);
+          if (imgPart?.inlineData?.data) {
+            return { ok: true, imageBase64: `data:${imgPart.inlineData.mimeType || "image/png"};base64,${imgPart.inlineData.data}` };
+          }
+          const fr = candidate?.finishReason;
+          if (fr === "SAFETY" || fr === "PROHIBITED_CONTENT") return { filtered: true };
+          return { ok: false, reason: "apiyi: no image in response" };
+        } catch (e) {
+          return { ok: false, reason: `apiyi exception: ${e instanceof Error ? e.message : String(e)}` };
+        }
+      };
+
       // ---------- Provider 1: fal.ai ----------
       const callFal = async (): Promise<ProviderResult> => {
         if (!FAL_KEY) return { ok: false, reason: "FAL_KEY not configured" };
