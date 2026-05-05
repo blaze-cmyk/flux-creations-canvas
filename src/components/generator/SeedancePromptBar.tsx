@@ -296,11 +296,6 @@ export function SeedancePromptBar() {
 
           {/* Bottom chips */}
           <div className="flex items-center gap-2 flex-wrap pl-1">
-            <span className="ms-chip-glass flex items-center gap-1.5 px-3.5 h-9 rounded-full text-xs text-foreground">
-              <SeedanceLogo className="w-3.5 h-3.5 text-white" />
-              Seedance 2.0
-            </span>
-
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <button className="ms-chip-glass flex items-center gap-1.5 px-3.5 h-9 rounded-full text-xs text-foreground transition-all">
