@@ -167,6 +167,8 @@ export function SeedancePromptBar() {
           layout
           transition={{ layout: { duration: 0.42, ease: [0.32, 0.72, 0, 1] } }}
           className="relative rounded-[22px] ms-glass p-2.5 flex flex-col gap-2.5"
+          onDragOver={(e) => e.preventDefault()}
+          onDrop={onPromptDrop}
         >
           {/* Asset tracks */}
           <div className="flex gap-2 px-1 pt-1 flex-wrap">
