@@ -23,18 +23,11 @@ const SLIDES: Slide[] = [
     subtitle: "Generate hyper-real images from a prompt or any reference photo.",
   },
   {
-    src: "/auth/v1.mp4",
+    src: "/auth/v6.mp4",
     type: "video",
     badge: "With Audio",
     title: "KLING 3.0",
     subtitle: "Cinematic motion, sound, and polish that feels real.",
-  },
-  {
-    src: "/auth/v6.mp4",
-    type: "video",
-    badge: "Video Edit",
-    title: "VIDEO EDITING",
-    subtitle: "Drop in raw footage and tell it what to change. Edit video like a prompt.",
   },
   {
     src: "/auth/v2.mp4",
@@ -58,11 +51,18 @@ const SLIDES: Slide[] = [
     subtitle: "Cinematic product reveals with motion and sound.",
   },
   {
-    src: "/auth/v5.mp4",
+    src: "/auth/v4.mp4",
     type: "video",
     badge: "Marketing Studio",
     title: "REAL UGC ADS",
     subtitle: "Creator-style ads for any product — generated, not filmed.",
+  },
+  {
+    src: "/auth/v5.mp4",
+    type: "video",
+    badge: "Try-On",
+    title: "UGC VIRTUAL TRY-ON",
+    subtitle: "Put your product on any avatar in any setting — instantly.",
   },
 ];
 
