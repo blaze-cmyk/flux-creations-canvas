@@ -301,6 +301,32 @@ export function SeedancePromptBar() {
               Seedance 2.0
             </span>
 
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button className="ms-chip-glass flex items-center gap-1.5 px-3.5 h-9 rounded-full text-xs text-foreground transition-all">
+                  <SeedanceLogo className="w-3.5 h-3.5 text-white" />
+                  {modelLabel}
+                  <ChevronDownIcon className="size-3.5 text-muted-foreground/70" />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent className="bg-ms-surface-2 border-ms-border">
+                <DropdownMenuItem
+                  onClick={() => setVariant('bytedance/seedance-2.0/reference-to-video')}
+                  className="text-sm flex flex-col items-start gap-0.5"
+                >
+                  <span>Seedance 2.0</span>
+                  <span className="text-[10px] text-muted-foreground">Highest quality • supports 1080p</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() => setVariant('bytedance/seedance-2.0-fast/text-to-video')}
+                  className="text-sm flex flex-col items-start gap-0.5"
+                >
+                  <span>Seedance 2.0 Fast</span>
+                  <span className="text-[10px] text-muted-foreground">~20% cheaper • 480p / 720p only</span>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+
             {/* Aspect — MS-style chip */}
             <SeedanceAspectChip value={ratio} onChange={setRatio} />
 
