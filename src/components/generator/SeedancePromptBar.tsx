@@ -132,6 +132,27 @@ export function SeedancePromptBar() {
     }
   };
 
+  // Paste image/video/audio from clipboard
+  const onPromptPaste = async (e: React.ClipboardEvent) => {
+    const items = e.clipboardData?.items;
+    if (!items) return;
+    const files: { kind: SeedanceAssetKind; file: File }[] = [];
+    for (let i = 0; i < items.length; i++) {
+      const it = items[i];
+      const kind: SeedanceAssetKind | null =
+        it.type.startsWith('image/') ? 'image' :
+        it.type.startsWith('video/') ? 'video' :
+        it.type.startsWith('audio/') ? 'audio' : null;
+      if (!kind) continue;
+      const f = it.getAsFile();
+      if (f) files.push({ kind, file: f });
+    }
+    if (files.length > 0) {
+      e.preventDefault();
+      for (const { kind, file } of files) await addAsset(kind, file);
+    }
+  };
+
   const insertTag = (tag: string) => {
     setPrompt((prompt ? prompt.trimEnd() + ' ' : '') + `@${tag} `);
   };
@@ -146,6 +167,8 @@ export function SeedancePromptBar() {
           layout
           transition={{ layout: { duration: 0.42, ease: [0.32, 0.72, 0, 1] } }}
           className="relative rounded-[22px] ms-glass p-2.5 flex flex-col gap-2.5"
+          onDragOver={(e) => e.preventDefault()}
+          onDrop={onPromptDrop}
         >
           {/* Asset tracks */}
           <div className="flex gap-2 px-1 pt-1 flex-wrap">
@@ -231,6 +254,7 @@ export function SeedancePromptBar() {
                   rows={3}
                   className="w-full bg-transparent border-0 text-sm leading-[1.6] text-foreground placeholder:text-muted-foreground/70 focus:outline-none resize-none ms-prompt-scroll min-h-[72px] max-h-[220px] overflow-y-auto"
                   style={{ fontFamily: 'Montserrat, system-ui, sans-serif' }}
+                  onPaste={onPromptPaste}
                   onKeyDown={(e) => {
                     // Allow native copy/paste/cut/select-all
                     if ((e.metaKey || e.ctrlKey) && ['c','v','x','a','z','y'].includes(e.key.toLowerCase())) {

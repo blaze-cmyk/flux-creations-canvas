@@ -36,6 +36,24 @@ export function VideoPromptBar() {
     });
   }, [referenceImages.length, addReferenceImage]);
 
+  const handlePaste = useCallback((e: React.ClipboardEvent) => {
+    const items = e.clipboardData?.items;
+    if (!items) return;
+    const files: File[] = [];
+    for (let i = 0; i < items.length; i++) {
+      if (items[i].type.startsWith('image/')) {
+        const f = items[i].getAsFile();
+        if (f) files.push(f);
+      }
+    }
+    if (files.length > 0) { e.preventDefault(); handleFiles(files); }
+  }, [handleFiles]);
+
+  const handleDrop = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    if (e.dataTransfer.files?.length) handleFiles(e.dataTransfer.files);
+  }, [handleFiles]);
+
   const handleSubmit = () => {
     generate();
   };
@@ -48,7 +66,11 @@ export function VideoPromptBar() {
 
   return (
     <div className="shrink-0 flex justify-center px-4 pb-4 pt-2">
-      <div className="w-full max-w-3xl bg-popover border border-border rounded-2xl shadow-2xl">
+      <div
+        className="w-full max-w-3xl bg-popover border border-border rounded-2xl shadow-2xl"
+        onDragOver={(e) => e.preventDefault()}
+        onDrop={handleDrop}
+      >
         <div className="relative px-4 pt-3 pb-2">
           {/* Mode tabs */}
           <div className="flex items-center gap-1 mb-3">
@@ -102,6 +124,7 @@ export function VideoPromptBar() {
                 value={prompt}
                 onChange={e => setPrompt(e.target.value)}
                 onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSubmit(); } }}
+                onPaste={handlePaste}
                 placeholder={mode === 'text-to-video' ? 'Describe the video you want to create...' : 'Describe how to animate this image...'}
                 rows={1}
                 className="w-full bg-transparent text-sm text-foreground placeholder:text-muted-foreground/50 resize-none border-0 focus:outline-none py-1 leading-5"
