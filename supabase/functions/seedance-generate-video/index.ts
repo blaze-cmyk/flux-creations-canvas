@@ -745,35 +745,13 @@ Deno.serve(async (req) => {
 
     if (videoId) await updateRow(admin, videoId, { stage: 'queued' });
 
-    // Provider order: BytePlus (primary test) -> AtlasCloud -> Apiyi.
-    // If BytePlus rejects the input media for real-person/privacy moderation,
-    // stop immediately so the UI shows the real BytePlus reason instead of a
-    // later fallback provider's unrelated token/polling error.
-    let result: any = await tryByteplus();
-    let usedFallback = false;
+    // BytePlus only — no fallbacks. If it fails, surface the real error.
+    const result: any = await tryByteplus();
+    const usedFallback = false;
     if (!result.ok) {
-      if (isInputPrivacyRejection(result.error)) {
-        const finalErr = result.error;
-        if (videoId) await updateRow(admin, videoId, { status: 'failed', stage: 'failed', error: finalErr, provider: 'byteplus' });
-        return json({ status: 'failed', stage: 'failed', error: finalErr, provider: 'byteplus' });
-      }
-      log('WARN', 'byteplus failed, trying atlas', { err: result.error });
-      const atlasRes = await tryAtlas();
-      if (atlasRes.ok) {
-        result = atlasRes;
-        usedFallback = true;
-      } else {
-        log('WARN', 'atlas failed, trying apiyi', { err: atlasRes.error });
-        const ap = await tryApiyi();
-        if (ap.ok) {
-          result = ap;
-          usedFallback = true;
-        } else {
-          const finalErr = result.error || atlasRes.error || ap.error;
-          if (videoId) await updateRow(admin, videoId, { status: 'failed', stage: 'failed', error: finalErr });
-          return json({ status: 'failed', stage: 'failed', error: finalErr });
-        }
-      }
+      const finalErr = result.error;
+      if (videoId) await updateRow(admin, videoId, { status: 'failed', stage: 'failed', error: finalErr, provider: 'byteplus' });
+      return json({ status: 'failed', stage: 'failed', error: finalErr, provider: 'byteplus' });
     }
 
     if (videoId) {
