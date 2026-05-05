@@ -149,11 +149,30 @@ export function SeedancePromptBar() {
         >
           {/* Asset tracks */}
           <div className="flex gap-2 px-1 pt-1 flex-wrap">
+            {/* Keyframes: image_1 = start frame, image_2 = end frame.
+                Seedance interpolates between them when both are present. */}
+            <KeyframeSlot
+              label="Start frame"
+              hint="image_1"
+              asset={images[0]}
+              onAdd={() => triggerUpload('image')}
+              onRemove={removeAsset}
+              onTag={insertTag}
+            />
+            <KeyframeSlot
+              label="End frame"
+              hint="image_2 · optional"
+              asset={images[1]}
+              onAdd={() => triggerUpload('image')}
+              onRemove={removeAsset}
+              onTag={insertTag}
+              disabled={!images[0]}
+            />
             <AssetTrack
-              label="Images"
-              hint={`${images.length}/${MAX_IMAGES}`}
+              label="Style refs"
+              hint={`${Math.max(0, images.length - 2)}/${MAX_IMAGES - 2}`}
               icon={<ImagePlus className="w-4 h-4" />}
-              assets={images}
+              assets={images.slice(2)}
               onAdd={() => triggerUpload('image')}
               onRemove={removeAsset}
               onTag={insertTag}
