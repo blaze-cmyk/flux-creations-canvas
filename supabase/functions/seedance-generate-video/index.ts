@@ -741,23 +741,23 @@ Deno.serve(async (req) => {
 
     if (videoId) await updateRow(admin, videoId, { stage: 'queued' });
 
-    // Provider order: Apiyi (primary test) -> AtlasCloud -> BytePlus
-    let result: any = await tryApiyi();
+    // Provider order: BytePlus (primary test) -> AtlasCloud -> Apiyi
+    let result: any = await tryByteplus();
     let usedFallback = false;
     if (!result.ok) {
-      log('WARN', 'apiyi failed, trying atlas', { err: result.error });
+      log('WARN', 'byteplus failed, trying atlas', { err: result.error });
       const atlasRes = await tryAtlas();
       if (atlasRes.ok) {
         result = atlasRes;
         usedFallback = true;
       } else {
-        log('WARN', 'atlas failed, trying byteplus', { err: atlasRes.error });
-        const bp = await tryByteplus();
-        if (bp.ok) {
-          result = bp;
+        log('WARN', 'atlas failed, trying apiyi', { err: atlasRes.error });
+        const ap = await tryApiyi();
+        if (ap.ok) {
+          result = ap;
           usedFallback = true;
         } else {
-          const finalErr = result.error || atlasRes.error || bp.error;
+          const finalErr = result.error || atlasRes.error || ap.error;
           if (videoId) await updateRow(admin, videoId, { status: 'failed', stage: 'failed', error: finalErr });
           return json({ status: 'failed', stage: 'failed', error: finalErr });
         }
