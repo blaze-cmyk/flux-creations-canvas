@@ -10,6 +10,7 @@ const FAL_BASE = "https://fal.run";
 const RUNWARE_BASE = "https://api.runware.ai/v1";
 const EVOLINK_BASE = "https://api.evolink.ai";
 const ATLAS_BASE = "https://api.atlascloud.ai/api/v1/model";
+const APIYI_BASE = "https://api.apiyi.com";
 
 type ModelConfig = {
   type: "nano" | "fal" | "runware";
@@ -19,6 +20,7 @@ type ModelConfig = {
   evolinkModel?: string;      // EvoLink model id (e.g. gemini-3-pro-image-preview)
   atlasModel?: string;        // AtlasCloud model id (e.g. google/nano-banana-pro/text-to-image)
   atlasEditModel?: string;    // AtlasCloud edit model id (image-to-image)
+  apiyiModel?: string;        // APIYI gemini model id (e.g. gemini-3-pro-image-preview)
   apiModel?: string;
   runwareModel?: string;
   supportsImageInput?: boolean;
@@ -41,6 +43,7 @@ const MODEL_MAP: Record<string, ModelConfig> = {
     evolinkModel: "gemini-3-pro-image-preview",
     atlasModel: "google/nano-banana-pro/text-to-image",
     atlasEditModel: "google/nano-banana-pro/image-to-image",
+    apiyiModel: "gemini-3-pro-image-preview",
     supportsImageInput: true, isMultiRef: true, fallbackModel: "seedream-4",
   },
   "nano-banana-2": {
@@ -50,6 +53,7 @@ const MODEL_MAP: Record<string, ModelConfig> = {
     evolinkModel: "gemini-3.1-flash-image-preview",
     atlasModel: "google/nano-banana-2/text-to-image",
     atlasEditModel: "google/nano-banana-2/image-to-image",
+    apiyiModel: "gemini-3.1-flash-image-preview",
     supportsImageInput: true, isMultiRef: true, fallbackModel: "seedream-4",
   },
 
@@ -203,6 +207,7 @@ serve(async (req) => {
       const FAL_KEY = Deno.env.get("FAL_KEY");
       const EVOLINK_API_KEY = Deno.env.get("EVOLINK_API_KEY");
       const ATLASCLOUD_API_KEY = Deno.env.get("ATLASCLOUD_API_KEY");
+      const APIYI_API_KEY = Deno.env.get("APIYI_API_KEY");
 
       const hasRefs = referenceImages.length > 0;
       const evolinkAr = ["1:1","1:4","4:1","1:8","8:1","2:3","3:2","3:4","4:3","4:5","5:4","9:16","16:9","21:9"].includes(ar) ? ar : "auto";
@@ -214,6 +219,54 @@ serve(async (req) => {
         | { ok: true; imageUrl?: string; imageBase64?: string }
         | { ok: false; reason: string }
         | CheckedFiltered;
+
+      // ---------- Provider 0: APIYI (Gemini direct, fastest) ----------
+      const callApiyi = async (): Promise<ProviderResult> => {
+        if (!APIYI_API_KEY) return { ok: false, reason: "APIYI_API_KEY not configured" };
+        if (!modelConfig.apiyiModel) return { ok: false, reason: "no apiyi model id" };
+        try {
+          const parts: any[] = [];
+          for (const refImg of referenceImages.slice(0, 14)) {
+            const dataUri = await fetchImageAsDataUri(refImg);
+            if (!dataUri) continue;
+            const m = dataUri.match(/^data:(image\/\w+);base64,(.+)$/);
+            if (!m) continue;
+            parts.push({ inlineData: { mimeType: m[1], data: m[2] } });
+          }
+          parts.push({ text: prompt });
+          const imageSize = QUALITY_MAP[quality] || "2K";
+          const endpoint = `${APIYI_BASE}/v1beta/models/${modelConfig.apiyiModel}:generateContent`;
+          console.log(`[nano cascade] APIYI → ${modelConfig.apiyiModel}, ar=${ar}, size=${imageSize}, refs=${referenceImages.length}`);
+          const ctrl = new AbortController();
+          const timer = setTimeout(() => ctrl.abort(), 60_000);
+          const resp = await fetch(endpoint, {
+            method: "POST",
+            headers: { Authorization: `Bearer ${APIYI_API_KEY}`, "Content-Type": "application/json" },
+            body: JSON.stringify({
+              contents: [{ parts }],
+              generationConfig: { responseModalities: ["IMAGE"], imageConfig: { aspectRatio: ar, imageSize } },
+            }),
+            signal: ctrl.signal,
+          }).finally(() => clearTimeout(timer));
+          if (!resp.ok) {
+            const t = await resp.text();
+            console.error(`[nano cascade] APIYI failed ${resp.status}: ${t.slice(0, 300)}`);
+            return { ok: false, reason: `apiyi ${resp.status}` };
+          }
+          const data = await resp.json();
+          const candidate = data?.candidates?.[0];
+          const resParts = candidate?.content?.parts ?? [];
+          const imgPart = resParts.find((p: any) => p.inlineData?.data);
+          if (imgPart?.inlineData?.data) {
+            return { ok: true, imageBase64: `data:${imgPart.inlineData.mimeType || "image/png"};base64,${imgPart.inlineData.data}` };
+          }
+          const fr = candidate?.finishReason;
+          if (fr === "SAFETY" || fr === "PROHIBITED_CONTENT") return { filtered: true };
+          return { ok: false, reason: "apiyi: no image in response" };
+        } catch (e) {
+          return { ok: false, reason: `apiyi exception: ${e instanceof Error ? e.message : String(e)}` };
+        }
+      };
 
       // ---------- Provider 1: fal.ai ----------
       const callFal = async (): Promise<ProviderResult> => {
@@ -272,8 +325,8 @@ serve(async (req) => {
           const taskId = submitData?.id;
           if (!taskId) return { ok: false, reason: "evolink: no task id" };
 
-          // Poll up to ~90s
-          for (let i = 0; i < 45; i++) {
+          // Poll up to ~40s (cascade must fit within 150s edge timeout)
+          for (let i = 0; i < 20; i++) {
             await new Promise((r) => setTimeout(r, 2000));
             const poll = await fetch(`${EVOLINK_BASE}/v1/tasks/${taskId}`, {
               headers: { Authorization: `Bearer ${EVOLINK_API_KEY}` },
@@ -326,8 +379,8 @@ serve(async (req) => {
           const predictionId = submitData?.data?.id ?? submitData?.id;
           if (!predictionId) return { ok: false, reason: "atlas: no prediction id" };
 
-          // Poll up to ~90s
-          for (let i = 0; i < 45; i++) {
+          // Poll up to ~40s (cascade must fit within 150s edge timeout)
+          for (let i = 0; i < 20; i++) {
             await new Promise((r) => setTimeout(r, 2000));
             const poll = await fetch(`${ATLAS_BASE}/prediction/${predictionId}`, {
               headers: { Authorization: `Bearer ${ATLASCLOUD_API_KEY}` },
@@ -351,6 +404,7 @@ serve(async (req) => {
       };
 
       const providers: Array<{ name: string; fn: () => Promise<ProviderResult> }> = [
+        { name: "APIYI", fn: callApiyi },
         { name: "fal.ai", fn: callFal },
         { name: "EvoLink", fn: callEvolink },
         { name: "AtlasCloud", fn: callAtlas },
@@ -390,7 +444,7 @@ serve(async (req) => {
           });
         }
       } else if (nanoFailed) {
-        return new Response(JSON.stringify({ error: "Nano Banana generation failed across fal.ai, EvoLink, and AtlasCloud", details: failures.join(" | ") }), {
+        return new Response(JSON.stringify({ error: "Nano Banana generation failed across APIYI, fal.ai, EvoLink, and AtlasCloud", details: failures.join(" | ") }), {
           status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
