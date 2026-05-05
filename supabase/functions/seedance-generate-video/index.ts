@@ -707,21 +707,58 @@ Deno.serve(async (req) => {
       return { ok: true, predictionId: submission.predictionId, endpoint: submission.endpoint, provider: 'byteplus', audioFallbackUsed };
     };
 
+    // ===== Attempt 0 (PRIMARY): Apiyi / laozhang.ai =====
+    // Reseller proxy for Seedance 2.0. Accepts public HTTPS URLs directly,
+    // no asset registration. Currently the main test path.
+    const tryApiyi = async (): Promise<{ ok: true; predictionId: string; endpoint: string; provider: 'apiyi'; audioFallbackUsed: boolean } | { ok: false; error: string }> => {
+      if (!APIYI_KEY) return { ok: false, error: 'Apiyi not configured' };
+      const resolvedPrompt = resolvePromptTags(promptText, {
+        images: images.length, videos: videos.length, audios: audios.length,
+      });
+      log('INFO', 'apiyi resolved prompt', { resolved: resolvedPrompt.slice(0, 240) });
+
+      const baseSubmit = {
+        prompt: resolvedPrompt || 'The character in image 1 dances gracefully to the music',
+        imageUrls: images,
+        videoUrls: videos,
+        audioUrls: audios,
+        duration: safeDuration,
+        resolution: normRes(resolution),
+        ratio: normRatio(ratio),
+        variant: chosenVariant,
+      };
+      let submission = await apiyiSubmit({ ...baseSubmit, generateAudio: effectiveGenerateAudio });
+      let audioFallbackUsed = false;
+      if (!submission.ok && isGeneratedAudioModeration(submission.error)) {
+        audioFallbackUsed = true;
+        submission = await apiyiSubmit({ ...baseSubmit, generateAudio: false });
+      }
+      if (!submission.ok) return { ok: false, error: submission.error };
+      return { ok: true, predictionId: submission.predictionId, endpoint: submission.endpoint, provider: 'apiyi', audioFallbackUsed };
+    };
+
     if (videoId) await updateRow(admin, videoId, { stage: 'queued' });
 
-    let result = await tryAtlas();
+    // Provider order: Apiyi (primary test) -> AtlasCloud -> BytePlus
+    let result: any = await tryApiyi();
     let usedFallback = false;
     if (!result.ok) {
-      log('WARN', 'atlas failed, trying byteplus', { err: result.error });
-      const fallback = await tryByteplus();
-      if (fallback.ok) {
-        result = fallback;
+      log('WARN', 'apiyi failed, trying atlas', { err: result.error });
+      const atlasRes = await tryAtlas();
+      if (atlasRes.ok) {
+        result = atlasRes;
         usedFallback = true;
       } else {
-        // Both failed — surface the AtlasCloud error (more user-friendly).
-        const finalErr = result.error;
-        if (videoId) await updateRow(admin, videoId, { status: 'failed', stage: 'failed', error: finalErr });
-        return json({ status: 'failed', stage: 'failed', error: finalErr });
+        log('WARN', 'atlas failed, trying byteplus', { err: atlasRes.error });
+        const bp = await tryByteplus();
+        if (bp.ok) {
+          result = bp;
+          usedFallback = true;
+        } else {
+          const finalErr = result.error || atlasRes.error || bp.error;
+          if (videoId) await updateRow(admin, videoId, { status: 'failed', stage: 'failed', error: finalErr });
+          return json({ status: 'failed', stage: 'failed', error: finalErr });
+        }
       }
     }
 
