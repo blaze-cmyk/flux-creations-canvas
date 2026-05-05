@@ -151,13 +151,17 @@ function friendly(raw: string | undefined): string {
   if (/output audio.*sensitive/i.test(raw)) {
     return 'Seedance flagged the generated audio. Turn Sound OFF and retry.';
   }
-  if (/input video.*sensitive/i.test(raw)) {
-    return 'Seedance flagged the input video as containing a real person. Try a shorter clip, a different framing, or remove the reference video.';
+  if (/input video.*sensitive|input video.*real person|PrivacyInformation/i.test(raw)) {
+    return 'BytePlus Seedance 2.0 rejected the reference video because it may contain a real person/privacy information. Try a shorter clip, a different framing, or remove the reference video.';
   }
-  if (/input image.*sensitive|sensitive content/i.test(raw)) {
-    return 'Seedance flagged a reference image. Try a different photo or rephrase the prompt.';
+  if (/input image.*sensitive|input image.*real person|sensitive content/i.test(raw)) {
+    return 'BytePlus Seedance 2.0 rejected the reference image because it may contain a real person/privacy information. Try a different photo, crop/blur the face, or remove that reference.';
   }
   return raw;
+}
+
+function isInputPrivacyRejection(raw: string | undefined): boolean {
+  return /Input(Image|Video)SensitiveContentDetected\.PrivacyInformation|input (image|video).*real person|may contain real person|privacy information/i.test(raw ?? '');
 }
 
 function isGeneratedAudioModeration(raw: string | undefined): boolean {
@@ -741,10 +745,18 @@ Deno.serve(async (req) => {
 
     if (videoId) await updateRow(admin, videoId, { stage: 'queued' });
 
-    // Provider order: BytePlus (primary test) -> AtlasCloud -> Apiyi
+    // Provider order: BytePlus (primary test) -> AtlasCloud -> Apiyi.
+    // If BytePlus rejects the input media for real-person/privacy moderation,
+    // stop immediately so the UI shows the real BytePlus reason instead of a
+    // later fallback provider's unrelated token/polling error.
     let result: any = await tryByteplus();
     let usedFallback = false;
     if (!result.ok) {
+      if (isInputPrivacyRejection(result.error)) {
+        const finalErr = result.error;
+        if (videoId) await updateRow(admin, videoId, { status: 'failed', stage: 'failed', error: finalErr, provider: 'byteplus' });
+        return json({ status: 'failed', stage: 'failed', error: finalErr, provider: 'byteplus' });
+      }
       log('WARN', 'byteplus failed, trying atlas', { err: result.error });
       const atlasRes = await tryAtlas();
       if (atlasRes.ok) {
