@@ -54,7 +54,7 @@ const VIDEO_MODEL_MAP: Record<string, VideoModelConfig> = {
   "ltx-2-19b": { type: "fal", textToVideo: "fal-ai/ltx-2-19b/text-to-video", imageToVideo: "fal-ai/ltx-2-19b/image-to-video", durationFormat: "ltx-frames", imageField: "image_url" },
   "rw-seedance-1.5-pro": { type: "runware", runwareModel: "bytedance:seedance@1.5-pro" },
   "rw-runway-gen4.5": { type: "runware", runwareModel: "runwayml:gen@4.5" },
-  "rw-sora-2": { type: "runware", runwareModel: "openai:3@1" },
+  // rw-sora-2 is routed to APIYI above (no Runware fallback).
   "rw-kling-2.5": { type: "runware", runwareModel: "klingai:6@1" },
   "rw-veo-3.1": { type: "runware", runwareModel: "google:3@2" },
   "rw-veo-3.1-fast": { type: "runware", runwareModel: "google:3@3" },
