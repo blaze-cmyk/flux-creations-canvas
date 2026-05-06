@@ -404,6 +404,11 @@ async function handleSubmit(body: Record<string, unknown>) {
       if (submitResp.status === 403 && parsed?.message) {
         return jsonResp({ error: `APIYI: ${parsed.message}` }, 403);
       }
+      // 503 "无可用渠道" → APIYI account/group has no channel enabled for this model.
+      const apiyiMsg = parsed?.error?.message || parsed?.message;
+      if (submitResp.status === 503 && apiyiMsg) {
+        return jsonResp({ error: `APIYI channel unavailable for ${apiyiModel}. Enable this model in your APIYI dashboard (分组/令牌 settings). Original message: ${apiyiMsg}` }, 503);
+      }
       return jsonResp({ error: `APIYI API error: ${submitResp.status}`, details: errText }, 502);
     }
 
