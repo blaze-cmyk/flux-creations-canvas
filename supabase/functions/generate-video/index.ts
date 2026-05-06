@@ -176,10 +176,38 @@ async function handlePoll(body: Record<string, unknown>) {
         statusData?.data?.video_url;
       if (directUrl) return jsonResp({ status: "complete", videoUrl: directUrl });
 
-      // Otherwise the canonical content endpoint streams the raw MP4 bytes.
-      // Return that URL directly (with the API key as query) — do NOT try to JSON.parse it.
-      const contentUrl = `${APIYI_BASE}/v1/videos/${taskId}/content`;
-      return jsonResp({ status: "complete", videoUrl: contentUrl });
+      // Otherwise /content streams the raw MP4 bytes (binary, NOT JSON).
+      // Download with the API key, then upload to public storage so the browser can play it.
+      const contentResp = await fetch(`${APIYI_BASE}/v1/videos/${taskId}/content`, {
+        headers: { Authorization: `Bearer ${APIYI_API_KEY}` },
+      });
+      if (!contentResp.ok) {
+        const t = await contentResp.text();
+        return jsonResp({ error: `APIYI content fetch failed: ${contentResp.status} ${t}` }, 502);
+      }
+      const bytes = new Uint8Array(await contentResp.arrayBuffer());
+
+      const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
+      const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+      const path = `apiyi/${taskId}.mp4`;
+      const uploadResp = await fetch(
+        `${SUPABASE_URL}/storage/v1/object/video-inputs/${path}`,
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${SERVICE_KEY}`,
+            "Content-Type": "video/mp4",
+            "x-upsert": "true",
+          },
+          body: bytes,
+        },
+      );
+      if (!uploadResp.ok) {
+        const t = await uploadResp.text();
+        return jsonResp({ error: `Storage upload failed: ${uploadResp.status} ${t}` }, 502);
+      }
+      const publicUrl = `${SUPABASE_URL}/storage/v1/object/public/video-inputs/${path}`;
+      return jsonResp({ status: "complete", videoUrl: publicUrl });
     }
     return jsonResp({ status: "processing" });
   }
