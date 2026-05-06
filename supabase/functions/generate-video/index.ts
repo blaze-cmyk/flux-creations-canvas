@@ -265,6 +265,82 @@ async function handleSubmit(body: Record<string, unknown>) {
   const config = VIDEO_MODEL_MAP[model];
   if (!config) return jsonResp({ error: `Unknown video model: ${model}` }, 400);
 
+  // ========== APIYI SUBMIT (Google Veo) ==========
+  // Per https://docs.apiyi.com/api-capabilities/veo/async-api
+  // Text-to-video: POST /v1/videos JSON { prompt, model }
+  // Image-to-video (first frame / first+last frame): use `-fl` model variant via multipart/form-data.
+  // Aspect ratio mapping: 16:9 → `-landscape`, otherwise vertical default (9:16, 720x1280).
+  if (config.type === "apiyi") {
+    const APIYI_API_KEY = Deno.env.get("APIYI_API_KEY");
+    if (!APIYI_API_KEY) return jsonResp({ error: "APIYI_API_KEY not configured" }, 500);
+
+    const baseModel = config.apiyiBaseModel || "veo-3.1";
+    const isLandscape = aspectRatio === "16:9";
+    const hasImages = mode === "image-to-video" && referenceImages.length > 0;
+
+    // Build APIYI model id following naming rules: base[-landscape][-fast][-fl]
+    // baseModel already may include "-fast" (e.g. "veo-3.1-fast"). Insert "-landscape" before "-fast".
+    let apiyiModel = baseModel;
+    if (isLandscape) {
+      apiyiModel = baseModel.includes("-fast")
+        ? baseModel.replace("-fast", "-landscape-fast")
+        : `${baseModel}-landscape`;
+    }
+    if (hasImages) {
+      apiyiModel = `${apiyiModel}-fl`;
+    }
+
+    if (!prompt || !prompt.trim()) {
+      return jsonResp({ error: "APIYI Veo requires a text prompt" }, 400);
+    }
+
+    console.log(`Submitting APIYI Veo task: model=${apiyiModel}, hasImages=${hasImages}`);
+
+    let submitResp: Response;
+    if (hasImages) {
+      // Multipart upload — fetch each image and append as input_reference (max 2).
+      const form = new FormData();
+      form.append("prompt", prompt);
+      form.append("model", apiyiModel);
+      const imgs = referenceImages.slice(0, 2);
+      for (let i = 0; i < imgs.length; i++) {
+        try {
+          const imgResp = await fetch(imgs[i]);
+          if (!imgResp.ok) throw new Error(`Failed to fetch reference image ${i}: ${imgResp.status}`);
+          const blob = await imgResp.blob();
+          const ext = (blob.type.split("/")[1] || "jpg").replace("jpeg", "jpg");
+          form.append("input_reference", blob, `frame_${i}.${ext}`);
+        } catch (e) {
+          return jsonResp({ error: `Failed to load reference image: ${e instanceof Error ? e.message : String(e)}` }, 400);
+        }
+      }
+      submitResp = await fetch(`${APIYI_BASE}/v1/videos`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${APIYI_API_KEY}` },
+        body: form,
+      });
+    } else {
+      submitResp = await fetch(`${APIYI_BASE}/v1/videos`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${APIYI_API_KEY}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ prompt, model: apiyiModel }),
+      });
+    }
+
+    if (!submitResp.ok) {
+      const errText = await submitResp.text();
+      console.error("APIYI submit error:", submitResp.status, errText);
+      return jsonResp({ error: `APIYI API error: ${submitResp.status}`, details: errText }, 502);
+    }
+
+    const submitData = await submitResp.json();
+    const taskId = submitData?.id;
+    if (!taskId) return jsonResp({ error: "No task ID in APIYI response", details: JSON.stringify(submitData) }, 502);
+
+    console.log(`APIYI task submitted: ${taskId} (model=${apiyiModel})`);
+    return jsonResp({ submitted: true, provider: "apiyi", taskId });
+  }
+
   // ========== EVOLINK SUBMIT ==========
   if (config.type === "evolink") {
     const EVOLINK_API_KEY = Deno.env.get("EVOLINK_API_KEY");
