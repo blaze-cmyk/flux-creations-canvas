@@ -330,6 +330,18 @@ async function handleSubmit(body: Record<string, unknown>) {
     if (!submitResp.ok) {
       const errText = await submitResp.text();
       console.error("APIYI submit error:", submitResp.status, errText);
+      let parsed: any = null;
+      try { parsed = JSON.parse(errText); } catch { /* not json */ }
+      const code = parsed?.code || parsed?.error?.code;
+      if (code === "quota_not_enough" || submitResp.status === 402) {
+        return jsonResp({ error: "APIYI account is out of credits. Please top up your APIYI balance to use Google Veo." }, 402);
+      }
+      if (code === "invalid_api_key" || submitResp.status === 401) {
+        return jsonResp({ error: "APIYI API key is invalid. Check the APIYI_API_KEY secret." }, 401);
+      }
+      if (submitResp.status === 403 && parsed?.message) {
+        return jsonResp({ error: `APIYI: ${parsed.message}` }, 403);
+      }
       return jsonResp({ error: `APIYI API error: ${submitResp.status}`, details: errText }, 502);
     }
 
