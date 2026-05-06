@@ -129,7 +129,7 @@ export const MODEL_DURATIONS: Record<string, string[]> = {
   'ltx-2-19b':            ['5','10'],
   'rw-seedance-1.5-pro':  ['5','10','12','15'],
   'rw-runway-gen4.5':     ['5','10'],
-  'rw-sora-2':            ['8'],
+  'rw-sora-2':            ['4','8','12'],
   'rw-kling-2.5':         ['5','10'],
   'rw-veo-3.1':           ['8'],
   'rw-veo-3.1-fast':      ['8'],
