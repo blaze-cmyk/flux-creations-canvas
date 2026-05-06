@@ -176,8 +176,8 @@ async function handlePoll(body: Record<string, unknown>) {
         statusData?.data?.video_url;
       if (directUrl) return jsonResp({ status: "complete", videoUrl: directUrl });
 
-      // Otherwise /content streams the raw MP4 bytes (binary, NOT JSON).
-      // Download with the API key, then upload to public storage so the browser can play it.
+      // Otherwise /content may return either the docs-style JSON payload with a URL,
+      // or raw MP4 bytes. Never blindly parse this response as JSON.
       const contentResp = await fetch(`${APIYI_BASE}/v1/videos/${taskId}/content`, {
         headers: { Authorization: `Bearer ${APIYI_API_KEY}` },
       });
@@ -185,6 +185,14 @@ async function handlePoll(body: Record<string, unknown>) {
         const t = await contentResp.text();
         return jsonResp({ error: `APIYI content fetch failed: ${contentResp.status} ${t}` }, 502);
       }
+      const contentType = contentResp.headers.get("content-type") || "";
+      if (contentType.includes("application/json")) {
+        const contentData = await contentResp.json();
+        const contentUrl = contentData?.url || contentData?.video_url || contentData?.data?.url || contentData?.result?.url;
+        if (contentUrl) return jsonResp({ status: "complete", videoUrl: contentUrl });
+        return jsonResp({ error: "APIYI content response did not include a video URL" }, 502);
+      }
+
       const bytes = new Uint8Array(await contentResp.arrayBuffer());
 
       const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
