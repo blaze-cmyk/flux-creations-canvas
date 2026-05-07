@@ -215,18 +215,16 @@ export function SeedancePromptBar() {
               onTag={insertTag}
               full={videos.length >= MAX_VIDEOS}
             />
-            {generateAudio && (
-              <AssetTrack
-                label="Audio"
-                hint={`${audios.length}/${MAX_AUDIOS} · ≤${MAX_MEDIA_SECONDS}s`}
-                icon={<Music className="w-4 h-4" />}
-                assets={audios}
-                onAdd={() => triggerUpload('audio')}
-                onRemove={removeAsset}
-                onTag={insertTag}
-                full={audios.length >= MAX_AUDIOS}
-              />
-            )}
+            <AssetTrack
+              label="Audio"
+              hint={`${audios.length}/${MAX_AUDIOS} · ≤${MAX_MEDIA_SECONDS}s`}
+              icon={<Music className="w-4 h-4" />}
+              assets={audios}
+              onAdd={() => triggerUpload('audio')}
+              onRemove={removeAsset}
+              onTag={insertTag}
+              full={audios.length >= MAX_AUDIOS}
+            />
           </div>
 
           {/* Hidden file input */}
