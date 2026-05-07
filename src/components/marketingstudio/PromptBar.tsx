@@ -251,6 +251,7 @@ export function PromptBar({ projectId, createProjectId, ensureCreateProject }: P
             createProjectId: embedded ? createPid : null,
             extraRefImages: extraRefs.map((r) => r.url),
             extraRefNames: extraRefs.map((r) => r.name),
+            generateAudio,
           },
         },
       );
