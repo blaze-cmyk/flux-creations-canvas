@@ -84,6 +84,7 @@ export function PromptBar({ projectId, createProjectId, ensureCreateProject }: P
   const [avatarId, setAvatarId] = useState<string | null>(null);
   const [exactVoiceover, setExactVoiceover] = useState(false);
   const [generating, setGenerating] = useState(false);
+  const [generateAudio, setGenerateAudio] = useState(true);
 
   // Extra reference images (drag/drop, paste, finder upload, @-mentionable)
   const [extraRefs, setExtraRefs] = useState<ExtraRef[]>([]);
