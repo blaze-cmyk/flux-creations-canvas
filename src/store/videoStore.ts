@@ -340,7 +340,7 @@ async function callGenerate(payload: Record<string, unknown>, videoId: string, g
   }
 
   try {
-    const { data, error } = await supabase.functions.invoke('generate-video', { body: { ...payload, action: 'submit' } });
+    const { data, error } = await supabase.functions.invoke('generate-video', { body: { ...payload, action: 'submit', videoId } });
     await get().loadHistory((payload.projectId as string | null | undefined) ?? undefined);
 
     if (error) {
