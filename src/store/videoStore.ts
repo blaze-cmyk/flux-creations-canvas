@@ -33,6 +33,10 @@ export type GeneratedVideo = {
   createdAt: number;
   error?: string;
   progress?: number;
+  provider?: string | null;
+  taskId?: string | null;
+  responseUrl?: string | null;
+  statusUrl?: string | null;
   characterOrientation?: 'video' | 'image';
   projectId?: string | null;
   liked?: boolean;
@@ -223,6 +227,10 @@ async function saveVideoToDb(video: GeneratedVideo) {
       thumbnail_url: video.thumbnailUrl || null,
       reference_images: video.referenceImages.filter(Boolean),
       error: video.error || null,
+      provider: video.provider || null,
+      task_id: video.taskId || null,
+      response_url: video.responseUrl || null,
+      status_url: video.statusUrl || null,
       project_id: video.projectId ?? null,
       create_project_id: video.projectId ?? null,
     }, { onConflict: 'id' });
@@ -239,6 +247,40 @@ function updateVideoAndSave(videoId: string, updates: Partial<GeneratedVideo>, g
 }
 
 const activeSeedancePolls = new Set<string>();
+const activeVideoPolls = new Set<string>();
+
+async function pollGenericVideo(videoId: string, pollBody: Record<string, unknown>, get: () => VideoState, set: (s: Partial<VideoState>) => void) {
+  if (!pollBody.provider || !pollBody.taskId || activeVideoPolls.has(videoId)) return;
+  activeVideoPolls.add(videoId);
+  try {
+    const maxAttempts = 360; // ~30 min budget for slow models (Kling 3.0 Pro, Veo 3.1)
+    let delay = 4000;
+    for (let i = 0; i < maxAttempts; i++) {
+      await new Promise(r => setTimeout(r, delay));
+      delay = Math.min(8000, delay + 250); // gentle backoff, cap at 8s
+      try {
+        const { data: pollData, error: pollError } = await supabase.functions.invoke('generate-video', { body: { action: 'poll', ...pollBody } });
+        if (pollError) continue;
+        if (pollData?.status === 'complete' && pollData.videoUrl) {
+          updateVideoAndSave(videoId, { status: 'complete', stage: 'complete', videoUrl: pollData.videoUrl, progress: 100 }, get, set);
+          return;
+        }
+        if (pollData?.status === 'failed') {
+          updateVideoAndSave(videoId, { status: 'failed', stage: 'failed', error: pollData.error || 'Generation failed' }, get, set);
+          return;
+        }
+        const prog = pollData?.progress;
+        if (typeof prog === 'number' && prog > 0) {
+          const videos = get().videos.map(v => v.id === videoId ? { ...v, progress: Math.round(prog) } : v);
+          set({ videos });
+        }
+      } catch {}
+    }
+    updateVideoAndSave(videoId, { status: 'failed', stage: 'failed', error: 'Video generation timed out' }, get, set);
+  } finally {
+    activeVideoPolls.delete(videoId);
+  }
+}
 
 async function pollSeedanceVideo(videoId: string, taskId: string, get: () => VideoState, set: (s: Partial<VideoState>) => void) {
   if (!taskId || activeSeedancePolls.has(videoId)) return;
@@ -325,9 +367,6 @@ async function callGenerate(payload: Record<string, unknown>, videoId: string, g
     }
 
     if (data?.submitted && data?.provider && data?.taskId) {
-      // Save provider/task info to DB for potential recovery
-      saveVideoToDb({ ...get().videos.find(v => v.id === videoId)! });
-
       const pollBody: Record<string, unknown> = {
         action: 'poll',
         provider: data.provider,
@@ -336,30 +375,15 @@ async function callGenerate(payload: Record<string, unknown>, videoId: string, g
       if (data.responseUrl) pollBody.responseUrl = data.responseUrl;
       if (data.statusUrl) pollBody.statusUrl = data.statusUrl;
 
-      const maxAttempts = 360; // ~30 min budget for slow models (Kling 3.0 Pro, Veo 3.1)
-      let delay = 4000;
-      for (let i = 0; i < maxAttempts; i++) {
-        await new Promise(r => setTimeout(r, delay));
-        delay = Math.min(8000, delay + 250); // gentle backoff, cap at 8s
-        try {
-          const { data: pollData, error: pollError } = await supabase.functions.invoke('generate-video', { body: pollBody });
-          if (pollError) continue;
-          if (pollData?.status === 'complete' && pollData?.videoUrl) {
-            updateVideoAndSave(videoId, { status: 'complete', videoUrl: pollData.videoUrl, progress: 100 }, get, set);
-            return;
-          }
-          if (pollData?.status === 'failed') {
-            updateVideoAndSave(videoId, { status: 'failed', error: pollData.error || 'Generation failed' }, get, set);
-            return;
-          }
-          const prog = pollData?.progress;
-          if (typeof prog === 'number' && prog > 0) {
-            const videos = get().videos.map(v => v.id === videoId ? { ...v, progress: Math.round(prog) } : v);
-            set({ videos });
-          }
-        } catch {}
-      }
-      updateVideoAndSave(videoId, { status: 'failed', error: 'Video generation timed out' }, get, set);
+      updateVideoAndSave(videoId, {
+        provider: data.provider,
+        taskId: data.taskId,
+        responseUrl: data.responseUrl || null,
+        statusUrl: data.statusUrl || null,
+        stage: 'processing',
+      }, get, set);
+
+      await pollGenericVideo(videoId, pollBody, get, set);
       return;
     }
 
@@ -583,6 +607,10 @@ export const useVideoStore = create<VideoState>()((set, get) => ({
         thumbnailUrl: row.thumbnail_url || undefined,
         createdAt: new Date(row.created_at).getTime(),
         error: row.error || undefined,
+        provider: row.provider || null,
+        taskId: row.task_id || null,
+        responseUrl: row.response_url || null,
+        statusUrl: row.status_url || null,
         liked: !!row.liked,
         projectId: row.create_project_id ?? row.project_id ?? null,
       }));
@@ -602,6 +630,11 @@ export const useVideoStore = create<VideoState>()((set, get) => ({
       (data || []).forEach((row: any) => {
         if (row.model === 'seedance-2.0' && row.status === 'processing' && row.task_id) {
           pollSeedanceVideo(row.id, row.task_id, get, set);
+        } else if (row.status === 'processing' && row.provider && row.task_id) {
+          const pollBody: Record<string, unknown> = { provider: row.provider, taskId: row.task_id };
+          if (row.response_url) pollBody.responseUrl = row.response_url;
+          if (row.status_url) pollBody.statusUrl = row.status_url;
+          pollGenericVideo(row.id, pollBody, get, set);
         }
       });
     } catch (e) {
@@ -626,6 +659,10 @@ export const useVideoStore = create<VideoState>()((set, get) => ({
       thumbnailUrl: row.thumbnail_url || undefined,
       createdAt: new Date(row.created_at).getTime(),
       error: row.error || undefined,
+      provider: row.provider || null,
+      taskId: row.task_id || null,
+      responseUrl: row.response_url || null,
+      statusUrl: row.status_url || null,
       liked: !!row.liked,
       projectId: row.create_project_id ?? row.project_id ?? null,
     };
