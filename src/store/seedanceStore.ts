@@ -254,6 +254,12 @@ export const useSeedanceStore = create<SeedanceState>((set, get) => ({
       toast.error('Add a prompt or at least one reference.');
       return;
     }
+    if (!s.generateAudio && s.audios.length > 0) {
+      toast.error('Sound is off', {
+        description: 'Turn Sound on to use audio references, or remove the audio upload.',
+      });
+      return;
+    }
     if (s.audios.length > 0 && s.images.length === 0 && s.videos.length === 0) {
       toast.error('Audio references require at least one image or video.');
       return;
@@ -279,7 +285,7 @@ export const useSeedanceStore = create<SeedanceState>((set, get) => ({
     try {
       imageUrls = await resolveAllToUrls(s.images.map(a => a.url));
       videoUrls = await resolveAllToUrls(s.videos.map(a => a.url));
-      audioUrls = await resolveAllToUrls(s.audios.map(a => a.url));
+      audioUrls = s.generateAudio ? await resolveAllToUrls(s.audios.map(a => a.url)) : [];
     } catch (e: any) {
       set({ isSubmitting: false });
       toast.error(`Upload failed: ${e?.message ?? 'unknown'}`);

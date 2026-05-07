@@ -629,6 +629,7 @@ Deno.serve(async (req) => {
     // If Seedance flags the generated audio, the friendly() helper surfaces a
     // "Turn Sound OFF" hint to the user.
     const effectiveGenerateAudio = generateAudio !== false;
+    const submittedAudios = effectiveGenerateAudio ? audios : [];
 
     // ===== BytePlus ModelArk (PRIMARY, only provider) =====
     // Accepts raw HTTPS URLs in content[]. No asset registration step.
@@ -645,7 +646,7 @@ Deno.serve(async (req) => {
         prompt: resolvedPrompt || 'The character in image 1 dances gracefully to the music',
         imageUrls: images,
         videoUrls: videos,
-        audioUrls: audios,
+        audioUrls: submittedAudios,
         duration: safeDuration,
         resolution: normRes(resolution),
         ratio: normRatio(ratio),
@@ -675,7 +676,7 @@ Deno.serve(async (req) => {
         prompt: resolvedPrompt || 'The character in image 1 dances gracefully to the music',
         imageUrls: images,
         videoUrls: videos,
-        audioUrls: audios,
+        audioUrls: submittedAudios,
         duration: safeDuration,
         resolution: normRes(resolution),
         ratio: normRatio(ratio),

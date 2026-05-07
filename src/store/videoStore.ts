@@ -387,7 +387,11 @@ async function callGenerate(payload: Record<string, unknown>, videoId: string, g
       return;
     }
 
-    updateVideoAndSave(videoId, { status: 'complete', videoUrl: data?.videoUrl }, get, set);
+    updateVideoAndSave(videoId, {
+      status: 'failed',
+      stage: 'failed',
+      error: 'Video provider did not return a result or task ID. Please retry.',
+    }, get, set);
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown generation error';
     updateVideoAndSave(videoId, { status: 'failed', error: message }, get, set);
@@ -587,11 +591,13 @@ export const useVideoStore = create<VideoState>()((set, get) => ({
     try {
       let q = (supabase as any)
         .from('video_generations')
-        .select('id,prompt,model,mode,aspect_ratio,duration,resolution,status,stage,video_url,thumbnail_url,reference_images,error,created_at,liked,project_id,create_project_id,task_id')
+        .select('id,prompt,model,mode,aspect_ratio,duration,resolution,status,stage,video_url,thumbnail_url,reference_images,error,created_at,liked,project_id,create_project_id,provider,task_id,response_url,status_url')
         .order('created_at', { ascending: false })
         .limit(100);
       if (projectId) q = q.or(`create_project_id.eq.${projectId},project_id.eq.${projectId}`);
       const { data } = await q;
+      const orphanError = 'Generation could not resume because provider task metadata was missing. Please retry.';
+      const orphanMs = 10 * 60 * 1000;
       const rows: GeneratedVideo[] = (data || []).map((row: any) => ({
         id: row.id,
         prompt: row.prompt || '',
@@ -601,12 +607,18 @@ export const useVideoStore = create<VideoState>()((set, get) => ({
         aspectRatio: row.aspect_ratio,
         duration: row.duration,
         resolution: row.resolution || undefined,
-        status: row.status === 'processing' ? 'generating' : row.status as GeneratedVideo['status'],
-        stage: (row.stage as VideoStage | null) ?? undefined,
+        status: row.status === 'processing' && !row.task_id && Date.now() - new Date(row.created_at).getTime() > orphanMs
+          ? 'failed'
+          : row.status === 'processing' ? 'generating' : row.status as GeneratedVideo['status'],
+        stage: row.status === 'processing' && !row.task_id && Date.now() - new Date(row.created_at).getTime() > orphanMs
+          ? 'failed'
+          : (row.stage as VideoStage | null) ?? undefined,
         videoUrl: row.video_url || undefined,
         thumbnailUrl: row.thumbnail_url || undefined,
         createdAt: new Date(row.created_at).getTime(),
-        error: row.error || undefined,
+        error: row.status === 'processing' && !row.task_id && Date.now() - new Date(row.created_at).getTime() > orphanMs
+          ? orphanError
+          : row.error || undefined,
         provider: row.provider || null,
         taskId: row.task_id || null,
         responseUrl: row.response_url || null,
@@ -627,6 +639,11 @@ export const useVideoStore = create<VideoState>()((set, get) => ({
       const nextLoaded = new Set(loaded ?? []);
       nextLoaded.add(key);
       set({ videos: mergedVideos, _historyLoaded: true, _loadedProjects: nextLoaded } as any);
+      (data || [])
+        .filter((row: any) => row.status === 'processing' && !row.task_id && Date.now() - new Date(row.created_at).getTime() > orphanMs)
+        .forEach((row: any) => {
+          (supabase as any).from('video_generations').update({ status: 'failed', stage: 'failed', error: orphanError }).eq('id', row.id).then(() => {});
+        });
       (data || []).forEach((row: any) => {
         if (row.model === 'seedance-2.0' && row.status === 'processing' && row.task_id) {
           pollSeedanceVideo(row.id, row.task_id, get, set);
