@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { RECREATE_EVENT, FormatPreset } from './formatPresets';
-import { Plus, Sparkles, Package, Smartphone, Smartphone as PhoneIcon, Gem, Clock } from 'lucide-react';
+import { Plus, Sparkles, Package, Smartphone, Smartphone as PhoneIcon, Gem, Clock, Volume2, VolumeX } from 'lucide-react';
 import { ExtraRefStrip, ExtraRef } from './ExtraRefStrip';
 import { resolveToUrl } from '@/lib/uploadToStorage';
 import {
