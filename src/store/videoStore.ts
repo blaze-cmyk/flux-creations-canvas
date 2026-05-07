@@ -33,6 +33,10 @@ export type GeneratedVideo = {
   createdAt: number;
   error?: string;
   progress?: number;
+  provider?: string | null;
+  taskId?: string | null;
+  responseUrl?: string | null;
+  statusUrl?: string | null;
   characterOrientation?: 'video' | 'image';
   projectId?: string | null;
   liked?: boolean;
@@ -223,6 +227,10 @@ async function saveVideoToDb(video: GeneratedVideo) {
       thumbnail_url: video.thumbnailUrl || null,
       reference_images: video.referenceImages.filter(Boolean),
       error: video.error || null,
+      provider: video.provider || null,
+      task_id: video.taskId || null,
+      response_url: video.responseUrl || null,
+      status_url: video.statusUrl || null,
       project_id: video.projectId ?? null,
       create_project_id: video.projectId ?? null,
     }, { onConflict: 'id' });
@@ -325,9 +333,6 @@ async function callGenerate(payload: Record<string, unknown>, videoId: string, g
     }
 
     if (data?.submitted && data?.provider && data?.taskId) {
-      // Save provider/task info to DB for potential recovery
-      saveVideoToDb({ ...get().videos.find(v => v.id === videoId)! });
-
       const pollBody: Record<string, unknown> = {
         action: 'poll',
         provider: data.provider,
@@ -335,6 +340,14 @@ async function callGenerate(payload: Record<string, unknown>, videoId: string, g
       };
       if (data.responseUrl) pollBody.responseUrl = data.responseUrl;
       if (data.statusUrl) pollBody.statusUrl = data.statusUrl;
+
+      updateVideoAndSave(videoId, {
+        provider: data.provider,
+        taskId: data.taskId,
+        responseUrl: data.responseUrl || null,
+        statusUrl: data.statusUrl || null,
+        stage: 'processing',
+      }, get, set);
 
       const maxAttempts = 360; // ~30 min budget for slow models (Kling 3.0 Pro, Veo 3.1)
       let delay = 4000;
