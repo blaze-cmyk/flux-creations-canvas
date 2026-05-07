@@ -340,7 +340,8 @@ async function callGenerate(payload: Record<string, unknown>, videoId: string, g
   }
 
   try {
-    const { data, error } = await supabase.functions.invoke('generate-video', { body: { ...payload, action: 'submit' } });
+    const { data, error } = await supabase.functions.invoke('generate-video', { body: { ...payload, action: 'submit', videoId } });
+    await get().loadHistory((payload.projectId as string | null | undefined) ?? undefined);
 
     if (error) {
       let errMsg = error.message;
@@ -512,6 +513,7 @@ export const useVideoStore = create<VideoState>()((set, get) => ({
       characterOrientation,
       keepAudio,
       resolution,
+      projectId,
     }, newVideo.id, get, set);
   },
 
@@ -564,6 +566,7 @@ export const useVideoStore = create<VideoState>()((set, get) => ({
       duration: video.duration,
       resolution: video.resolution ?? get().resolution,
       characterOrientation: video.characterOrientation ?? 'video',
+      projectId: video.projectId ?? null,
     }, id, get, set);
   },
 

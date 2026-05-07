@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -70,6 +71,16 @@ function jsonResp(data: unknown, status = 200) {
     status,
     headers: { ...corsHeaders, "Content-Type": "application/json" },
   });
+}
+
+async function updateVideoRow(videoId: string | undefined, patch: Record<string, unknown>) {
+  if (!videoId) return;
+  const url = Deno.env.get("SUPABASE_URL");
+  const key = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+  if (!url || !key) return;
+  const admin = createClient(url, key);
+  const { error } = await admin.from("video_generations").update(patch).eq("id", videoId);
+  if (error) console.error("video row update failed", error.message);
 }
 
 function normalizeClientFacingError(error: unknown) {
@@ -306,9 +317,13 @@ async function handleSubmit(body: Record<string, unknown>) {
   const mode = typeof body?.mode === "string" ? body.mode : "text-to-video";
   const aspectRatio = typeof body?.aspectRatio === "string" ? body.aspectRatio : "16:9";
   const duration = typeof body?.duration === "string" ? body.duration : "5";
+  const videoId = typeof body?.videoId === "string" ? body.videoId : undefined;
 
   const config = VIDEO_MODEL_MAP[model];
-  if (!config) return jsonResp({ error: `Unknown video model: ${model}` }, 400);
+  if (!config) {
+    await updateVideoRow(videoId, { status: "failed", stage: "failed", error: `Unknown video model: ${model}` });
+    return jsonResp({ error: `Unknown video model: ${model}` }, 400);
+  }
 
   // ========== APIYI SUBMIT (Google Veo + OpenAI Sora 2) ==========
   // Veo:  https://docs.apiyi.com/api-capabilities/veo/async-api
@@ -356,6 +371,7 @@ async function handleSubmit(body: Record<string, unknown>) {
     }
 
     console.log(`Submitting APIYI ${family} task: model=${apiyiModel}, hasImages=${hasImages}, extras=${JSON.stringify(extraFields)}`);
+    await updateVideoRow(videoId, { provider: "apiyi", stage: "submitting", status: "processing", error: null });
 
     let submitResp: Response;
     if (hasImages) {
@@ -392,6 +408,7 @@ async function handleSubmit(body: Record<string, unknown>) {
     if (!submitResp.ok) {
       const errText = await submitResp.text();
       console.error("APIYI submit error:", submitResp.status, errText);
+      await updateVideoRow(videoId, { status: "failed", stage: "failed", error: `APIYI API error: ${submitResp.status} ${errText}`.slice(0, 1000), provider: "apiyi" });
       let parsed: any = null;
       try { parsed = JSON.parse(errText); } catch { /* not json */ }
       const code = parsed?.code || parsed?.error?.code;
@@ -414,8 +431,12 @@ async function handleSubmit(body: Record<string, unknown>) {
 
     const submitData = await submitResp.json();
     const taskId = submitData?.id;
-    if (!taskId) return jsonResp({ error: "No task ID in APIYI response", details: JSON.stringify(submitData) }, 502);
+    if (!taskId) {
+      await updateVideoRow(videoId, { status: "failed", stage: "failed", error: "No task ID in APIYI response", provider: "apiyi" });
+      return jsonResp({ error: "No task ID in APIYI response", details: JSON.stringify(submitData) }, 502);
+    }
 
+    await updateVideoRow(videoId, { provider: "apiyi", task_id: taskId, status: "processing", stage: "processing", error: null });
     console.log(`APIYI task submitted: ${taskId} (model=${apiyiModel})`);
     return jsonResp({ submitted: true, provider: "apiyi", taskId });
   }
@@ -458,6 +479,7 @@ async function handleSubmit(body: Record<string, unknown>) {
     if (prompt) evolinkBody.prompt = prompt;
 
     console.log(`Submitting Evolink task: model=${config.evolinkModel}, quality=${evolinkQuality}`);
+    await updateVideoRow(videoId, { provider: "evolink", stage: "submitting", status: "processing", error: null });
 
     const submitResp = await fetch(`${EVOLINK_BASE}/v1/videos/generations`, {
       method: "POST",
@@ -489,6 +511,7 @@ async function handleSubmit(body: Record<string, unknown>) {
           const requestId = falData.request_id;
           if (requestId) {
             console.log(`Fal fallback submitted: ${requestId}`);
+              await updateVideoRow(videoId, { provider: "fal", task_id: requestId, response_url: falData.response_url, status_url: falData.status_url || null, status: "processing", stage: "processing", error: null });
             return jsonResp({
               submitted: true,
               provider: "fal",
@@ -504,15 +527,21 @@ async function handleSubmit(body: Record<string, unknown>) {
         }
       }
       if (submitResp.status === 402) {
+        await updateVideoRow(videoId, { status: "failed", stage: "failed", error: "Motion-control provider out of credits and fallback failed. Please try again later.", provider: "evolink" });
         return jsonResp({ error: "Motion-control provider out of credits and fallback failed. Please try again later." }, 402);
       }
+      await updateVideoRow(videoId, { status: "failed", stage: "failed", error: `Evolink API error: ${submitResp.status} ${errText}`.slice(0, 1000), provider: "evolink" });
       return jsonResp({ error: `Evolink API error: ${submitResp.status}`, details: errText }, 502);
     }
 
     const submitData = await submitResp.json();
     const taskId = submitData.id;
-    if (!taskId) return jsonResp({ error: "No task ID in Evolink response" }, 502);
+    if (!taskId) {
+      await updateVideoRow(videoId, { status: "failed", stage: "failed", error: "No task ID in Evolink response", provider: "evolink" });
+      return jsonResp({ error: "No task ID in Evolink response" }, 502);
+    }
 
+    await updateVideoRow(videoId, { provider: "evolink", task_id: taskId, status: "processing", stage: "processing", error: null });
     console.log(`Evolink task submitted: ${taskId}`);
     return jsonResp({ submitted: true, provider: "evolink", taskId });
   }
@@ -619,21 +648,32 @@ async function handleSubmit(body: Record<string, unknown>) {
     }
 
     console.log(`Submitting to fal.ai queue: ${endpoint}, mode=${mode}`);
+    await updateVideoRow(videoId, { provider: "fal", stage: "submitting", status: "processing", error: null });
 
-    const submitResp = await fetch(`${FAL_QUEUE}/${endpoint}`, {
-      method: "POST",
-      headers: { Authorization: `Key ${FAL_KEY}`, "Content-Type": "application/json", Accept: "application/json" },
-      body: JSON.stringify(input),
-    });
+    let submitResp: Response;
+    try {
+      submitResp = await fetch(`${FAL_QUEUE}/${endpoint}`, {
+        method: "POST",
+        headers: { Authorization: `Key ${FAL_KEY}`, "Content-Type": "application/json", Accept: "application/json" },
+        body: JSON.stringify(input),
+        signal: AbortSignal.timeout(45000),
+      });
+    } catch (e) {
+      const error = `Fal submit timed out before returning queue metadata: ${e instanceof Error ? e.message : String(e)}`;
+      await updateVideoRow(videoId, { status: "failed", stage: "failed", error, provider: "fal" });
+      return jsonResp({ error }, 504);
+    }
 
     if (!submitResp.ok) {
       const errText = await submitResp.text();
       console.error("Fal submit error:", submitResp.status, errText);
+      await updateVideoRow(videoId, { status: "failed", stage: "failed", error: `Fal API error: ${submitResp.status} ${errText}`.slice(0, 1000) });
       return jsonResp({ error: `Fal API error: ${submitResp.status}`, details: errText }, 502);
     }
 
     const submitData = await submitResp.json();
     const responseUrl = submitData.response_url;
+    const requestId = submitData.request_id;
 
     // If response came immediately (unlikely for video)
     if (!responseUrl) {
@@ -641,15 +681,32 @@ async function handleSubmit(body: Record<string, unknown>) {
       const vid = payload?.video?.url || payload?.video;
       if (vid) {
         const videoUrl = typeof vid === "string" ? vid : vid.url;
+        await updateVideoRow(videoId, { provider: "fal", task_id: requestId ?? "immediate", status: "complete", stage: "complete", video_url: videoUrl, error: null });
         return jsonResp({ submitted: true, provider: "fal", taskId: "immediate", status: "complete", videoUrl });
       }
     }
 
-    console.log(`Fal.ai task submitted: request_id=${submitData.request_id}`);
+    if (!requestId || !responseUrl) {
+      const error = "Fal did not return queue metadata for this Kling job.";
+      await updateVideoRow(videoId, { status: "failed", stage: "failed", error, provider: "fal" });
+      return jsonResp({ error, details: JSON.stringify(submitData) }, 502);
+    }
+
+    await updateVideoRow(videoId, {
+      provider: "fal",
+      task_id: requestId,
+      response_url: responseUrl,
+      status_url: submitData.status_url || null,
+      status: "processing",
+      stage: "processing",
+      error: null,
+    });
+
+    console.log(`Fal.ai task submitted: request_id=${requestId}`);
     return jsonResp({
       submitted: true,
       provider: "fal",
-      taskId: submitData.request_id,
+      taskId: requestId,
       responseUrl,
       statusUrl: submitData.status_url || null,
     });
@@ -727,6 +784,7 @@ async function handleSubmit(body: Record<string, unknown>) {
     }
 
     console.log(`Calling Runware video: model=${config.runwareModel}, async`);
+    await updateVideoRow(videoId, { provider: "runware", task_id: taskUUID, stage: "submitting", status: "processing", error: null });
 
     const response = await fetch(RUNWARE_BASE, {
       method: "POST",
@@ -737,6 +795,7 @@ async function handleSubmit(body: Record<string, unknown>) {
     if (!response.ok) {
       const errText = await response.text();
       console.error("Runware video error:", response.status, errText);
+      await updateVideoRow(videoId, { status: "failed", stage: "failed", error: `Runware API error: ${response.status} ${errText}`.slice(0, 1000), provider: "runware", task_id: taskUUID });
       return jsonResp({ error: `Runware API error: ${response.status}`, details: errText }, 502);
     }
 
@@ -746,14 +805,17 @@ async function handleSubmit(body: Record<string, unknown>) {
     const completed = resData?.data?.find((d: any) => d.videoURL);
 
     if (completed?.videoURL) {
+      await updateVideoRow(videoId, { provider: "runware", task_id: taskUUID, status: "complete", stage: "complete", video_url: completed.videoURL, error: null });
       return jsonResp({ submitted: true, provider: "runware", taskId: taskUUID, status: "complete", videoUrl: completed.videoURL });
     }
 
     const erroredAck = resData?.errors?.[0];
     if (erroredAck) {
+      await updateVideoRow(videoId, { status: "failed", stage: "failed", error: `Runware: ${erroredAck.message || erroredAck.code || "submit failed"}`, provider: "runware", task_id: taskUUID });
       return jsonResp({ error: `Runware: ${erroredAck.message || erroredAck.code || "submit failed"}` }, 502);
     }
 
+    await updateVideoRow(videoId, { provider: "runware", task_id: ackRow?.taskUUID || taskUUID, status: "processing", stage: "processing", error: null });
     console.log(`Runware task submitted (async): ${taskUUID}`);
     return jsonResp({ submitted: true, provider: "runware", taskId: ackRow?.taskUUID || taskUUID });
   }
