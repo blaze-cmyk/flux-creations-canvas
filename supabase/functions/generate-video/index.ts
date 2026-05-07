@@ -650,11 +650,19 @@ async function handleSubmit(body: Record<string, unknown>) {
     console.log(`Submitting to fal.ai queue: ${endpoint}, mode=${mode}`);
     await updateVideoRow(videoId, { provider: "fal", stage: "submitting", status: "processing", error: null });
 
-    const submitResp = await fetch(`${FAL_QUEUE}/${endpoint}`, {
-      method: "POST",
-      headers: { Authorization: `Key ${FAL_KEY}`, "Content-Type": "application/json", Accept: "application/json" },
-      body: JSON.stringify(input),
-    });
+    let submitResp: Response;
+    try {
+      submitResp = await fetch(`${FAL_QUEUE}/${endpoint}`, {
+        method: "POST",
+        headers: { Authorization: `Key ${FAL_KEY}`, "Content-Type": "application/json", Accept: "application/json" },
+        body: JSON.stringify(input),
+        signal: AbortSignal.timeout(45000),
+      });
+    } catch (e) {
+      const error = `Fal submit timed out before returning queue metadata: ${e instanceof Error ? e.message : String(e)}`;
+      await updateVideoRow(videoId, { status: "failed", stage: "failed", error, provider: "fal" });
+      return jsonResp({ error }, 504);
+    }
 
     if (!submitResp.ok) {
       const errText = await submitResp.text();
