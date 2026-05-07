@@ -3,8 +3,8 @@ import { GenerateButton } from '@/components/generator/GenerateButton';
 import { useState } from 'react';
 import { Menu, X, Bell, Gem, User, ArrowLeft, ChevronDown, Pencil, Trash2 } from 'lucide-react';
 import { ThemeToggle } from '@/components/ThemeToggle';
-import logoWhite from '@/assets/korsola-logo-white.png';
-import logoPink from '@/assets/korsola-logo-pink.png';
+import logoWhite from '@/assets/korsola-logo-default.png';
+import logoPink from '@/assets/korsola-logo-hover.jpg';
 import { useLayoutStore } from '@/store/layoutStore';
 import { useCreateProjectsStore } from '@/store/createProjectsStore';
 import {
