@@ -371,6 +371,7 @@ async function handleSubmit(body: Record<string, unknown>) {
     }
 
     console.log(`Submitting APIYI ${family} task: model=${apiyiModel}, hasImages=${hasImages}, extras=${JSON.stringify(extraFields)}`);
+    await updateVideoRow(videoId, { provider: "apiyi", stage: "submitting", status: "processing", error: null });
 
     let submitResp: Response;
     if (hasImages) {
@@ -407,6 +408,7 @@ async function handleSubmit(body: Record<string, unknown>) {
     if (!submitResp.ok) {
       const errText = await submitResp.text();
       console.error("APIYI submit error:", submitResp.status, errText);
+      await updateVideoRow(videoId, { status: "failed", stage: "failed", error: `APIYI API error: ${submitResp.status} ${errText}`.slice(0, 1000), provider: "apiyi" });
       let parsed: any = null;
       try { parsed = JSON.parse(errText); } catch { /* not json */ }
       const code = parsed?.code || parsed?.error?.code;
@@ -429,8 +431,12 @@ async function handleSubmit(body: Record<string, unknown>) {
 
     const submitData = await submitResp.json();
     const taskId = submitData?.id;
-    if (!taskId) return jsonResp({ error: "No task ID in APIYI response", details: JSON.stringify(submitData) }, 502);
+    if (!taskId) {
+      await updateVideoRow(videoId, { status: "failed", stage: "failed", error: "No task ID in APIYI response", provider: "apiyi" });
+      return jsonResp({ error: "No task ID in APIYI response", details: JSON.stringify(submitData) }, 502);
+    }
 
+    await updateVideoRow(videoId, { provider: "apiyi", task_id: taskId, status: "processing", stage: "processing", error: null });
     console.log(`APIYI task submitted: ${taskId} (model=${apiyiModel})`);
     return jsonResp({ submitted: true, provider: "apiyi", taskId });
   }
