@@ -13,6 +13,11 @@ export function VideoDetailModal() {
     setVideoFailed(false);
   }, [selectedVideoId]);
 
+  const posterSrc = useMemo(
+    () => video?.thumbnailUrl || video?.referenceImages?.find((img) => img && !img.startsWith('data:video') && !img.includes('.mp4')),
+    [video?.thumbnailUrl, video?.referenceImages],
+  );
+
   if (!video) return null;
 
   const open = !!selectedVideoId;
@@ -31,10 +36,6 @@ export function VideoDetailModal() {
           ? 'Video Edit'
           : 'Text to Video';
 
-  const posterSrc = useMemo(
-    () => video.thumbnailUrl || video.referenceImages?.find((img) => img && !img.startsWith('data:video') && !img.includes('.mp4')),
-    [video.thumbnailUrl, video.referenceImages],
-  );
   const playSrc = video.videoUrl;
 
   const handleDownload = async () => {
