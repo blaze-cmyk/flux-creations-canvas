@@ -2,6 +2,30 @@ import { create } from 'zustand';
 import { supabase } from '@/integrations/supabase/client';
 import { MSGeneration, MSStage, MSGenStatus } from '@/store/marketingStudioStore';
 
+const SIGNED_URL_MAX_AGE_MS = 50 * 60 * 1000;
+
+function signedUrlExpired(url: string | null | undefined): boolean {
+  if (!url || !url.includes('/storage/v1/object/sign/')) return false;
+  try {
+    const token = new URL(url).searchParams.get('token');
+    if (!token) return true;
+    const payload = JSON.parse(atob(token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')));
+    return typeof payload.exp === 'number' && payload.exp * 1000 < Date.now() + 60_000;
+  } catch {
+    return true;
+  }
+}
+
+function cacheBustSignedUrl(url: string): string {
+  try {
+    const parsed = new URL(url);
+    parsed.searchParams.set('v', String(Math.floor(Date.now() / SIGNED_URL_MAX_AGE_MS)));
+    return parsed.toString();
+  } catch {
+    return url;
+  }
+}
+
 type State = {
   byProject: Record<string, MSGeneration[]>;
   loading: boolean;
@@ -17,7 +41,7 @@ let activeProject: string | null = null;
 
 const mapRow = (row: any): MSGeneration => ({
   id: row.id,
-  thumbUrl: row.thumb_url ?? row.keyframe_url ?? '',
+  thumbUrl: cacheBustSignedUrl(row.thumb_url ?? row.keyframe_url ?? ''),
   videoUrl: row.video_url ?? undefined,
   prompt: row.prompt ?? '',
   mode: (row.format ?? 'UGC') as MSGeneration['mode'],
@@ -70,6 +94,32 @@ export const useMarketingFeedStore = create<State>((set, get) => ({
       if (error || !data) return;
       const items = (data as any[]).map(mapRow);
       set((s) => ({ byProject: { ...s.byProject, [createProjectId]: items } }));
+      refreshExpiredThumbs(data as any[]);
+    };
+
+    const refreshExpiredThumbs = async (rows: any[]) => {
+      const expired = rows.filter((row) => signedUrlExpired(row.thumb_url) || signedUrlExpired(row.keyframe_url));
+      if (!expired.length) return;
+      const productIds = Array.from(new Set(expired.map((row) => row.product_id).filter(Boolean)));
+      if (!productIds.length) return;
+      const { data: images } = await supabase
+        .from('ms_product_images' as any)
+        .select('product_id, storage_path, is_primary, created_at')
+        .in('product_id', productIds)
+        .order('is_primary', { ascending: false })
+        .order('created_at', { ascending: true });
+      const primaryByProduct = new Map<string, string>();
+      (images || []).forEach((img: any) => {
+        if (!primaryByProduct.has(img.product_id)) primaryByProduct.set(img.product_id, img.storage_path);
+      });
+      await Promise.all(expired.map(async (row) => {
+        const path = primaryByProduct.get(row.product_id);
+        if (!path) return;
+        const { data: signed } = await supabase.storage.from('ms-products').createSignedUrl(path, 60 * 60);
+        if (!signed?.signedUrl) return;
+        await supabase.from('ms_generations').update({ thumb_url: signed.signedUrl } as any).eq('id', row.id);
+        upsertOne({ ...row, thumb_url: signed.signedUrl });
+      }));
     };
 
     const kickProviderPoll = async () => {
