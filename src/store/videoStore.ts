@@ -42,6 +42,12 @@ export type GeneratedVideo = {
   liked?: boolean;
 };
 
+function fallbackVideoThumbnail(row: any): string | undefined {
+  if (row.thumbnail_url) return row.thumbnail_url;
+  const refs = Array.isArray(row.reference_images) ? row.reference_images : [];
+  return refs.find((url: unknown) => typeof url === 'string' && /^https?:\/\//i.test(url)) as string | undefined;
+}
+
 export const VIDEO_MODELS = [
   { id: 'kling-v3-pro', name: 'Kling 3.0 Pro', desc: 'Top-tier cinematic visuals, fluid motion, audio', featured: true, badge: 'NEW' as const, provider: 'fal', modes: ['text-to-video', 'image-to-video'] as const },
   { id: 'ev-kling-v3-motion', name: 'Kling 3.0 Motion', desc: 'Cheapest & fastest motion control — recommended', featured: true, badge: 'TOP' as const, provider: 'evolink', modes: ['motion-control'] as const },
@@ -617,7 +623,7 @@ export const useVideoStore = create<VideoState>()((set, get) => ({
           ? 'failed'
           : (row.stage as VideoStage | null) ?? undefined,
         videoUrl: row.video_url || undefined,
-        thumbnailUrl: row.thumbnail_url || undefined,
+        thumbnailUrl: fallbackVideoThumbnail(row),
         createdAt: new Date(row.created_at).getTime(),
         error: row.status === 'processing' && !row.task_id && Date.now() - new Date(row.created_at).getTime() > orphanMs
           ? orphanError
@@ -676,7 +682,7 @@ export const useVideoStore = create<VideoState>()((set, get) => ({
       status: row.status === 'processing' ? 'generating' : (row.status as GeneratedVideo['status']),
       stage: (row.stage as VideoStage | null) ?? undefined,
       videoUrl: row.video_url || undefined,
-      thumbnailUrl: row.thumbnail_url || undefined,
+      thumbnailUrl: fallbackVideoThumbnail(row),
       createdAt: new Date(row.created_at).getTime(),
       error: row.error || undefined,
       provider: row.provider || null,
