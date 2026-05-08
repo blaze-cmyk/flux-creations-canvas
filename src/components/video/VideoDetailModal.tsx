@@ -7,16 +7,20 @@ import { toast } from 'sonner';
 export function VideoDetailModal() {
   const { videos, selectedVideoId, setSelectedVideoId, retryVideo } = useVideoStore();
   const [videoFailed, setVideoFailed] = useState(false);
+  const [posterIndex, setPosterIndex] = useState(0);
   const video = videos.find((v) => v.id === selectedVideoId);
 
   useEffect(() => {
     setVideoFailed(false);
+    setPosterIndex(0);
   }, [selectedVideoId]);
 
-  const posterSrc = useMemo(
-    () => video?.thumbnailUrl || video?.referenceImages?.find((img) => img && !img.startsWith('data:video') && !img.includes('.mp4')),
-    [video?.thumbnailUrl, video?.referenceImages],
-  );
+  const posterCandidates = useMemo(() => {
+    const refs = video?.referenceImages?.filter((img) => img && !img.startsWith('data:video') && !img.includes('.mp4')) || [];
+    return Array.from(new Set([video?.thumbnailUrl, ...refs].filter(Boolean) as string[]));
+  }, [video?.thumbnailUrl, video?.referenceImages]);
+  const posterSrc = posterCandidates[posterIndex];
+  const nextPoster = () => setPosterIndex((idx) => Math.min(idx + 1, posterCandidates.length - 1));
 
   if (!video) return null;
 
