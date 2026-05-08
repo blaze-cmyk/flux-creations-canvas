@@ -1,3 +1,4 @@
+import { useEffect, useMemo, useState } from 'react';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { Heart, Share2, Download, MoreHorizontal, Pencil, RefreshCw, Send } from 'lucide-react';
 import { useVideoStore, VIDEO_MODELS } from '@/store/videoStore';
@@ -5,7 +6,22 @@ import { toast } from 'sonner';
 
 export function VideoDetailModal() {
   const { videos, selectedVideoId, setSelectedVideoId, retryVideo } = useVideoStore();
+  const [videoFailed, setVideoFailed] = useState(false);
+  const [posterIndex, setPosterIndex] = useState(0);
   const video = videos.find((v) => v.id === selectedVideoId);
+
+  useEffect(() => {
+    setVideoFailed(false);
+    setPosterIndex(0);
+  }, [selectedVideoId]);
+
+  const posterCandidates = useMemo(() => {
+    const refs = video?.referenceImages?.filter((img) => img && !img.startsWith('data:video') && !img.includes('.mp4')) || [];
+    return Array.from(new Set([video?.thumbnailUrl, ...refs].filter(Boolean) as string[]));
+  }, [video?.thumbnailUrl, video?.referenceImages]);
+  const posterSrc = posterCandidates[posterIndex];
+  const nextPoster = () => setPosterIndex((idx) => Math.min(idx + 1, posterCandidates.length - 1));
+
   if (!video) return null;
 
   const open = !!selectedVideoId;
@@ -54,26 +70,47 @@ export function VideoDetailModal() {
         <div className="flex-1 min-h-0 grid grid-cols-1 md:grid-cols-[minmax(0,1fr)_minmax(300px,360px)]">
           {/* Media */}
           <div className="relative flex items-center justify-center min-h-0 overflow-hidden">
-            {playSrc && (
-              <video
-                src={playSrc}
-                muted
-                loop
-                playsInline
+            {posterSrc && (
+              <img
+                src={posterSrc}
+                alt=""
                 aria-hidden
+                onError={nextPoster}
                 className="absolute inset-0 w-full h-full object-cover scale-110 blur-2xl opacity-50 pointer-events-none"
+                draggable={false}
               />
             )}
-            {playSrc ? (
-              <video
-                key={playSrc}
-                src={`${playSrc}#t=0.1`}
-                controls
-                autoPlay
-                loop
-                playsInline
-                preload="auto"
+            {playSrc && !videoFailed ? (
+              <div className="relative max-w-full max-h-full z-10">
+                {posterSrc && (
+                  <img
+                    src={posterSrc}
+                    alt="Video preview"
+                    onError={nextPoster}
+                    className="max-w-full max-h-[88vh] w-auto h-auto object-contain"
+                    draggable={false}
+                  />
+                )}
+                <video
+                  key={playSrc}
+                  src={`${playSrc}#t=0.1`}
+                  poster={posterSrc}
+                  controls
+                  loop
+                  playsInline
+                  preload="metadata"
+                  onCanPlay={(e) => { e.currentTarget.play().catch(() => {}); }}
+                  onError={() => setVideoFailed(true)}
+                  className="absolute inset-0 w-full h-full object-contain"
+                />
+              </div>
+            ) : posterSrc ? (
+              <img
+                src={posterSrc}
+                alt="Video preview"
+                onError={nextPoster}
                 className="relative max-w-full max-h-full w-auto h-auto object-contain z-10"
+                draggable={false}
               />
             ) : (
               <div className="text-muted-foreground text-sm">No preview available</div>
