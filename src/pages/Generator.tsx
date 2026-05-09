@@ -34,6 +34,9 @@ export default function Generator() {
   const hasActiveGeneratingVideo = useVideoStore((s) =>
     s.videos.some((v) => v.status === 'generating' && (!activeProjectId || v.projectId === activeProjectId)),
   );
+  const hasActiveGeneratingImage = useGeneratorStore((s) =>
+    s.images.some((img) => img.status === 'generating' && (!activeProjectId || img.projectId === activeProjectId)),
+  );
   const setActiveProject = useCreateProjectsStore((s) => s.setActiveProject);
   const loadProjects = useCreateProjectsStore((s) => s.loadProjects);
   const createProject = useCreateProjectsStore((s) => s.createProject);
@@ -59,6 +62,12 @@ export default function Generator() {
     const interval = window.setInterval(() => loadVideoHistory(activeProjectId), 10000);
     return () => window.clearInterval(interval);
   }, [activeProjectId, hasActiveGeneratingVideo, loadVideoHistory]);
+
+  useEffect(() => {
+    if (!activeProjectId || !hasActiveGeneratingImage) return;
+    const interval = window.setInterval(() => loadHistory(activeProjectId), 5000);
+    return () => window.clearInterval(interval);
+  }, [activeProjectId, hasActiveGeneratingImage, loadHistory]);
 
   // Realtime: instant queued → complete updates for images & videos in the
   // active /create project. Auto-reconnects on socket errors / tab refocus.
