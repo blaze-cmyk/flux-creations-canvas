@@ -613,6 +613,7 @@ serve(async (req) => {
     if (modelConfig.type === "runware") {
       const RUNWARE_API_KEY = Deno.env.get("RUNWARE_API_KEY");
       if (!RUNWARE_API_KEY) {
+        await updateGenerationRow(generationId, { status: "failed", error: "RUNWARE_API_KEY not configured" });
         return new Response(JSON.stringify({ error: "RUNWARE_API_KEY not configured" }), {
           status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
@@ -662,11 +663,13 @@ serve(async (req) => {
           const rwErr = JSON.parse(errText);
           const providerErr = rwErr?.errors?.[0];
           if (providerErr?.code === "invalidProviderContent") {
+            await updateGenerationRow(generationId, { status: "nsfw", error: "Image was filtered by the model provider's safety system." });
             return new Response(JSON.stringify({ error: "Image was filtered by the model provider's safety system.", filtered: true }), {
               status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
             });
           }
         } catch { /* not JSON, fall through */ }
+        await updateGenerationRow(generationId, { status: "failed", error: `Runware API error: ${response.status}` });
         return new Response(JSON.stringify({ error: `Runware API error: ${response.status}`, details: errText }), {
           status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
@@ -682,6 +685,7 @@ serve(async (req) => {
       } else {
         const errMsg = resData?.error || "No image in Runware response";
         console.error("Runware no image:", JSON.stringify(resData).substring(0, 500));
+        await updateGenerationRow(generationId, { status: "failed", error: errMsg });
         return new Response(JSON.stringify({ error: errMsg }), {
           status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
@@ -715,6 +719,7 @@ serve(async (req) => {
     });
   } catch (e) {
     console.error("generate-image error:", e);
+    try { await updateGenerationRow(typeof (await req.clone().json())?.generationId === "string" ? (await req.clone().json()).generationId : undefined, { status: "failed", error: e instanceof Error ? e.message : "Unknown error" }); } catch { /* request body already consumed or invalid */ }
     return new Response(JSON.stringify({ error: e instanceof Error ? e.message : "Unknown error" }), {
       status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
