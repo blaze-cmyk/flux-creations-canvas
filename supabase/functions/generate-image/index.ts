@@ -683,6 +683,28 @@ serve(async (req) => {
       }
     }
 
+    if (generationId && (imageBase64 || imageUrl)) {
+      const admin = getAdminClient();
+      if (admin) {
+        try {
+          const storedUrl = await uploadGeneratedImage(admin, imageBase64 || imageUrl!, generationId);
+          if (storedUrl) {
+            imageUrl = storedUrl;
+            imageBase64 = undefined;
+            await updateGenerationRow(generationId, {
+              image_url: storedUrl,
+              status: "complete",
+              error: null,
+              project_id: projectId,
+              create_project_id: projectId,
+            });
+          }
+        } catch (e) {
+          console.error("persist generated image failed", e instanceof Error ? e.message : String(e));
+        }
+      }
+    }
+
     return new Response(JSON.stringify({ imageUrl, imageBase64 }), {
       status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
