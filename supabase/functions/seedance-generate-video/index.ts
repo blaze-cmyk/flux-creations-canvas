@@ -773,6 +773,10 @@ Deno.serve(async (req) => {
         audioFallbackUsed = true;
         submission = await byteplusSubmit({ ...baseSubmit, generateAudio: false });
       }
+      if (!submission.ok && videos.length > 1 && isReferenceVideoDurationError(submission.error)) {
+        log('WARN', 'byteplus video references over duration cap; retrying first clip only', { videos: videos.length });
+        submission = await byteplusSubmit({ ...baseSubmit, videoUrls: videos.slice(0, 1), generateAudio: false });
+      }
       if (!submission.ok) return { ok: false, error: submission.error };
       return { ok: true, predictionId: submission.predictionId, endpoint: submission.endpoint, provider: 'byteplus', audioFallbackUsed };
     };
