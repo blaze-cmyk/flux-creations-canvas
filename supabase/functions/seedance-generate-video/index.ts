@@ -1083,6 +1083,12 @@ Deno.serve(async (req) => {
         stage: 'processing',
         error: null,
       });
+      // Real-time path: poll AtlasCloud in the background and patch the row
+      // the moment it's done. Realtime then pushes to the UI instantly — no
+      // waiting on the client polling cadence.
+      if (result.provider === 'atlas') {
+        kickBackgroundPoll(admin, videoId, result.predictionId);
+      }
     }
 
     const videoFallbackUsed = Boolean(result.videoFallbackUsed || durationSkippedVideos.length > 0);
