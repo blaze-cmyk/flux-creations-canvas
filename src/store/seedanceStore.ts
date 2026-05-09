@@ -424,14 +424,18 @@ export const useSeedanceStore = create<SeedanceState>((set, get) => ({
 
     // Poll until complete. The edge function patches video_generations as it
     // progresses so the Create Video grid auto-updates via realtime / refetch.
+    // Realtime drives the UI: the edge function polls AtlasCloud server-side
+    // and patches video_generations the instant it's done, which streams to the
+    // browser via Supabase Realtime. This client loop is now only a safety net
+    // (slow cadence) for the rare case the realtime channel is dropped.
     (async () => {
-      const maxAttempts = 360;
-      let delay = 4000;
+      const maxAttempts = 120;
+      let delay = 15000;
       let currentTaskId: string = data.taskId;
       let currentProvider: string = usedProvider;
       for (let i = 0; i < maxAttempts; i++) {
         await new Promise(r => setTimeout(r, delay));
-        delay = Math.min(8000, delay + 250);
+        delay = Math.min(20000, delay + 500);
         try {
           const { data: poll } = await supabase.functions.invoke('seedance-generate-video', {
             body: { action: 'poll', predictionId: currentTaskId, videoId, provider: currentProvider },
