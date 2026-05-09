@@ -41,6 +41,7 @@ const SEEDANCE_REF = 'bytedance/seedance-2.0/reference-to-video';
 const SEEDANCE_TEXT = 'bytedance/seedance-2.0/text-to-video';
 const SEEDANCE_FAST = 'bytedance/seedance-2.0-fast/text-to-video';
 
+const MAX_TOTAL_REFERENCE_VIDEO_SECONDS = 15;
 const ALLOWED_RES = new Set(['480p', '720p', '1080p', '1080p-SR', '1440p-SR']);
 const ALLOWED_RATIO = new Set(['16:9', '4:3', '1:1', '3:4', '9:16', '21:9', 'adaptive']);
 const ALLOWED_VARIANT = new Set([SEEDANCE_REF, SEEDANCE_TEXT, SEEDANCE_FAST]);
