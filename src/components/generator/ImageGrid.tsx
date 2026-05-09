@@ -871,7 +871,7 @@ function MarketingCard({ gen, createProjectId }: { gen: MSGeneration & { kind: '
     try {
       await supabase
         .from('ms_generations')
-        .update({ status: 'queued', stage: 'scripting', error: null, updated_at: new Date().toISOString() } as any)
+        .update({ status: 'queued', stage: 'scripting', error: null, updated_at: new Date().toISOString() } as Record<string, unknown>)
         .eq('id', gen.id);
       await supabase.functions.invoke('ms-retry-generation', { body: { id: gen.id } });
     } catch {
