@@ -379,8 +379,9 @@ export const useSeedanceStore = create<SeedanceState>((set, get) => ({
       });
     }
     if (data?.usedFallback) {
-      toast.message('Switched to BytePlus', {
-        description: 'AtlasCloud was unavailable — generating directly via ByteDance ModelArk.',
+      const fallbackName = data?.provider === 'atlas' ? 'AtlasCloud' : data?.provider === 'apiyi' ? 'Apiyi' : 'BytePlus';
+      toast.message(`Switched to ${fallbackName}`, {
+        description: `${fallbackName} is handling this generation.`,
       });
     }
 
