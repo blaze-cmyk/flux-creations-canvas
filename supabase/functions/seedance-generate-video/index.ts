@@ -841,6 +841,7 @@ Deno.serve(async (req) => {
                   task_id: atlasRetry.predictionId, provider: 'atlas',
                   stage: 'retry-atlas', status: 'processing', error: null,
                 });
+                kickBackgroundPoll(admin, videoId, atlasRetry.predictionId);
                 return json({
                   status: 'processing', stage: 'retry-atlas',
                   taskId: atlasRetry.predictionId, provider: 'atlas', usedFallback: true,
