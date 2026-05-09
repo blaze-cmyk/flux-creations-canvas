@@ -393,13 +393,13 @@ export const useGeneratorStore = create<GeneratorState>()((set, get) => ({
       project_id: projectId,
       create_project_id: projectId,
     }));
-    supabase.from('generations').upsert(placeholderRows as any, { onConflict: 'id' }).then(({ error }) => {
+    await supabase.from('generations').upsert(placeholderRows as any, { onConflict: 'id' }).then(({ error }) => {
       if (error) console.error('Placeholder insert error:', error);
     });
 
     newImages.forEach(async (img) => {
       try {
-        const result = await callGenerateAPI({ prompt, referenceImages, model, quality, aspectRatio });
+        const result = await callGenerateAPI({ prompt, referenceImages, model, quality, aspectRatio, generationId: img.id, projectId });
 
         if (result.error) {
           const status = result.nsfw ? 'nsfw' as const : 'failed' as const;
@@ -445,12 +445,16 @@ export const useGeneratorStore = create<GeneratorState>()((set, get) => ({
         }
       } catch (e) {
         console.error('Generation error:', e);
+        const message = e instanceof Error ? e.message : 'Unknown error';
         set({
           images: get().images.map((i) =>
             i.id === img.id
-              ? { ...i, status: 'failed' as const, error: e instanceof Error ? e.message : 'Unknown error' }
+              ? { ...i, status: 'failed' as const, error: message }
               : i
           ),
+        });
+        supabase.from('generations').update({ status: 'failed', error: message } as any).eq('id', img.id).then(({ error }) => {
+          if (error) console.error('Status update error:', error);
         });
       }
     });
@@ -472,6 +476,8 @@ export const useGeneratorStore = create<GeneratorState>()((set, get) => ({
       model: img.model,
       quality: img.quality,
       aspectRatio: img.aspectRatio,
+      generationId: id,
+      projectId: img.projectId ?? null,
     }).then(async (result) => {
       if (result.error) {
         set({
