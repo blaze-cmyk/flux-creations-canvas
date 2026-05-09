@@ -937,14 +937,11 @@ Deno.serve(async (req) => {
 
     if (videoId) await updateRow(admin, videoId, { stage: 'queued' });
 
-    // AtlasCloud is the primary Seedance 2.0 route. BytePlus is only fallback.
+    // Seedance 2.0 is AtlasCloud-only for this app. Do not silently switch
+    // providers for user-owned reference images/videos.
     const attempts: Array<{ name: string; run: () => Promise<any> }> = [
       { name: 'atlas', run: () => tryAtlas() },
-      { name: 'byteplus', run: () => tryByteplus() },
     ];
-    if (chosenVariant !== SEEDANCE_FAST) {
-      attempts.push({ name: 'byteplus-fast', run: () => tryByteplus(SEEDANCE_FAST) });
-    }
 
     let result: any = { ok: false, error: 'No providers configured' };
     let usedFallback = false;
