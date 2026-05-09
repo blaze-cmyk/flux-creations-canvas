@@ -189,6 +189,14 @@ function inferProviderFromTaskId(taskId: string): 'atlas' | 'byteplus' {
   return /^[a-f0-9]{32}$/i.test(taskId) ? 'atlas' : 'byteplus';
 }
 
+function resolvePollProvider(rawProvider: unknown, taskId: string): 'atlas' | 'byteplus' | 'apiyi' {
+  // Never allow stale client/database provider values to override the concrete
+  // AtlasCloud id shape. This is the permanent guard against Atlas jobs being
+  // polled through BytePlus and failing with "resource not found".
+  if (/^[a-f0-9]{32}$/i.test(taskId)) return 'atlas';
+  return normalizeProvider(rawProvider) || inferProviderFromTaskId(taskId);
+}
+
 function toWsrvJpg(rawUrl: string, w = 1024, h = 1024): string {
   if (!rawUrl) return rawUrl;
   if (rawUrl.includes('wsrv.nl')) return rawUrl;
@@ -586,8 +594,8 @@ Deno.serve(async (req) => {
     if (action === 'poll') {
       const predictionId = String(body.predictionId ?? body.taskId ?? '').trim();
       const videoId = String(body.videoId ?? '').trim();
-      const provider = normalizeProvider(body.provider) || inferProviderFromTaskId(predictionId);
       if (!predictionId) return json({ error: 'predictionId required' }, 400);
+      const provider = resolvePollProvider(body.provider, predictionId);
 
       const out = provider === 'atlas'
         ? await atlasPoll(predictionId)
