@@ -66,6 +66,12 @@ function readFileToDataUrl(file: File): Promise<string> {
   });
 }
 
+function withDurationHint(url: string, durationSec?: number): string {
+  if (!durationSec || !Number.isFinite(durationSec)) return url;
+  const separator = url.includes('?') ? '&' : '?';
+  return `${url}${separator}duration=${durationSec.toFixed(2)}s`;
+}
+
 function probeMedia(file: File, kind: 'video' | 'audio'): Promise<{ duration: number; width?: number; height?: number }> {
   return new Promise((resolve) => {
     try {
