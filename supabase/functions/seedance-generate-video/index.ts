@@ -168,7 +168,14 @@ function friendly(raw: string | undefined): string {
   if (/reference asset was rejected|check the URL, format, and size|unsupported format/i.test(raw)) {
     return 'AtlasCloud rejected a reference file. Reference videos must be MP4/MOV at 480p/720p, under 50MB, and total video reference duration must stay under 15s.';
   }
+  if (/copyright|output video may be related/i.test(raw)) {
+    return 'AtlasCloud blocked the generated video for possible copyright (recognizable brand, logo, character, or celebrity in the reference). Replace the flagged reference with a generic photo and retry.';
+  }
   return raw;
+}
+
+function isCopyrightRejection(raw: string | undefined): boolean {
+  return /copyright|output video may be related/i.test(raw ?? '');
 }
 
 function isInputPrivacyRejection(raw: string | undefined): boolean {
