@@ -119,6 +119,10 @@ async function callGenerateAPI(params: {
 // Upload image to storage and return public URL
 async function uploadToStorage(imageData: string, id: string): Promise<string | null> {
   try {
+    if (imageData.startsWith('http') && imageData.includes(`/storage/v1/object/public/generated-images/${id}.`)) {
+      return imageData;
+    }
+
     let blob: Blob;
     let ext = 'png';
 
@@ -529,7 +533,7 @@ export const useGeneratorStore = create<GeneratorState>()((set, get) => ({
     });
     const { error } = await supabase
       .from('generations')
-      .update({ project_id: projectId } as any)
+      .update({ project_id: projectId, create_project_id: projectId } as any)
       .eq('id', id);
     if (error) console.error('Move image error:', error);
   },
