@@ -317,7 +317,7 @@ export const useSeedanceStore = create<SeedanceState>((set, get) => ({
         resolution: s.resolution,
         status: 'processing',
         reference_images: allRefs,
-        provider: 'atlascloud',
+        provider: 'atlas',
         project_id: projectId ?? null,
         create_project_id: projectId ?? null,
       });
