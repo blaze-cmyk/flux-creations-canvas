@@ -229,11 +229,31 @@ serve(async (req) => {
     const model = typeof body?.model === "string" ? body.model : "nano-banana-pro";
     const quality = typeof body?.quality === "string" ? body.quality : "2K";
     const aspectRatio = typeof body?.aspectRatio === "string" ? body.aspectRatio : "1:1";
+    const generationId = typeof body?.generationId === "string" ? body.generationId : undefined;
+    const projectId = typeof body?.projectId === "string" ? body.projectId : null;
 
     if (!prompt.trim()) {
       return new Response(JSON.stringify({ error: "prompt is required" }), {
         status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
+    }
+
+    if (generationId) {
+      const admin = getAdminClient();
+      if (admin) {
+        await admin.from("generations").upsert({
+          id: generationId,
+          prompt,
+          model,
+          quality,
+          aspect_ratio: aspectRatio === "Auto" ? "1:1" : aspectRatio,
+          image_url: null,
+          status: "generating",
+          error: null,
+          project_id: projectId,
+          create_project_id: projectId,
+        }, { onConflict: "id" });
+      }
     }
 
     let activeModel = model;
@@ -461,6 +481,7 @@ serve(async (req) => {
       for (const p of providers) {
         const res = await p.fn();
         if ("filtered" in res) {
+          await updateGenerationRow(generationId, { status: "nsfw", error: "Image was filtered due to content policy." });
           return new Response(JSON.stringify({ error: "Image was filtered due to content policy.", filtered: true }), {
             status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
           });
@@ -491,6 +512,7 @@ serve(async (req) => {
           });
         }
       } else if (nanoFailed) {
+        await updateGenerationRow(generationId, { status: "failed", error: "Nano Banana generation failed across APIYI, fal.ai, EvoLink, and AtlasCloud" });
         return new Response(JSON.stringify({ error: "Nano Banana generation failed across APIYI, fal.ai, EvoLink, and AtlasCloud", details: failures.join(" | ") }), {
           status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
@@ -562,6 +584,7 @@ serve(async (req) => {
       const resultData = await submitResp.json();
 
       if (resultData?.has_nsfw_concepts?.[0]) {
+        await updateGenerationRow(generationId, { status: "nsfw", error: "Image was filtered due to content policy." });
         return new Response(JSON.stringify({ error: "Image was filtered due to content policy.", filtered: true }), {
           status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
