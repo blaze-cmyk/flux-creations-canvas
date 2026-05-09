@@ -83,6 +83,13 @@ const AUDIO_EXT = /\.(mp3|wav|m4a|aac|ogg|flac)(\?|#|$)/i;
 function looksLikeVideo(url: string): boolean { return VIDEO_EXT.test(url); }
 function looksLikeAudio(url: string): boolean { return AUDIO_EXT.test(url); }
 
+function isAtlasDirectVideoUrl(url: string): boolean {
+  // AtlasCloud reference_videos accepts normal public MP4/MOV URLs. Re-uploading
+  // those through uploadMedia can return extensionless atlas-img URLs, which
+  // Seedance then rejects as an invalid/unsupported reference file.
+  return /\.(mp4|mov)(\?|#|$)/i.test(url);
+}
+
 function clampDuration(d: unknown): number {
   const n = Number(d);
   if (!Number.isFinite(n)) return 5;
@@ -169,6 +176,18 @@ function isInputPrivacyRejection(raw: string | undefined): boolean {
 
 function isGeneratedAudioModeration(raw: string | undefined): boolean {
   return /output audio.*sensitive|generated audio/i.test(raw ?? '');
+}
+
+function isAtlasReferenceRejection(raw: string | undefined): boolean {
+  return /AtlasCloud rejected a reference file|reference asset was rejected|check the URL, format, and size|unsupported format/i.test(raw ?? '');
+}
+
+function removeUnavailableVideoReferenceLanguage(prompt: string): string {
+  return prompt
+    .replace(/\buse\s+the\s+reference\s+videos?\s+the\s+reference\s+video[^.\n]*(?:\.|,)?/gi, 'Use natural raw expressions and motion from the written directions.')
+    .replace(/\bthe\s+reference\s+videos?\b/gi, 'the written motion direction')
+    .replace(/\bthe\s+reference\s+video\b/gi, 'the written motion direction')
+    .trim();
 }
 
 function isBalanceError(status: number, body: string) {
@@ -318,7 +337,10 @@ async function createRequiredAtlasAsset(
 ): Promise<{ assetUrl?: string; error?: string }> {
   if (assetType === 'Video') {
     // AtlasCloud docs: sd/assets is a subject portrait/image library only;
-    // reference_videos accept uploaded URLs, so videos go through uploadMedia.
+    // reference_videos accept public MP4/MOV URLs directly. Prefer the original
+    // storage URL when it has a supported extension so the generation request
+    // does not receive an extensionless uploadMedia URL.
+    if (isAtlasDirectVideoUrl(rawUrl)) return { assetUrl: rawUrl };
     const mediaUrl = await uploadAtlasMedia(rawUrl, label);
     if (mediaUrl) return { assetUrl: mediaUrl };
     return { error: 'AtlasCloud could not ingest the reference video. Retry with a smaller file (<50MB) or remove that reference.' };
@@ -707,7 +729,7 @@ Deno.serve(async (req) => {
 
     // ===== AtlasCloud Seedance 2.0 fallback =====
     // Requires sd/assets registration for images (avoids real-person moderation).
-    const tryAtlas = async (): Promise<{ ok: true; predictionId: string; endpoint: string; provider: 'atlas'; audioFallbackUsed: boolean } | { ok: false; error: string }> => {
+    const tryAtlas = async (): Promise<{ ok: true; predictionId: string; endpoint: string; provider: 'atlas'; audioFallbackUsed: boolean; videoFallbackUsed: boolean } | { ok: false; error: string }> => {
       if (!ATLAS_KEY) return { ok: false, error: 'AtlasCloud not configured' };
 
       const imageAssets: string[] = [];
@@ -746,12 +768,23 @@ Deno.serve(async (req) => {
       };
       let submission = await atlasSubmit({ ...baseSubmit, generateAudio: effectiveGenerateAudio });
       let audioFallbackUsed = false;
+      let videoFallbackUsed = false;
       if (!submission.ok && isGeneratedAudioModeration(submission.error)) {
         audioFallbackUsed = true;
         submission = await atlasSubmit({ ...baseSubmit, generateAudio: false });
       }
+      if (!submission.ok && videoAssets.length > 0 && isAtlasReferenceRejection(submission.error)) {
+        log('WARN', 'atlas video reference rejected; retrying visual-only', { videos: videoAssets.length });
+        videoFallbackUsed = true;
+        submission = await atlasSubmit({
+          ...baseSubmit,
+          prompt: `${removeUnavailableVideoReferenceLanguage(baseSubmit.prompt)}\n\nThe uploaded motion reference video could not be used by the provider, so create the same scene from the image references and written action beats only.`,
+          videoUrls: [],
+          generateAudio: false,
+        });
+      }
       if (!submission.ok) return { ok: false, error: submission.error };
-      return { ok: true, predictionId: submission.predictionId, endpoint: submission.endpoint, provider: 'atlas', audioFallbackUsed };
+      return { ok: true, predictionId: submission.predictionId, endpoint: submission.endpoint, provider: 'atlas', audioFallbackUsed, videoFallbackUsed };
     };
 
     // ===== Attempt 0 (PRIMARY): Apiyi / laozhang.ai =====
@@ -827,7 +860,7 @@ Deno.serve(async (req) => {
       });
     }
 
-    log('INFO', 'submit ok', { provider: result.provider, predictionId: result.predictionId, endpoint: result.endpoint, usedFallback, audioFallbackUsed: result.audioFallbackUsed });
+    log('INFO', 'submit ok', { provider: result.provider, predictionId: result.predictionId, endpoint: result.endpoint, usedFallback, audioFallbackUsed: result.audioFallbackUsed, videoFallbackUsed: result.videoFallbackUsed });
 
     return json({
       submitted: true,
@@ -837,6 +870,7 @@ Deno.serve(async (req) => {
       status: 'processing',
       stage: 'processing',
       audioFallbackUsed: result.audioFallbackUsed,
+      videoFallbackUsed: result.videoFallbackUsed,
       usedFallback,
     });
   } catch (e) {
