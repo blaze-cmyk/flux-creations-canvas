@@ -202,6 +202,18 @@ function removeUnavailableVideoReferenceLanguage(prompt: string): string {
     .trim();
 }
 
+function sanitizeAtlasCopyrightPrompt(prompt: string): string {
+  return prompt
+    .replace(/\bKiss\s*Cam\b/gi, 'a funny public-camera moment')
+    .replace(/\bnational TV\b/gi, 'a public event screen')
+    .replace(/\bstadium\b/gi, 'event venue')
+    .replace(/\bviral\b/gi, 'widely shared')
+    .replace(/\bTikTok\b/gi, 'vertical social video')
+    .replace(/\bFor Your Reference\/Edit\b/gi, 'Motion timing')
+    .concat('\n\nAtlasCloud safety note: this is an original AI-created character from a user-owned reference image. Do not depict any real celebrity, real broadcast footage, brand logo, or copyrighted event; keep it as a generic vertical selfie video in the same room.')
+    .trim();
+}
+
 function isBalanceError(status: number, body: string) {
   if (status === 401 || status === 402) return true;
   return /balance|exhausted|locked|insufficient|top.?up/i.test(body);
