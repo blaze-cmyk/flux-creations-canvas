@@ -823,6 +823,11 @@ Deno.serve(async (req) => {
         audioFallbackUsed = true;
         submission = await atlasSubmit({ ...baseSubmit, generateAudio: false });
       }
+      if (!submission.ok && videoAssets.length > 1 && (isReferenceVideoDurationError(submission.error) || isAtlasReferenceRejection(submission.error))) {
+        log('WARN', 'atlas video references rejected; retrying first clip only', { videos: videoAssets.length });
+        videoFallbackUsed = true;
+        submission = await atlasSubmit({ ...baseSubmit, videoUrls: videoAssets.slice(0, 1), generateAudio: false });
+      }
       if (!submission.ok && videoAssets.length > 0 && isAtlasReferenceRejection(submission.error)) {
         log('WARN', 'atlas video reference rejected; retrying visual-only', { videos: videoAssets.length });
         videoFallbackUsed = true;
@@ -832,11 +837,6 @@ Deno.serve(async (req) => {
           videoUrls: [],
           generateAudio: false,
         });
-      }
-      if (!submission.ok && videoAssets.length > 1 && isReferenceVideoDurationError(submission.error)) {
-        log('WARN', 'atlas video references over duration cap; retrying first clip only', { videos: videoAssets.length });
-        videoFallbackUsed = true;
-        submission = await atlasSubmit({ ...baseSubmit, videoUrls: videoAssets.slice(0, 1), generateAudio: false });
       }
       if (!submission.ok) return { ok: false, error: submission.error };
       return { ok: true, predictionId: submission.predictionId, endpoint: submission.endpoint, provider: 'atlas', audioFallbackUsed, videoFallbackUsed };
