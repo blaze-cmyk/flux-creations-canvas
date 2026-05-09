@@ -306,7 +306,8 @@ export const useSeedanceStore = create<SeedanceState>((set, get) => ({
     let audioUrls: string[] = [];
     try {
       imageUrls = await resolveAllToUrls(s.images.map(a => a.url));
-      videoUrls = await resolveAllToUrls(s.videos.map(a => a.url));
+      const rawVideoUrls = await resolveAllToUrls(s.videos.map(a => a.url));
+      videoUrls = rawVideoUrls.map((url, index) => withDurationHint(url, s.videos[index]?.durationSec));
       audioUrls = s.generateAudio ? await resolveAllToUrls(s.audios.map(a => a.url)) : [];
     } catch (e: any) {
       set({ isSubmitting: false });
