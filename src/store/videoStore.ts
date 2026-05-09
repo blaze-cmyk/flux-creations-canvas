@@ -289,11 +289,14 @@ async function pollGenericVideo(videoId: string, pollBody: Record<string, unknow
 }
 
 function normalizeSeedanceProvider(provider?: string | null, taskId?: string | null): string {
+  // AtlasCloud prediction ids are 32-char hex. Trust the id shape over any stale
+  // row/client provider so Atlas jobs cannot be accidentally polled as BytePlus.
+  if (taskId && /^[a-f0-9]{32}$/i.test(taskId)) return 'atlas';
   const value = String(provider ?? '').toLowerCase().trim();
   if (value.startsWith('atlas')) return 'atlas';
   if (value.startsWith('apiyi') || value.includes('laozhang')) return 'apiyi';
   if (value.startsWith('byteplus')) return 'byteplus';
-  return taskId && /^[a-f0-9]{32}$/i.test(taskId) ? 'atlas' : 'byteplus';
+  return 'byteplus';
 }
 
 async function pollSeedanceVideo(videoId: string, taskId: string, get: () => VideoState, set: (s: Partial<VideoState>) => void, provider?: string | null) {
@@ -564,7 +567,13 @@ export const useVideoStore = create<VideoState>()((set, get) => ({
         if (error || data?.error) {
           updateVideoAndSave(id, { status: 'failed', error: (data?.error || error?.message) ?? 'Seedance retry failed' }, get, set);
         } else if (data?.taskId) {
-          pollSeedanceVideo(id, data.taskId, get, set, data?.provider ?? 'byteplus');
+          const provider = normalizeSeedanceProvider(data?.provider, data.taskId);
+          updateVideoAndSave(id, {
+            provider,
+            taskId: data.taskId,
+            stage: 'processing',
+          }, get, set);
+          pollSeedanceVideo(id, data.taskId, get, set, provider);
         }
       } catch (e: any) {
         updateVideoAndSave(id, { status: 'failed', error: e?.message ?? 'Seedance retry failed' }, get, set);
