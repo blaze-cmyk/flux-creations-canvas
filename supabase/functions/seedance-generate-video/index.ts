@@ -732,6 +732,7 @@ Deno.serve(async (req) => {
         knownReferenceVideoSeconds,
       });
     }
+    const effectivePromptText = durationSkippedVideos.length > 0 ? removeUnavailableVideoReferenceLanguage(promptText) : promptText;
 
     const hasRefs = images.length > 0 || videos.length > 0 || audios.length > 0;
     const chosenVariant = normVariant(variant, hasRefs);
@@ -752,7 +753,7 @@ Deno.serve(async (req) => {
       if (!BYTEPLUS_KEY) return { ok: false, error: 'BytePlus not configured' };
 
       const variantUsed = variantOverride ?? chosenVariant;
-      const resolvedPrompt = resolvePromptTags(promptText, {
+      const resolvedPrompt = resolvePromptTags(effectivePromptText, {
         images: images.length, videos: videos.length, audios: audios.length,
       });
       log('INFO', 'byteplus resolved prompt', { resolved: resolvedPrompt.slice(0, 240), variant: variantUsed });
@@ -805,7 +806,7 @@ Deno.serve(async (req) => {
         audioAssets.push(r.assetUrl);
       }
 
-      const resolvedPrompt = resolvePromptTags(promptText, {
+      const resolvedPrompt = resolvePromptTags(effectivePromptText, {
         images: images.length, videos: videos.length, audios: submittedAudios.length,
       });
       log('INFO', 'atlas resolved prompt', { resolved: resolvedPrompt.slice(0, 240), variant: chosenVariant });
@@ -851,7 +852,7 @@ Deno.serve(async (req) => {
     // no asset registration. Currently the main test path.
     const tryApiyi = async (): Promise<{ ok: true; predictionId: string; endpoint: string; provider: 'apiyi'; audioFallbackUsed: boolean } | { ok: false; error: string }> => {
       if (!APIYI_KEY) return { ok: false, error: 'Apiyi not configured' };
-      const resolvedPrompt = resolvePromptTags(promptText, {
+      const resolvedPrompt = resolvePromptTags(effectivePromptText, {
         images: images.length, videos: videos.length, audios: audios.length,
       });
       log('INFO', 'apiyi resolved prompt', { resolved: resolvedPrompt.slice(0, 240) });
