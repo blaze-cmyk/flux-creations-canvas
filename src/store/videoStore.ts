@@ -288,7 +288,7 @@ async function pollGenericVideo(videoId: string, pollBody: Record<string, unknow
   }
 }
 
-async function pollSeedanceVideo(videoId: string, taskId: string, get: () => VideoState, set: (s: Partial<VideoState>) => void) {
+async function pollSeedanceVideo(videoId: string, taskId: string, get: () => VideoState, set: (s: Partial<VideoState>) => void, provider: string = 'byteplus') {
   if (!taskId || activeSeedancePolls.has(videoId)) return;
   activeSeedancePolls.add(videoId);
   try {
