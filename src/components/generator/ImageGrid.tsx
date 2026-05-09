@@ -48,7 +48,9 @@ function thumbUrl(url: string | undefined, width = 480, quality = 70): string | 
       return url.replace('/storage/v1/object/public/', '/storage/v1/render/image/public/')
         + (url.includes('?') ? '&' : '?') + `width=${width}&quality=${quality}&resize=contain`;
     }
-  } catch {}
+  } catch {
+    // Keep the original URL if the transform URL cannot be created.
+  }
   return url;
 }
 
@@ -86,7 +88,7 @@ export function ImageGrid() {
 
     list = list.filter((i) => {
       if (i.kind === 'marketing') return true; // already scoped to active project by feed
-      const pid = (i as any).projectId as string | undefined;
+      const pid = i.projectId ?? undefined;
       return activeProjectId ? pid === activeProjectId : !pid;
     });
 
@@ -95,7 +97,7 @@ export function ImageGrid() {
       list = list.filter((i) => i.prompt?.toLowerCase().includes(q));
     }
     if (modelFilter) {
-      list = list.filter((i) => (i as any).model === modelFilter);
+      list = list.filter((i) => (i.kind === 'marketing' ? i.mode : i.model) === modelFilter);
     }
     if (dateFilter !== 'all') {
       const now = Date.now();
