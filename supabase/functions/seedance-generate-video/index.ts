@@ -157,6 +157,9 @@ function friendly(raw: string | undefined): string {
   if (/input image.*sensitive|input image.*real person|sensitive content/i.test(raw)) {
     return 'BytePlus Seedance 2.0 rejected the reference image because it may contain a real person/privacy information. Try a different photo, crop/blur the face, or remove that reference.';
   }
+  if (/reference asset was rejected|check the URL, format, and size|unsupported format/i.test(raw)) {
+    return 'AtlasCloud rejected a reference file. Reference videos must be MP4/MOV at 480p/720p, under 50MB, and total video reference duration must stay under 15s.';
+  }
   return raw;
 }
 
@@ -212,6 +215,18 @@ function filenameFromUrl(rawUrl: string, fallback: string): string {
   }
 }
 
+function filenameForAtlasUpload(rawUrl: string, blobType: string, label: string): string {
+  const lowerType = blobType.toLowerCase();
+  const ext = lowerType.includes('quicktime') || lowerType.includes('mov')
+    ? 'mov'
+    : lowerType.includes('webm')
+      ? 'webm'
+      : lowerType.includes('audio')
+        ? (lowerType.includes('mpeg') ? 'mp3' : lowerType.includes('wav') ? 'wav' : 'm4a')
+        : 'mp4';
+  return filenameFromUrl(rawUrl, `${label}.${ext}`).replace(/\.[^/.]+$/, `.${ext}`);
+}
+
 async function uploadAtlasMedia(rawUrl: string, label: string): Promise<string | null> {
   if (!ATLAS_KEY || !rawUrl) return null;
   const source = await fetch(rawUrl);
@@ -225,7 +240,7 @@ async function uploadAtlasMedia(rawUrl: string, label: string): Promise<string |
     return null;
   }
   const form = new FormData();
-  form.append('file', blob, filenameFromUrl(rawUrl, `${label}.mp4`));
+  form.append('file', blob, filenameForAtlasUpload(rawUrl, blob.type, label));
   const res = await fetch(`${ATLAS_BASE}/uploadMedia`, {
     method: 'POST',
     headers: { Authorization: `Bearer ${ATLAS_KEY}` },
@@ -771,16 +786,14 @@ Deno.serve(async (req) => {
 
     if (videoId) await updateRow(admin, videoId, { stage: 'queued' });
 
-    // Fallback chain: BytePlus (chosen variant) → BytePlus Seedance 2.0 fast →
-    // AtlasCloud Seedance 2.0 (with asset registration). Each step only triggers
-    // when the previous one fails (privacy moderation, balance, transient errors).
+    // AtlasCloud is the primary Seedance 2.0 route. BytePlus is only fallback.
     const attempts: Array<{ name: string; run: () => Promise<any> }> = [
+      { name: 'atlas', run: () => tryAtlas() },
       { name: 'byteplus', run: () => tryByteplus() },
     ];
     if (chosenVariant !== SEEDANCE_FAST) {
       attempts.push({ name: 'byteplus-fast', run: () => tryByteplus(SEEDANCE_FAST) });
     }
-    attempts.push({ name: 'atlas', run: () => tryAtlas() });
 
     let result: any = { ok: false, error: 'No providers configured' };
     let usedFallback = false;
@@ -799,8 +812,9 @@ Deno.serve(async (req) => {
 
     if (!result.ok) {
       const finalErr = errors.join(' | ');
-      if (videoId) await updateRow(admin, videoId, { status: 'failed', stage: 'failed', error: finalErr, provider: 'byteplus' });
-      return json({ status: 'failed', stage: 'failed', error: finalErr, provider: 'byteplus' });
+      const failedProvider = errors.some((e) => e.startsWith('atlas:')) ? 'atlas' : errors.some((e) => e.startsWith('apiyi:')) ? 'apiyi' : 'byteplus';
+      if (videoId) await updateRow(admin, videoId, { status: 'failed', stage: 'failed', error: finalErr, provider: failedProvider });
+      return json({ status: 'failed', stage: 'failed', error: finalErr, provider: failedProvider });
     }
 
     if (videoId) {

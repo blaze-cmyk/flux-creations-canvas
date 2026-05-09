@@ -31,6 +31,7 @@ export const MAX_IMAGES = 9;
 export const MAX_VIDEOS = 3;
 export const MAX_AUDIOS = 3;
 export const MAX_MEDIA_SECONDS = 15;
+const MAX_REFERENCE_VIDEO_EDGE = 1280;
 
 type SeedanceState = {
   prompt: string;
@@ -219,6 +220,12 @@ export const useSeedanceStore = create<SeedanceState>((set, get) => ({
         });
         return;
       }
+      if (kind === 'video' && media.width && media.height && Math.max(media.width, media.height) > MAX_REFERENCE_VIDEO_EDGE) {
+        toast.error('Reference video too high-res', {
+          description: 'AtlasCloud accepts 480p/720p references. Upload 720×1280 or smaller.',
+        });
+        return;
+      }
       const url = await readFileToDataUrl(file);
       const asset: SeedanceAsset = {
         id: nextTagId(list, kind), kind, name: file.name, url, durationSec: dur,
@@ -317,7 +324,7 @@ export const useSeedanceStore = create<SeedanceState>((set, get) => ({
         resolution: s.resolution,
         status: 'processing',
         reference_images: allRefs,
-        provider: 'atlascloud',
+        provider: 'atlas',
         project_id: projectId ?? null,
         create_project_id: projectId ?? null,
       });
