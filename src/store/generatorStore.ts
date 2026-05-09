@@ -158,6 +158,31 @@ async function uploadToStorage(imageData: string, id: string): Promise<string | 
 }
 
 // Upload a reference image (base64) to storage and return a persistent URL
+// Detect aspect ratio from a reference image and snap to closest supported value
+const SUPPORTED_ARS: Array<[string, number]> = [
+  ['1:1', 1], ['3:4', 3/4], ['4:3', 4/3], ['2:3', 2/3], ['3:2', 3/2],
+  ['9:16', 9/16], ['16:9', 16/9], ['5:4', 5/4], ['4:5', 4/5], ['21:9', 21/9],
+];
+async function detectAspectRatio(url: string): Promise<string> {
+  return new Promise((resolve) => {
+    try {
+      const img = new Image();
+      img.crossOrigin = 'anonymous';
+      img.onload = () => {
+        const r = img.naturalWidth / img.naturalHeight;
+        let best = '1:1', bestDiff = Infinity;
+        for (const [label, val] of SUPPORTED_ARS) {
+          const d = Math.abs(Math.log(r / val));
+          if (d < bestDiff) { bestDiff = d; best = label; }
+        }
+        resolve(best);
+      };
+      img.onerror = () => resolve('1:1');
+      img.src = url;
+    } catch { resolve('1:1'); }
+  });
+}
+
 async function uploadReferenceImage(dataUri: string): Promise<string> {
   if (!dataUri.startsWith('data:')) return dataUri; // already a URL
   const id = `ref-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
@@ -183,7 +208,7 @@ function loadPersistedReferenceImages(): string[] {
 
 // Save a completed generation to the database
 async function saveToDb(img: GeneratedImage, storageUrl: string, projectId: string | null) {
-  const { error } = await supabase.from('generations').insert({
+  const { error } = await supabase.from('generations').upsert({
     id: img.id,
     prompt: img.prompt,
     model: img.model,
@@ -194,8 +219,8 @@ async function saveToDb(img: GeneratedImage, storageUrl: string, projectId: stri
     error: img.error || null,
     project_id: projectId,
     create_project_id: projectId,
-  } as any);
-  if (error) console.error('DB insert error:', error);
+  } as any, { onConflict: 'id' });
+  if (error) console.error('DB upsert error:', error);
 
   // Set/refresh project thumbnail with the latest image — only if user hasn't locked one
   if (projectId && storageUrl) {
@@ -306,12 +331,21 @@ export const useGeneratorStore = create<GeneratorState>()((set, get) => ({
   },
 
   generate: async () => {
-    const { prompt, referenceImages, model, quality, aspectRatio, quantity } = get();
+    const { prompt, referenceImages, model, quality, aspectRatio: rawAr, quantity } = get();
     if (!prompt.trim()) return;
 
+    // Auto AR: derive from first reference image's natural dimensions
+    let aspectRatio = rawAr;
+    if (rawAr === 'Auto' && referenceImages.length > 0) {
+      try {
+        aspectRatio = await detectAspectRatio(referenceImages[0]);
+        console.log('[generator] Auto AR resolved →', aspectRatio);
+      } catch { aspectRatio = '1:1'; }
+    } else if (rawAr === 'Auto') {
+      aspectRatio = '1:1';
+    }
+
     // Resolve active project FIRST so placeholders carry the correct projectId.
-    // Otherwise the grid (which filters by activeProjectId) would hide them the
-    // moment a brand-new project is auto-created and becomes active.
     const projStore = useCreateProjectsStore.getState();
     let projectId: string | null = projStore.activeProjectId;
     if (!projectId) {
@@ -338,6 +372,22 @@ export const useGeneratorStore = create<GeneratorState>()((set, get) => ({
 
     set({ images: [...newImages, ...get().images] });
 
+    // Persist placeholder rows immediately so a refresh mid-generation doesn't lose them.
+    const placeholderRows = newImages.map((img) => ({
+      id: img.id,
+      prompt: img.prompt,
+      model: img.model,
+      quality: img.quality,
+      aspect_ratio: img.aspectRatio,
+      image_url: null,
+      status: 'generating',
+      project_id: projectId,
+      create_project_id: projectId,
+    }));
+    supabase.from('generations').upsert(placeholderRows as any, { onConflict: 'id' }).then(({ error }) => {
+      if (error) console.error('Placeholder insert error:', error);
+    });
+
     newImages.forEach(async (img) => {
       try {
         const result = await callGenerateAPI({ prompt, referenceImages, model, quality, aspectRatio });
@@ -348,6 +398,9 @@ export const useGeneratorStore = create<GeneratorState>()((set, get) => ({
             images: get().images.map((i) =>
               i.id === img.id ? { ...i, status, error: result.error } : i
             ),
+          });
+          supabase.from('generations').update({ status, error: result.error } as any).eq('id', img.id).then(({ error }) => {
+            if (error) console.error('Status update error:', error);
           });
         } else {
           const rawUrl = result.imageBase64 || result.imageUrl;
