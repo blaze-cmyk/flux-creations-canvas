@@ -570,10 +570,12 @@ Deno.serve(async (req) => {
     if (action === 'poll') {
       const predictionId = String(body.predictionId ?? body.taskId ?? '').trim();
       const videoId = String(body.videoId ?? '').trim();
-      const provider = 'byteplus';
+      const provider = String(body.provider ?? 'byteplus').toLowerCase();
       if (!predictionId) return json({ error: 'predictionId required' }, 400);
 
-      const out = await byteplusPoll(predictionId);
+      const out = provider === 'atlas'
+        ? await atlasPoll(predictionId)
+        : await byteplusPoll(predictionId);
       if (out.status === 'done') {
         if (videoId) await updateRow(admin, videoId, { status: 'complete', stage: 'complete', video_url: out.videoUrl, error: null });
         return json({ status: 'complete', stage: 'complete', videoUrl: out.videoUrl });
