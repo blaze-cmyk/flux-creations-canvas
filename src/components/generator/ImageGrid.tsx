@@ -352,7 +352,8 @@ function getAspectClass(ratio: string): string {
 function ImageCard({ image }: {
   image: ReturnType<typeof useGeneratorStore.getState>['images'][0];
 }) {
-  const { setSelectedImageId, retryImage, deleteImage, useAsReference, moveImageToProject } = useGeneratorStore();
+  const { setSelectedImageId, retryImage, deleteImage, moveImageToProject } = useGeneratorStore();
+  const addImageAsReference = useGeneratorStore((s) => s.useAsReference);
   const setVideoMode = usePromptModeStore((s) => s.setMode);
   const addVideoReferenceImage = useVideoStore((s) => s.addReferenceImage);
   const setVideoSubMode = useVideoStore((s) => s.setMode);
@@ -538,7 +539,7 @@ function ImageCard({ image }: {
           <>
             <HoverIconBtn
               label="Reference"
-              onClick={(e) => { e.stopPropagation(); useAsReference(image.imageUrl!); }}
+              onClick={(e) => { e.stopPropagation(); addImageAsReference(image.imageUrl!); }}
               svg={<svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path fillRule="evenodd" clipRule="evenodd" d="M3 4.75C3 3.7835 3.7835 3 4.75 3H19.25C20.2165 3 21 3.7835 21 4.75V19.25C21 20.2165 20.2165 21 19.25 21H4.75C3.7835 21 3 20.2165 3 19.25V4.75ZM4.75 4.5C4.61193 4.5 4.5 4.61193 4.5 4.75V14.4393L6.76256 12.1768C7.44598 11.4934 8.55402 11.4934 9.23744 12.1768L16.5607 19.5H19.25C19.3881 19.5 19.5 19.3881 19.5 19.25V4.75C19.5 4.61193 19.3881 4.5 19.25 4.5H4.75Z" fill="currentColor"/><path d="M13.4255 8.53727C13.4738 8.51308 13.5131 8.47385 13.5373 8.42546L14.2764 6.94721C14.3685 6.76295 14.6315 6.76295 14.7236 6.94721L15.4627 8.42546C15.4869 8.47385 15.5262 8.51308 15.5745 8.53727L17.0528 9.27639C17.237 9.36852 17.237 9.63148 17.0528 9.72361L15.5745 10.4627C15.5262 10.4869 15.4869 10.5262 15.4627 10.5745L14.7236 12.0528C14.6315 12.237 14.3685 12.237 14.2764 12.0528L13.5373 10.5745C13.5131 10.5262 13.4738 10.4869 13.4255 10.4627L11.9472 9.72361C11.763 9.63148 11.763 9.36852 11.9472 9.27639L13.4255 8.53727Z" fill="currentColor"/></svg>}
             />
             <HoverIconBtn
@@ -570,7 +571,7 @@ function ImageCard({ image }: {
         >
           <MenuItem icon={<Maximize2 className="w-3.5 h-3.5" />} label="Open" onClick={() => { setSelectedImageId(image.id); setShowMenu(false); }} />
           <MenuItem icon={<RefreshCw className="w-3.5 h-3.5" />} label="Regenerate" onClick={() => { retryImage(image.id); setShowMenu(false); }} />
-          <MenuItem icon={<Link2 className="w-3.5 h-3.5" />} label="Use as Reference" onClick={() => { if (image.imageUrl) useAsReference(image.imageUrl); setShowMenu(false); }} />
+          <MenuItem icon={<Link2 className="w-3.5 h-3.5" />} label="Use as Reference" onClick={() => { if (image.imageUrl) addImageAsReference(image.imageUrl); setShowMenu(false); }} />
           <MenuItem icon={<Heart className="w-3.5 h-3.5" />} label="Like" onClick={() => setShowMenu(false)} />
           <MenuItem icon={<Download className="w-3.5 h-3.5" />} label="Download" onClick={(e) => { handleDownload(e); setShowMenu(false); }} />
           {image.imageUrl && image.projectId && (
