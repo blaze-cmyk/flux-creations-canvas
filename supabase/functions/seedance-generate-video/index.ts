@@ -173,6 +173,22 @@ function isBalanceError(status: number, body: string) {
   return /balance|exhausted|locked|insufficient|top.?up/i.test(body);
 }
 
+function normalizeProvider(raw: unknown): 'atlas' | 'byteplus' | 'apiyi' | '' {
+  const v = String(raw ?? '').toLowerCase().trim();
+  if (!v) return '';
+  if (v.startsWith('atlas')) return 'atlas';
+  if (v.startsWith('apiyi') || v.includes('laozhang')) return 'apiyi';
+  if (v.startsWith('byteplus')) return 'byteplus';
+  return '';
+}
+
+function inferProviderFromTaskId(taskId: string): 'atlas' | 'byteplus' {
+  // AtlasCloud prediction ids are 32-char lowercase hex. BytePlus task ids are
+  // not, so this prevents legacy rows with provider=null from polling BytePlus
+  // with an Atlas id and getting permanent "resource not found" failures.
+  return /^[a-f0-9]{32}$/i.test(taskId) ? 'atlas' : 'byteplus';
+}
+
 function toWsrvJpg(rawUrl: string, w = 1024, h = 1024): string {
   if (!rawUrl) return rawUrl;
   if (rawUrl.includes('wsrv.nl')) return rawUrl;
