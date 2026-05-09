@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -140,6 +141,52 @@ function toBase64DataUri(bytes: Uint8Array, mimeType: string): string {
   return `data:${mimeType};base64,${bytesToBase64(bytes)}`;
 }
 
+function getAdminClient() {
+  const url = Deno.env.get("SUPABASE_URL");
+  const key = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+  if (!url || !key) return null;
+  return createClient(url, key);
+}
+
+async function uploadGeneratedImage(admin: ReturnType<typeof createClient>, imageData: string, id: string): Promise<string | undefined> {
+  let bytes: Uint8Array;
+  let mimeType = "image/png";
+  let ext = "png";
+
+  if (imageData.startsWith("data:")) {
+    const match = imageData.match(/^data:([^;]+);base64,(.+)$/);
+    if (!match) return undefined;
+    mimeType = match[1] || mimeType;
+    ext = mimeType.includes("jpeg") || mimeType.includes("jpg") ? "jpg" : "png";
+    bytes = Uint8Array.from(atob(match[2]), (c) => c.charCodeAt(0));
+  } else if (imageData.startsWith("http://") || imageData.startsWith("https://")) {
+    const parsed = new URL(imageData);
+    const ssrfErr = await assertUrlIsPublic(parsed);
+    if (ssrfErr) throw new Error(`Blocked provider image fetch: ${ssrfErr}`);
+    const resp = await fetch(imageData);
+    if (!resp.ok) throw new Error(`Provider image fetch failed: ${resp.status}`);
+    mimeType = resp.headers.get("content-type")?.split(";")[0]?.trim() || mimeType;
+    if (!isAllowedImageContentType(mimeType)) throw new Error(`Provider returned invalid image type: ${mimeType}`);
+    ext = mimeType.includes("jpeg") || mimeType.includes("jpg") ? "jpg" : "png";
+    bytes = new Uint8Array(await resp.arrayBuffer());
+  } else {
+    return undefined;
+  }
+
+  const path = `${id}.${ext}`;
+  const { error } = await admin.storage.from("generated-images").upload(path, bytes, { contentType: mimeType, upsert: true });
+  if (error) throw new Error(`Storage upload failed: ${error.message}`);
+  return admin.storage.from("generated-images").getPublicUrl(path).data.publicUrl;
+}
+
+async function updateGenerationRow(id: string | undefined, patch: Record<string, unknown>) {
+  if (!id) return;
+  const admin = getAdminClient();
+  if (!admin) return;
+  const { error } = await admin.from("generations").update(patch).eq("id", id);
+  if (error) console.error("generation row update failed", error.message);
+}
+
 // Map aspect ratio string to width/height for Runware
 // Flux Ultra has fixed dimension pairs
 const ULTRA_DIMS: Record<string, [number, number]> = {
@@ -173,6 +220,7 @@ serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
+  let requestGenerationId: string | undefined;
   try {
     const body = await req.json();
     const prompt = typeof body?.prompt === "string" ? body.prompt : "";
@@ -182,6 +230,9 @@ serve(async (req) => {
     const model = typeof body?.model === "string" ? body.model : "nano-banana-pro";
     const quality = typeof body?.quality === "string" ? body.quality : "2K";
     const aspectRatio = typeof body?.aspectRatio === "string" ? body.aspectRatio : "1:1";
+    const generationId = typeof body?.generationId === "string" ? body.generationId : undefined;
+    requestGenerationId = generationId;
+    const projectId = typeof body?.projectId === "string" ? body.projectId : null;
 
     if (!prompt.trim()) {
       return new Response(JSON.stringify({ error: "prompt is required" }), {
@@ -189,9 +240,28 @@ serve(async (req) => {
       });
     }
 
+    if (generationId) {
+      const admin = getAdminClient();
+      if (admin) {
+        await admin.from("generations").upsert({
+          id: generationId,
+          prompt,
+          model,
+          quality,
+          aspect_ratio: aspectRatio === "Auto" ? "1:1" : aspectRatio,
+          image_url: null,
+          status: "generating",
+          error: null,
+          project_id: projectId,
+          create_project_id: projectId,
+        }, { onConflict: "id" });
+      }
+    }
+
     let activeModel = model;
     let modelConfig = MODEL_MAP[activeModel];
     if (!modelConfig) {
+      await updateGenerationRow(generationId, { status: "failed", error: `Unknown model: ${activeModel}` });
       return new Response(JSON.stringify({ error: `Unknown model: ${activeModel}` }), {
         status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
@@ -414,6 +484,7 @@ serve(async (req) => {
       for (const p of providers) {
         const res = await p.fn();
         if ("filtered" in res) {
+          await updateGenerationRow(generationId, { status: "nsfw", error: "Image was filtered due to content policy." });
           return new Response(JSON.stringify({ error: "Image was filtered due to content policy.", filtered: true }), {
             status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
           });
@@ -439,11 +510,13 @@ serve(async (req) => {
         modelConfig = MODEL_MAP[activeModel];
         console.log(`[nano cascade] falling back to ${activeModel} (${modelConfig?.type})`);
         if (!modelConfig) {
+          await updateGenerationRow(generationId, { status: "failed", error: `Fallback model not found: ${activeModel}` });
           return new Response(JSON.stringify({ error: `Fallback model not found: ${activeModel}` }), {
             status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
           });
         }
       } else if (nanoFailed) {
+        await updateGenerationRow(generationId, { status: "failed", error: "Nano Banana generation failed across APIYI, fal.ai, EvoLink, and AtlasCloud" });
         return new Response(JSON.stringify({ error: "Nano Banana generation failed across APIYI, fal.ai, EvoLink, and AtlasCloud", details: failures.join(" | ") }), {
           status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
@@ -454,6 +527,7 @@ serve(async (req) => {
     if (modelConfig.type === "fal") {
       const FAL_KEY = Deno.env.get("FAL_KEY");
       if (!FAL_KEY) {
+        await updateGenerationRow(generationId, { status: "failed", error: "FAL_KEY not configured" });
         return new Response(JSON.stringify({ error: "FAL_KEY not configured" }), {
           status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
@@ -507,6 +581,7 @@ serve(async (req) => {
       if (!submitResp.ok) {
         const errText = await submitResp.text();
         console.error("Fal error:", submitResp.status, errText);
+        await updateGenerationRow(generationId, { status: "failed", error: `Fal API error: ${submitResp.status}` });
         return new Response(JSON.stringify({ error: `Fal API error: ${submitResp.status}`, details: errText }), {
           status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
@@ -515,6 +590,7 @@ serve(async (req) => {
       const resultData = await submitResp.json();
 
       if (resultData?.has_nsfw_concepts?.[0]) {
+        await updateGenerationRow(generationId, { status: "nsfw", error: "Image was filtered due to content policy." });
         return new Response(JSON.stringify({ error: "Image was filtered due to content policy.", filtered: true }), {
           status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
@@ -527,6 +603,7 @@ serve(async (req) => {
         // Returning base64 from 4K renders blows past the 6MB edge worker limit.
         imageUrl = outUrl;
       } else {
+        await updateGenerationRow(generationId, { status: "failed", error: "No image in fal.ai response" });
         return new Response(JSON.stringify({ error: "No image in fal.ai response", details: JSON.stringify(resultData).slice(0, 500) }), {
           status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
@@ -538,6 +615,7 @@ serve(async (req) => {
     if (modelConfig.type === "runware") {
       const RUNWARE_API_KEY = Deno.env.get("RUNWARE_API_KEY");
       if (!RUNWARE_API_KEY) {
+        await updateGenerationRow(generationId, { status: "failed", error: "RUNWARE_API_KEY not configured" });
         return new Response(JSON.stringify({ error: "RUNWARE_API_KEY not configured" }), {
           status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
@@ -587,11 +665,13 @@ serve(async (req) => {
           const rwErr = JSON.parse(errText);
           const providerErr = rwErr?.errors?.[0];
           if (providerErr?.code === "invalidProviderContent") {
+            await updateGenerationRow(generationId, { status: "nsfw", error: "Image was filtered by the model provider's safety system." });
             return new Response(JSON.stringify({ error: "Image was filtered by the model provider's safety system.", filtered: true }), {
               status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
             });
           }
         } catch { /* not JSON, fall through */ }
+        await updateGenerationRow(generationId, { status: "failed", error: `Runware API error: ${response.status}` });
         return new Response(JSON.stringify({ error: `Runware API error: ${response.status}`, details: errText }), {
           status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
@@ -607,9 +687,33 @@ serve(async (req) => {
       } else {
         const errMsg = resData?.error || "No image in Runware response";
         console.error("Runware no image:", JSON.stringify(resData).substring(0, 500));
+        await updateGenerationRow(generationId, { status: "failed", error: errMsg });
         return new Response(JSON.stringify({ error: errMsg }), {
           status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
+      }
+    }
+
+    if (generationId && (imageBase64 || imageUrl)) {
+      const admin = getAdminClient();
+      if (admin) {
+        try {
+          const storedUrl = await uploadGeneratedImage(admin, imageBase64 || imageUrl!, generationId);
+          if (storedUrl) {
+            imageUrl = storedUrl;
+            imageBase64 = undefined;
+            await updateGenerationRow(generationId, {
+              image_url: storedUrl,
+              status: "complete",
+              error: null,
+              project_id: projectId,
+              create_project_id: projectId,
+            });
+          }
+        } catch (e) {
+          console.error("persist generated image failed", e instanceof Error ? e.message : String(e));
+          await updateGenerationRow(generationId, { status: "failed", error: e instanceof Error ? e.message : "Image storage failed" });
+        }
       }
     }
 
@@ -618,6 +722,7 @@ serve(async (req) => {
     });
   } catch (e) {
     console.error("generate-image error:", e);
+    await updateGenerationRow(requestGenerationId, { status: "failed", error: e instanceof Error ? e.message : "Unknown error" });
     return new Response(JSON.stringify({ error: e instanceof Error ? e.message : "Unknown error" }), {
       status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
     });

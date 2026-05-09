@@ -77,6 +77,8 @@ async function callGenerateAPI(params: {
   model: string;
   quality: string;
   aspectRatio: string;
+  generationId?: string;
+  projectId?: string | null;
 }): Promise<{ imageUrl?: string; imageBase64?: string; error?: string; nsfw?: boolean }> {
   const { data, error } = await supabase.functions.invoke('generate-image', {
     body: {
@@ -85,6 +87,8 @@ async function callGenerateAPI(params: {
       model: params.model,
       quality: params.quality,
       aspectRatio: params.aspectRatio,
+      generationId: params.generationId,
+      projectId: params.projectId,
     },
   });
 
@@ -115,6 +119,10 @@ async function callGenerateAPI(params: {
 // Upload image to storage and return public URL
 async function uploadToStorage(imageData: string, id: string): Promise<string | null> {
   try {
+    if (imageData.startsWith('http') && imageData.includes(`/storage/v1/object/public/generated-images/${id}.`)) {
+      return imageData;
+    }
+
     let blob: Blob;
     let ext = 'png';
 
@@ -292,13 +300,12 @@ export const useGeneratorStore = create<GeneratorState>()((set, get) => ({
 
   loadHistory: async (projectId?: string | null) => {
     const key = projectId ?? '__all__';
-    if (get().loadedProjects.has(key)) return;
     try {
       let q = supabase
         .from('generations')
         .select('id,prompt,model,quality,aspect_ratio,status,image_url,created_at,error,project_id,create_project_id,liked')
         .order('created_at', { ascending: false })
-        .limit(200);
+        .limit(500);
       if (projectId) q = q.or(`create_project_id.eq.${projectId},project_id.eq.${projectId}`);
       const { data, error } = await (q as any);
       if (error) {
@@ -320,11 +327,17 @@ export const useGeneratorStore = create<GeneratorState>()((set, get) => ({
         liked: !!row.liked,
       }));
       const current = get().images;
-      const currentIds = new Set(current.map((i) => i.id));
-      const newFromDb = loaded.filter((i) => !currentIds.has(i.id));
+      const byId = new Map<string, GeneratedImage>();
+      [...current, ...loaded].forEach((img) => {
+        const existing = byId.get(img.id);
+        byId.set(img.id, existing ? { ...existing, ...img, referenceImages: existing.referenceImages } : img);
+      });
       const nextLoaded = new Set(get().loadedProjects);
       nextLoaded.add(key);
-      set({ images: [...current, ...newFromDb], loadedProjects: nextLoaded });
+      set({
+        images: Array.from(byId.values()).sort((a, b) => b.createdAt - a.createdAt),
+        loadedProjects: nextLoaded,
+      });
     } catch (e) {
       console.error('Load history error:', e);
     }
@@ -384,13 +397,13 @@ export const useGeneratorStore = create<GeneratorState>()((set, get) => ({
       project_id: projectId,
       create_project_id: projectId,
     }));
-    supabase.from('generations').upsert(placeholderRows as any, { onConflict: 'id' }).then(({ error }) => {
+    await supabase.from('generations').upsert(placeholderRows as any, { onConflict: 'id' }).then(({ error }) => {
       if (error) console.error('Placeholder insert error:', error);
     });
 
     newImages.forEach(async (img) => {
       try {
-        const result = await callGenerateAPI({ prompt, referenceImages, model, quality, aspectRatio });
+        const result = await callGenerateAPI({ prompt, referenceImages, model, quality, aspectRatio, generationId: img.id, projectId });
 
         if (result.error) {
           const status = result.nsfw ? 'nsfw' as const : 'failed' as const;
@@ -436,12 +449,16 @@ export const useGeneratorStore = create<GeneratorState>()((set, get) => ({
         }
       } catch (e) {
         console.error('Generation error:', e);
+        const message = e instanceof Error ? e.message : 'Unknown error';
         set({
           images: get().images.map((i) =>
             i.id === img.id
-              ? { ...i, status: 'failed' as const, error: e instanceof Error ? e.message : 'Unknown error' }
+              ? { ...i, status: 'failed' as const, error: message }
               : i
           ),
+        });
+        supabase.from('generations').update({ status: 'failed', error: message } as any).eq('id', img.id).then(({ error }) => {
+          if (error) console.error('Status update error:', error);
         });
       }
     });
@@ -463,6 +480,8 @@ export const useGeneratorStore = create<GeneratorState>()((set, get) => ({
       model: img.model,
       quality: img.quality,
       aspectRatio: img.aspectRatio,
+      generationId: id,
+      projectId: img.projectId ?? null,
     }).then(async (result) => {
       if (result.error) {
         set({
@@ -514,7 +533,7 @@ export const useGeneratorStore = create<GeneratorState>()((set, get) => ({
     });
     const { error } = await supabase
       .from('generations')
-      .update({ project_id: projectId } as any)
+      .update({ project_id: projectId, create_project_id: projectId } as any)
       .eq('id', id);
     if (error) console.error('Move image error:', error);
   },
