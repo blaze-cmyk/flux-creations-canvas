@@ -259,6 +259,7 @@ serve(async (req) => {
     let activeModel = model;
     let modelConfig = MODEL_MAP[activeModel];
     if (!modelConfig) {
+      await updateGenerationRow(generationId, { status: "failed", error: `Unknown model: ${activeModel}` });
       return new Response(JSON.stringify({ error: `Unknown model: ${activeModel}` }), {
         status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
@@ -507,6 +508,7 @@ serve(async (req) => {
         modelConfig = MODEL_MAP[activeModel];
         console.log(`[nano cascade] falling back to ${activeModel} (${modelConfig?.type})`);
         if (!modelConfig) {
+          await updateGenerationRow(generationId, { status: "failed", error: `Fallback model not found: ${activeModel}` });
           return new Response(JSON.stringify({ error: `Fallback model not found: ${activeModel}` }), {
             status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
           });
@@ -523,6 +525,7 @@ serve(async (req) => {
     if (modelConfig.type === "fal") {
       const FAL_KEY = Deno.env.get("FAL_KEY");
       if (!FAL_KEY) {
+        await updateGenerationRow(generationId, { status: "failed", error: "FAL_KEY not configured" });
         return new Response(JSON.stringify({ error: "FAL_KEY not configured" }), {
           status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
@@ -576,6 +579,7 @@ serve(async (req) => {
       if (!submitResp.ok) {
         const errText = await submitResp.text();
         console.error("Fal error:", submitResp.status, errText);
+        await updateGenerationRow(generationId, { status: "failed", error: `Fal API error: ${submitResp.status}` });
         return new Response(JSON.stringify({ error: `Fal API error: ${submitResp.status}`, details: errText }), {
           status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
@@ -597,6 +601,7 @@ serve(async (req) => {
         // Returning base64 from 4K renders blows past the 6MB edge worker limit.
         imageUrl = outUrl;
       } else {
+        await updateGenerationRow(generationId, { status: "failed", error: "No image in fal.ai response" });
         return new Response(JSON.stringify({ error: "No image in fal.ai response", details: JSON.stringify(resultData).slice(0, 500) }), {
           status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
