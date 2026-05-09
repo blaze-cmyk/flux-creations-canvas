@@ -712,6 +712,7 @@ serve(async (req) => {
           }
         } catch (e) {
           console.error("persist generated image failed", e instanceof Error ? e.message : String(e));
+          await updateGenerationRow(generationId, { status: "failed", error: e instanceof Error ? e.message : "Image storage failed" });
         }
       }
     }
