@@ -709,7 +709,8 @@ Deno.serve(async (req) => {
     const fromVideos = splitRefsByType(videoUrls);
     const fromAudios = splitRefsByType(audioUrls);
     const images = uniqueUrls([...fromImages.imageUrls, ...fromVideos.imageUrls, ...fromAudios.imageUrls], 9);
-    const videos = uniqueUrls([...fromImages.videoUrls, ...fromVideos.videoUrls, ...fromAudios.videoUrls], 3);
+    const rawVideos = uniqueUrls([...fromImages.videoUrls, ...fromVideos.videoUrls, ...fromAudios.videoUrls], 3);
+    const { accepted: videos, skipped: durationSkippedVideos, knownTotal: knownReferenceVideoSeconds } = capReferenceVideosByKnownDuration(rawVideos);
     const audios = uniqueUrls([...fromImages.audioUrls, ...fromVideos.audioUrls, ...fromAudios.audioUrls], 3);
 
     if (!promptText && images.length === 0 && videos.length === 0) {
@@ -717,6 +718,15 @@ Deno.serve(async (req) => {
     }
     if (audios.length && images.length === 0 && videos.length === 0) {
       return json({ error: 'Reference audios require at least one reference image or video.' }, 400);
+    }
+
+    if (durationSkippedVideos.length > 0) {
+      log('WARN', 'skipped reference videos over total duration cap', {
+        providedVideos: rawVideos.length,
+        acceptedVideos: videos.length,
+        skippedVideos: durationSkippedVideos.length,
+        knownReferenceVideoSeconds,
+      });
     }
 
     const hasRefs = images.length > 0 || videos.length > 0 || audios.length > 0;
