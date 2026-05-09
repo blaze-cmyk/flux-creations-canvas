@@ -655,7 +655,7 @@ export const useVideoStore = create<VideoState>()((set, get) => ({
         });
       (data || []).forEach((row: any) => {
         if (row.model === 'seedance-2.0' && row.status === 'processing' && row.task_id) {
-          pollSeedanceVideo(row.id, row.task_id, get, set);
+          pollSeedanceVideo(row.id, row.task_id, get, set, row.provider ?? 'byteplus');
         } else if (row.status === 'processing' && row.provider && row.task_id) {
           const pollBody: Record<string, unknown> = { provider: row.provider, taskId: row.task_id };
           if (row.response_url) pollBody.responseUrl = row.response_url;
