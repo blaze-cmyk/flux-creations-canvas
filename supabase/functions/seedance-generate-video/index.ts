@@ -178,6 +178,18 @@ function isGeneratedAudioModeration(raw: string | undefined): boolean {
   return /output audio.*sensitive|generated audio/i.test(raw ?? '');
 }
 
+function isAtlasReferenceRejection(raw: string | undefined): boolean {
+  return /AtlasCloud rejected a reference file|reference asset was rejected|check the URL, format, and size|unsupported format/i.test(raw ?? '');
+}
+
+function removeUnavailableVideoReferenceLanguage(prompt: string): string {
+  return prompt
+    .replace(/\buse\s+the\s+reference\s+videos?\s+the\s+reference\s+video[^.\n]*(?:\.|,)?/gi, 'Use natural raw expressions and motion from the written directions.')
+    .replace(/\bthe\s+reference\s+videos?\b/gi, 'the written motion direction')
+    .replace(/\bthe\s+reference\s+video\b/gi, 'the written motion direction')
+    .trim();
+}
+
 function isBalanceError(status: number, body: string) {
   if (status === 401 || status === 402) return true;
   return /balance|exhausted|locked|insufficient|top.?up/i.test(body);
@@ -759,6 +771,16 @@ Deno.serve(async (req) => {
       if (!submission.ok && isGeneratedAudioModeration(submission.error)) {
         audioFallbackUsed = true;
         submission = await atlasSubmit({ ...baseSubmit, generateAudio: false });
+      }
+      if (!submission.ok && videoAssets.length > 0 && isAtlasReferenceRejection(submission.error)) {
+        log('WARN', 'atlas video reference rejected; retrying visual-only', { videos: videoAssets.length });
+        audioFallbackUsed = audioFallbackUsed || effectiveGenerateAudio;
+        submission = await atlasSubmit({
+          ...baseSubmit,
+          prompt: `${removeUnavailableVideoReferenceLanguage(baseSubmit.prompt)}\n\nThe uploaded motion reference video could not be used by the provider, so create the same scene from the image references and written action beats only.`,
+          videoUrls: [],
+          generateAudio: false,
+        });
       }
       if (!submission.ok) return { ok: false, error: submission.error };
       return { ok: true, predictionId: submission.predictionId, endpoint: submission.endpoint, provider: 'atlas', audioFallbackUsed };
