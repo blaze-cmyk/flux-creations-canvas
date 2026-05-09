@@ -572,11 +572,6 @@ export const useVideoStore = create<VideoState>()((set, get) => ({
       return;
     }
 
-    const resolvedProvider = normalizeSeedanceProvider(video.provider, video.taskId);
-    if (video.provider !== resolvedProvider) {
-      updateVideoAndSave(id, { provider: resolvedProvider }, get, set);
-    }
-
     callGenerate({
       prompt: video.prompt,
       referenceImages: [...video.referenceImages],
