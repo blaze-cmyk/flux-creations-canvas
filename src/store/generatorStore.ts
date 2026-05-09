@@ -399,6 +399,9 @@ export const useGeneratorStore = create<GeneratorState>()((set, get) => ({
               i.id === img.id ? { ...i, status, error: result.error } : i
             ),
           });
+          supabase.from('generations').update({ status, error: result.error } as any).eq('id', img.id).then(({ error }) => {
+            if (error) console.error('Status update error:', error);
+          });
         } else {
           const rawUrl = result.imageBase64 || result.imageUrl;
           let persistentUrl = rawUrl;
