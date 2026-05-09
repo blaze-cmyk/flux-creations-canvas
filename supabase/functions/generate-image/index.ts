@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -138,6 +139,52 @@ async function fetchImageAsDataUri(src: string): Promise<string | null> {
 
 function toBase64DataUri(bytes: Uint8Array, mimeType: string): string {
   return `data:${mimeType};base64,${bytesToBase64(bytes)}`;
+}
+
+function getAdminClient() {
+  const url = Deno.env.get("SUPABASE_URL");
+  const key = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+  if (!url || !key) return null;
+  return createClient(url, key);
+}
+
+async function uploadGeneratedImage(admin: ReturnType<typeof createClient>, imageData: string, id: string): Promise<string | undefined> {
+  let bytes: Uint8Array;
+  let mimeType = "image/png";
+  let ext = "png";
+
+  if (imageData.startsWith("data:")) {
+    const match = imageData.match(/^data:([^;]+);base64,(.+)$/);
+    if (!match) return undefined;
+    mimeType = match[1] || mimeType;
+    ext = mimeType.includes("jpeg") || mimeType.includes("jpg") ? "jpg" : "png";
+    bytes = Uint8Array.from(atob(match[2]), (c) => c.charCodeAt(0));
+  } else if (imageData.startsWith("http://") || imageData.startsWith("https://")) {
+    const parsed = new URL(imageData);
+    const ssrfErr = await assertUrlIsPublic(parsed);
+    if (ssrfErr) throw new Error(`Blocked provider image fetch: ${ssrfErr}`);
+    const resp = await fetch(imageData);
+    if (!resp.ok) throw new Error(`Provider image fetch failed: ${resp.status}`);
+    mimeType = resp.headers.get("content-type")?.split(";")[0]?.trim() || mimeType;
+    if (!isAllowedImageContentType(mimeType)) throw new Error(`Provider returned invalid image type: ${mimeType}`);
+    ext = mimeType.includes("jpeg") || mimeType.includes("jpg") ? "jpg" : "png";
+    bytes = new Uint8Array(await resp.arrayBuffer());
+  } else {
+    return undefined;
+  }
+
+  const path = `${id}.${ext}`;
+  const { error } = await admin.storage.from("generated-images").upload(path, bytes, { contentType: mimeType, upsert: true });
+  if (error) throw new Error(`Storage upload failed: ${error.message}`);
+  return admin.storage.from("generated-images").getPublicUrl(path).data.publicUrl;
+}
+
+async function updateGenerationRow(id: string | undefined, patch: Record<string, unknown>) {
+  if (!id) return;
+  const admin = getAdminClient();
+  if (!admin) return;
+  const { error } = await admin.from("generations").update(patch).eq("id", id);
+  if (error) console.error("generation row update failed", error.message);
 }
 
 // Map aspect ratio string to width/height for Runware
