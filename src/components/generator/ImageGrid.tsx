@@ -696,6 +696,8 @@ function VideoCard({ video }: { video: GeneratedVideo & { kind: 'video' } }) {
     hint: video.model,
     durationSeconds: parseInt(video.duration || '6', 10) || 6,
   });
+  const [inViewRef, inView] = useInView<HTMLDivElement>('400px');
+
   if (video.status === 'generating') {
     // Provider-supplied progress wins when available, else use the curve.
     const pct = typeof video.progress === 'number' ? Math.max(vidPct, video.progress) : vidPct;
@@ -736,8 +738,6 @@ function VideoCard({ video }: { video: GeneratedVideo & { kind: 'video' } }) {
       </div>
     );
   }
-
-  const [inViewRef, inView] = useInView<HTMLDivElement>('400px');
 
   return (
     <div
