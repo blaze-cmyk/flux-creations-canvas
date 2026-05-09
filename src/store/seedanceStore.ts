@@ -384,7 +384,9 @@ export const useSeedanceStore = create<SeedanceState>((set, get) => ({
       });
     }
 
-    const usedProvider: string = data?.provider ?? 'atlascloud';
+    // Edge fn returns 'atlas' | 'byteplus' | 'apiyi' — match exactly so the
+    // poll handler routes to the correct provider's status endpoint.
+    const usedProvider: string = data?.provider ?? 'atlas';
 
     // Reset UI for next prompt; polling continues in background.
     set({ isSubmitting: false });
