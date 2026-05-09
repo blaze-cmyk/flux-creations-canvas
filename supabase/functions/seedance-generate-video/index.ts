@@ -586,14 +586,14 @@ Deno.serve(async (req) => {
     if (action === 'poll') {
       const predictionId = String(body.predictionId ?? body.taskId ?? '').trim();
       const videoId = String(body.videoId ?? '').trim();
-      const providerRaw = String(body.provider ?? 'byteplus').toLowerCase();
-      // Accept 'atlas' or 'atlascloud' (legacy clients) as the AtlasCloud route.
-      const provider = providerRaw.startsWith('atlas') ? 'atlas' : providerRaw;
+      const provider = normalizeProvider(body.provider) || inferProviderFromTaskId(predictionId);
       if (!predictionId) return json({ error: 'predictionId required' }, 400);
 
       const out = provider === 'atlas'
         ? await atlasPoll(predictionId)
-        : await byteplusPoll(predictionId);
+        : provider === 'apiyi'
+          ? await apiyiPoll(predictionId)
+          : await byteplusPoll(predictionId);
       if (out.status === 'done') {
         if (videoId) await updateRow(admin, videoId, { status: 'complete', stage: 'complete', video_url: out.videoUrl, error: null });
         return json({ status: 'complete', stage: 'complete', videoUrl: out.videoUrl });
