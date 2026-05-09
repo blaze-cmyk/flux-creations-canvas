@@ -328,7 +328,7 @@ export const useGeneratorStore = create<GeneratorState>()((set, get) => ({
       }));
       const current = get().images;
       const byId = new Map<string, GeneratedImage>();
-      [...loaded, ...current].forEach((img) => {
+      [...current, ...loaded].forEach((img) => {
         const existing = byId.get(img.id);
         byId.set(img.id, existing ? { ...existing, ...img, referenceImages: existing.referenceImages } : img);
       });
