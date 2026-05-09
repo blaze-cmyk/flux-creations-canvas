@@ -677,6 +677,108 @@ async function updateRow(admin: any, videoId: string, patch: Record<string, unkn
   await admin.from('video_generations').update(patch).eq('id', videoId);
 }
 
+// Background poller — runs in the edge worker after the HTTP response is sent
+// (via EdgeRuntime.waitUntil) so the DB row is patched the instant AtlasCloud
+// finishes. Realtime then pushes the update to the browser with no client-side
+// polling involved. The client poller is kept as a safety net only.
+async function runBackgroundPoll(admin: any, videoId: string, taskId: string) {
+  const POLL_MS = 3000;
+  const MAX_MIN = 30;
+  const maxAttempts = Math.ceil((MAX_MIN * 60 * 1000) / POLL_MS);
+  let currentTaskId = taskId;
+  let retriedCopyright = false;
+
+  for (let i = 0; i < maxAttempts; i++) {
+    await new Promise((r) => setTimeout(r, POLL_MS));
+    try {
+      const out = await atlasPoll(currentTaskId);
+      if (out.status === 'done') {
+        await updateRow(admin, videoId, {
+          status: 'complete', stage: 'complete', video_url: out.videoUrl, error: null, provider: 'atlas',
+        });
+        log('INFO', 'background poll complete', { videoId });
+        return;
+      }
+      if (out.status === 'failed') {
+        // Mirror the action==='poll' copyright auto-retry inline so we don't
+        // need the client to ping us back.
+        if (!retriedCopyright && isCopyrightRejection(out.error) && ATLAS_KEY) {
+          retriedCopyright = true;
+          try {
+            const { data: row } = await admin
+              .from('video_generations')
+              .select('prompt, reference_images, duration, resolution, aspect_ratio, stage')
+              .eq('id', videoId)
+              .maybeSingle();
+            if (row) {
+              const split = splitRefsByType((row.reference_images as string[]) ?? []);
+              const imageAssets: string[] = [];
+              for (let k = 0; k < split.imageUrls.length; k++) {
+                const r = await createRequiredAtlasAsset(split.imageUrls[k], `bg-retry-image-${k + 1}`, 'Image');
+                if (r.assetUrl) imageAssets.push(r.assetUrl);
+              }
+              const videoAssets: string[] = [];
+              for (let k = 0; k < split.videoUrls.length; k++) {
+                const r = await createRequiredAtlasAsset(split.videoUrls[k], `bg-retry-video-${k + 1}`, 'Video');
+                if (r.assetUrl) videoAssets.push(r.assetUrl);
+              }
+              const atlasRetry = await atlasSubmit({
+                prompt: sanitizeAtlasCopyrightPrompt(String(row.prompt ?? '')),
+                imageUrls: imageAssets,
+                videoUrls: videoAssets,
+                audioUrls: [],
+                duration: Number(row.duration ?? 5),
+                resolution: String(row.resolution ?? '720p'),
+                ratio: String(row.aspect_ratio ?? '16:9'),
+                generateAudio: false,
+                variant: SEEDANCE_REF,
+              });
+              if (atlasRetry.ok) {
+                currentTaskId = atlasRetry.predictionId;
+                await updateRow(admin, videoId, {
+                  task_id: currentTaskId, provider: 'atlas',
+                  stage: 'retry-atlas', status: 'processing', error: null,
+                });
+                log('INFO', 'background poll: copyright retry submitted', { videoId, newTaskId: currentTaskId });
+                continue;
+              }
+            }
+          } catch (e) {
+            log('WARN', 'background copyright retry threw', { error: String(e) });
+          }
+        }
+        await updateRow(admin, videoId, {
+          status: 'failed', stage: 'failed', error: out.error, provider: 'atlas',
+        });
+        log('WARN', 'background poll failed', { videoId, error: out.error });
+        return;
+      }
+      // still processing — loop
+    } catch (e) {
+      log('WARN', 'background poll threw', { error: String(e) });
+    }
+  }
+  await updateRow(admin, videoId, {
+    status: 'failed', stage: 'failed', error: 'Generation timed out after 30 min', provider: 'atlas',
+  });
+}
+
+// EdgeRuntime is provided by Supabase Edge Functions runtime.
+declare const EdgeRuntime: { waitUntil(p: Promise<unknown>): void } | undefined;
+function kickBackgroundPoll(admin: any, videoId: string, taskId: string) {
+  const promise = runBackgroundPoll(admin, videoId, taskId);
+  try {
+    if (typeof EdgeRuntime !== 'undefined' && EdgeRuntime?.waitUntil) {
+      EdgeRuntime.waitUntil(promise);
+    } else {
+      // Fallback: just let it run (will be killed when worker idles).
+      promise.catch((e) => log('WARN', 'background poll rejected', { error: String(e) }));
+    }
+  } catch (e) {
+    log('WARN', 'kickBackgroundPoll threw', { error: String(e) });
+  }
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response(null, { headers: corsHeaders });
   if (!ATLAS_KEY) return json({ error: 'AtlasCloud is not configured for Seedance.' }, 500);
@@ -739,6 +841,7 @@ Deno.serve(async (req) => {
                   task_id: atlasRetry.predictionId, provider: 'atlas',
                   stage: 'retry-atlas', status: 'processing', error: null,
                 });
+                kickBackgroundPoll(admin, videoId, atlasRetry.predictionId);
                 return json({
                   status: 'processing', stage: 'retry-atlas',
                   taskId: atlasRetry.predictionId, provider: 'atlas', usedFallback: true,
@@ -981,6 +1084,12 @@ Deno.serve(async (req) => {
         stage: 'processing',
         error: null,
       });
+      // Real-time path: poll AtlasCloud in the background and patch the row
+      // the moment it's done. Realtime then pushes to the UI instantly — no
+      // waiting on the client polling cadence.
+      if (result.provider === 'atlas') {
+        kickBackgroundPoll(admin, videoId, result.predictionId);
+      }
     }
 
     const videoFallbackUsed = Boolean(result.videoFallbackUsed || durationSkippedVideos.length > 0);
